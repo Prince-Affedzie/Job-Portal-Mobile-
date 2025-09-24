@@ -1,0 +1,29 @@
+import API from "./apiClient";
+
+// Auth
+export const signUp = (data) => API.post("/api/user/signup", data);
+export const loginUser = (data) => API.post("/api/user/login", data);
+export const logoutUser = () => API.post("/api/user/logout");
+
+export const requestPasswordReset = (email) =>
+  API.post("/api/user/request-password-reset", { email });
+
+export const resetPassword = (password) =>
+  API.post("/api/user/reset-password", { password });
+
+export const fetchUser = () => API.get("/api/user/view_profile");
+
+export const completeProfile = (data) =>
+  API.put("/api/user/edit_profile", data, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+export const uploadImage = (file) => {
+  const form = new FormData();
+  form.append("profileImage", file);
+  return API.put("/api/user/image_profile", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const addPortfolio = (data) => API.post("/api/user/upload_portfolio", data);
