@@ -1,14 +1,13 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useCallback } from "react";
 import {
   View,
   Text,
   FlatList,
-  SafeAreaView,
-  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  ScrollView,
   Animated,
   Dimensions
 } from "react-native";
@@ -19,17 +18,38 @@ import { navigate } from '../../services/navigationService';
 import { TaskerContext } from "../../context/TaskerContext"
 import { AuthContext } from "../../context/AuthContext";
 import HeroSection from "../../component/tasker/HeroSection";
+import CategoryCards from "../../component/tasker/CategoryCards";
+import Header from "../../component/tasker/Header";
 import moment from "moment";
+
 const { width } = Dimensions.get('window');
+
+// Map our category IDs to backend category names
+const CATEGORY_MAPPING = {
+  'home_services': 'Home Services',
+  'delivery_errands': 'Delivery & Errands', 
+  'digital_services': 'Digital Services',
+  'writing_assistance': 'Writing & Assistance',
+  'learning_tutoring': 'Learning & Tutoring',
+  'creative_tasks': 'Creative Tasks',
+  'event_support': 'Event Support',
+  'others': 'Others'
+};
 
 const AvailableTasksScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(1));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
+  
   const { availableTasks, loadAvailableTasks, loading } = useContext(TaskerContext);
-  const {user} = useContext(AuthContext)
-  const timeAgo = (deadline) => {
-       return deadline ? moment(deadline).fromNow() : "N/A";
-    };
+  const { user } = useContext(AuthContext);
+
+  const timeAgo = useCallback((deadline) => {
+    return deadline ? moment(deadline).fromNow() : "N/A";
+  }, []);
 
   useEffect(() => {
     loadAvailableTasks();
@@ -40,12 +60,62 @@ const AvailableTasksScreen = () => {
     }).start();
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadAvailableTasks().finally(() => setRefreshing(false));
-  };
+  // Function to load tasks with proper parameters
+  const loadTasks = useCallback((search = '', Category = null) => {
+    // Convert category ID to backend category name
+    const category= Category ? CATEGORY_MAPPING[Category.id] : null;
+    return loadAvailableTasks({search, category});
+  }, [loadAvailableTasks]);
 
-  const renderItem = ({ item, index }) => (
+  // Handle search functionality
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+    setIsSearching(true);
+    
+    const searchTimer = setTimeout(() => {
+      setListLoading(true);
+      loadTasks(query.trim(), selectedCategory)
+        .finally(() => {
+          setListLoading(false);
+          setIsSearching(false);
+        });
+    }, 500);
+
+    return () => clearTimeout(searchTimer);
+  }, [loadTasks, selectedCategory]);
+
+  // Handle category press - CORRECTED
+  const handleCategoryPress = useCallback((category) => {
+    setSelectedCategory(category);
+    setListLoading(true);
+    
+    loadTasks(searchQuery, category)
+      .finally(() => setListLoading(false));
+  }, [searchQuery, loadTasks]);
+
+  // Clear both search and category
+  const handleClearAll = useCallback(() => {
+    setSearchQuery('');
+    setSelectedCategory(null);
+    setListLoading(true);
+    loadAvailableTasks().finally(() => setListLoading(false));
+  }, [loadAvailableTasks]);
+
+  const handleFilterPress = useCallback(() => {
+    console.log("Filter pressed");
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setSearchQuery('');
+    setSelectedCategory(null);
+    loadAvailableTasks().finally(() => setRefreshing(false));
+  }, [loadAvailableTasks]);
+
+  // Show active filters in search status
+  const hasActiveFilters = searchQuery || selectedCategory;
+
+  const renderItem = useCallback(({ item, index }) => (
     <Animated.View
       style={{
         opacity: fadeAnim,
@@ -120,9 +190,10 @@ const AvailableTasksScreen = () => {
         </View>
       </TouchableOpacity>
     </Animated.View>
-  );
+  ), [fadeAnim, timeAgo]);
 
-  if (loading && !refreshing) {
+  // Show full screen loading only on initial load
+  if (loading && !refreshing && availableTasks.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6366F1" />
@@ -134,31 +205,99 @@ const AvailableTasksScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <StatusBar/>
-      <HeroSection  userName={user.name} />
-      <FlatList
-        data={availableTasks}
-        keyExtractor={(item) => item._id}
-        renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#6366F1']}
-            tintColor="#6366F1"
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>No tasks available</Text>
-            <Text style={styles.emptyText}>
-              Check back later for new opportunities
+      <Header title="Available Tasks" />
+      
+      <HeroSection 
+        userName={user.name} 
+        onSearchPress={handleSearch}
+        onFilterPress={handleFilterPress}
+        showStats={false}
+      />
+      
+      {/* Enhanced Filter Status Indicator */}
+      {hasActiveFilters && (
+        <View style={styles.filterStatus}>
+          <View style={styles.filterStatusContent}>
+            <Ionicons name="filter" size={16} color="#6366F1" />
+            <Text style={styles.filterStatusText}>
+              Active filters: 
+              {searchQuery && ` Search: "${searchQuery}"`}
+              {searchQuery && selectedCategory && ' • '}
+              {selectedCategory && ` Category: ${selectedCategory.name}`}
             </Text>
           </View>
-        }
-        contentContainerStyle={availableTasks.length === 0 ? styles.emptyContainer : styles.listContainer}
-        showsVerticalScrollIndicator={false}
+          <TouchableOpacity 
+            onPress={handleClearAll}
+            style={styles.clearAllButton}
+          >
+            <Ionicons name="close-circle" size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <CategoryCards 
+        selectedCategory={selectedCategory?.id}
+        onCategoryPress={handleCategoryPress}
       />
+
+      <View style={styles.listContainer}>
+        {listLoading ? (
+          <View style={styles.listLoadingContainer}>
+            <ActivityIndicator size="small" color="#6366F1" />
+            <Text style={styles.listLoadingText}>
+              {searchQuery || selectedCategory ? 'Filtering tasks...' : 'Updating tasks...'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={availableTasks} // Use availableTasks directly since backend filters
+            keyExtractor={(item) => item._id}
+            renderItem={renderItem}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={['#6366F1']}
+                tintColor="#6366F1"
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                {hasActiveFilters ? (
+                  <>
+                    <Ionicons name="search-outline" size={64} color="#CBD5E1" />
+                    <Text style={styles.emptyTitle}>No tasks found</Text>
+                    <Text style={styles.emptyText}>
+                      {searchQuery && selectedCategory 
+                        ? `No results for "${searchQuery}" in ${selectedCategory.name}`
+                        : searchQuery 
+                        ? `No results for "${searchQuery}"`
+                        : `No tasks in ${selectedCategory?.name}`
+                      }
+                    </Text>
+                    <TouchableOpacity 
+                      style={styles.clearSearchButtonLarge}
+                      onPress={handleClearAll}
+                    >
+                      <Text style={styles.clearSearchText}>Clear filters</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
+                    <Text style={styles.emptyTitle}>No tasks available</Text>
+                    <Text style={styles.emptyText}>
+                      Check back later for new opportunities
+                    </Text>
+                  </>
+                )}
+              </View>
+            }
+            contentContainerStyle={availableTasks.length === 0 ? styles.emptyContainer : styles.listContentContainer}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -169,6 +308,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAFC",
   },
   listContainer: {
+    flex: 1,
+  },
+  listContentContainer: {
     padding: 16,
     paddingTop: 8,
   },
@@ -177,6 +319,65 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  // Enhanced Filter Status
+  filterStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom:8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  filterStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  filterStatusText: {
+    fontSize: 16,
+    color: '#64748B',
+    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
+  },
+  clearAllButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  // List-specific loading (not full screen)
+  listLoadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  listLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#64748B",
+  },
+  clearSearchButtonLarge: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  clearSearchText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  // Card Styles
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,

@@ -26,17 +26,12 @@ import { getMiniTaskInfo, applyToMiniTask, bidOnMiniTask } from '../../api/miniT
 import moment from 'moment'
 import { BidModal } from '../../component/tasker/BidModal';
 import { ScamAlertModal } from '../../component/tasker/ScamAlertModal';
+const HANDYMAN_AVATAR = require('../../assets/HandyManAvatar.png');
+import Header from "../../component/tasker/Header";
 
 const { width } = Dimensions.get('window');
 
-// Default placeholder images for tasks
-const PLACEHOLDER_IMAGES = [
-  'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400',
-  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-  
-  
-];
+
 
 const TaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
@@ -138,12 +133,6 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     }
   };
 
-  const getTaskImages = () => {
-    if (!task || !task.images || task.images.length === 0) {
-      return PLACEHOLDER_IMAGES;
-    }
-    return task.images;
-  };
 
   const getRequirements = () => {
     if (!task || !task.requirements || task.requirements.length === 0) {
@@ -212,7 +201,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     );
   }
 
-  const taskImages = getTaskImages();
+ 
   const requirements = getRequirements();
   const skills = getSkills();
 
@@ -223,42 +212,16 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+         <Header title="Task Details" showBackButton={true} />
         {/* Header Images */}
         <View style={styles.imageContainer}>
-          <ScrollView 
-            horizontal 
-            pagingEnabled 
-            showsHorizontalScrollIndicator={false}
-            onScroll={(e) => {
-              const contentOffset = e.nativeEvent.contentOffset.x;
-              const index = Math.round(contentOffset / width);
-              setSelectedImage(index);
-            }}
-          >
-            {taskImages.map((image, index) => (
-              <Image
-                key={index}
-                source={{ uri: image }}
-                style={styles.taskImage}
-                resizeMode="cover"
-                onError={() => {
-                  taskImages[index] = PLACEHOLDER_IMAGES[0];
-                }}
-              />
-            ))}
-          </ScrollView>
-          <View style={styles.imagePagination}>
-            {taskImages.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.paginationDot,
-                  index === selectedImage && styles.paginationDotActive
-                ]}
-              />
-            ))}
-          </View>
-
+      <View style={styles.avatarWrapper}>
+        <Image
+          source={HANDYMAN_AVATAR}
+          style={styles.taskAvatar}
+          resizeMode="contain"
+        />
+      </View>
           <TouchableOpacity
             style={[styles.backButton, { top: insets.top + 16 }]}
             onPress={() => navigation.goBack()}
@@ -310,14 +273,14 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
           {/* Stats */}
           <View style={styles.stats}>
-            <View style={styles.stat}>
+           {/* <View style={styles.stat}>
               <Ionicons name="eye" size={16} color="#64748B" />
               <Text style={styles.statText}>{task.views || 0} views</Text>
             </View>
             <View style={styles.stat}>
               <Ionicons name="people" size={16} color="#64748B" />
               <Text style={styles.statText}>{task.applications || 0} applications</Text>
-            </View>
+            </View>*/}
             <View style={styles.stat}>
               <Ionicons name="time" size={16} color="#64748B" />
               <Text style={styles.statText}>{calculateTimeLeft()}</Text>
@@ -359,9 +322,9 @@ const TaskDetailsScreen = ({ route, navigation }) => {
             <View style={styles.locationCard}>
               <Ionicons name="location" size={20} color="#6366F1" />
               <View style={styles.locationInfo}>
-                <Text style={styles.locationText}>{task.location || 'Flexible Location'}</Text>
+                <Text style={styles.locationText}>{task.locationType || 'Flexible Location'}</Text>
                 <Text style={styles.addressText}>
-                  {task.address ? `${task.address.street}, ${task.address.city}` : 'Location details available after application'}
+                  {task.address ? `${task.address.region}, ${task.address.city}, ${task.address.suburb}` : 'Location details available after application'}
                 </Text>
               </View>
             </View>
@@ -459,9 +422,9 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   );
 };
 
-// Add these new styles to your existing styles
+
 export const styles = StyleSheet.create({
-  // ... (keep all your existing styles) ...
+
  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -505,34 +468,29 @@ export const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  imageContainer: {
-    height: 300,
-    position: 'relative',
-  },
-  taskImage: {
-    width: width,
-    height: 300,
-  },
-  imagePagination: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
-    marginHorizontal: 4,
-  },
-  paginationDotActive: {
-    backgroundColor: '#FFFFFF',
-    width: 12,
-  },
+ imageContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#1A1F3B', 
+  borderRadius: 16,
+  padding: 5,
+  marginHorizontal:2,
+  marginVertical: 2,
+  marginTop:10,
+},
+avatarWrapper: {
+  width: 250, 
+  height: 250,
+  borderRadius: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+ 
+},
+taskAvatar: {
+  width: 200,
+  height: 200,
+  borderRadius: 10,
+},
   backButton: {
     position: 'absolute',
     left: 16,

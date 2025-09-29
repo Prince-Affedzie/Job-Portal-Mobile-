@@ -20,7 +20,7 @@ export const assignApplicantToTask = (taskId, applicantId) =>
   API.put(`/api/h1/v2/assign/mini_task/${taskId}/${applicantId}`);
 
 export const getYourAppliedMiniTasks = () =>
-  API.get("/api/h1/v2/get_your_apllied/mini_tasks");
+  API.get("/api/h1/v2/get_your_applied/mini_tasks");
 
 export const acceptMiniTaskAssignment = (id) =>
   API.put(`/api/h1/v2/accept_task_assignment/${id}`);
@@ -59,3 +59,11 @@ export const getPreviewUrl = (fileKey, submission) =>
 
 export const raiseDispute = (reportForm) =>
   API.post("/api/create_dispute", reportForm);
+
+
+export const applyToMiniTask =(Id)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`)
+export const bidOnMiniTask =(Id,bidData)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`,bidData)
+
+//MarkTaskAsDone 
+export const markTaskAsDoneTasker = (Id)=>API.put(`/api/h1/v2/mark_task_as_done/tasker/${Id}`)
+export const markTaskAsDoneClient = (Id)=>API.put(`/api/h1/v2/mark_task_as_done/client/${Id}`)

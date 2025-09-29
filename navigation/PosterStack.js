@@ -10,7 +10,7 @@ const Tab = createBottomTabNavigator();
 
 export default function PosterStack() {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false }}>
+    <Tab.Navigator screenOptions={{ headerShown: true }}>
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}

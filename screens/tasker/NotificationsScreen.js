@@ -11,7 +11,8 @@ import {
   Animated,
   Dimensions,
   Switch,
-  Alert // Added Alert import
+  Alert,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,13 +20,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import NotificationDetailModal from '../../component/common/NotificationDetailModal';
+import Header from "../../component/tasker/Header";
 
 const { width } = Dimensions.get('window');
 
 const NotificationsScreen = ({ navigation }) => {
-  const { notifications, loading, loadNotifications, markNotificationAsRead } = useContext(NotificationContext);
+  const { 
+    notifications, 
+    loading, 
+    loadNotifications, 
+    markAllNotificationsAsRead,
+    deleteNotification,
+    deleteBulkNotifications
+  } = useContext(NotificationContext);
+  
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'important'
+  const [filter, setFilter] = useState('all');
   const [notificationSettings, setNotificationSettings] = useState({
     taskAlerts: true,
     messages: true,
@@ -39,9 +49,12 @@ const NotificationsScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedNotifications, setSelectedNotifications] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
 
   useEffect(() => {
-    // Start the fade animation
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
@@ -56,18 +69,62 @@ const NotificationsScreen = ({ navigation }) => {
     loadNotifications().finally(() => setRefreshing(false));
   };
 
-  const clearAll = () => {
-    Alert.alert(
-      'Clear All',
-      'Are you sure you want to clear all notifications?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear All', onPress: () => {
-          // Implement clear all logic here
-          Alert.alert('Notifications cleared');
-        }}
-      ]
-    );
+  // Mark all as read functionality
+  const handleMarkAllAsRead = async () => {
+    const unreadNotifications = safeNotifications.filter(n => !n.read);
+    if (unreadNotifications.length === 0) {
+      Alert.alert('Info', 'All notifications are already read');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await markAllNotificationsAsRead();
+      Alert.alert('Success', 'All notifications marked as read');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to mark notifications as read');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Delete selected notifications
+  const handleDeleteSelected = async () => {
+    if (selectedNotifications.length === 0) {
+      Alert.alert('Info', 'No notifications selected');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await deleteBulkNotifications(selectedNotifications);
+      setSelectedNotifications([]);
+      setSelectMode(false);
+      setShowDeleteConfirm(false);
+      Alert.alert('Success', `${selectedNotifications.length} notification(s) deleted successfully`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to delete notifications');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Toggle selection of a notification
+  const toggleSelection = (id) => {
+    if (selectedNotifications.includes(id)) {
+      setSelectedNotifications(selectedNotifications.filter(item => item !== id));
+    } else {
+      setSelectedNotifications([...selectedNotifications, id]);
+    }
+  };
+
+  // Select all notifications
+  const selectAll = () => {
+    if (selectedNotifications.length === filteredNotifications.length) {
+      setSelectedNotifications([]);
+    } else {
+      setSelectedNotifications(filteredNotifications.map(note => note._id));
+    }
   };
 
   const getNotificationIcon = (type) => {
@@ -88,20 +145,19 @@ const NotificationsScreen = ({ navigation }) => {
         return { icon: 'notifications', color: '#94A3B8' };
     }
   };
-const handleNotificationPress = (notification) => {
-    if (markNotificationAsRead) {
-      markNotificationAsRead(notification.id);
+
+  const handleNotificationPress = (notification) => {
+    if (selectMode) {
+      toggleSelection(notification._id);
+      return;
     }
-    
-    // Show the modal with the notification details
     setSelectedNotification(notification);
     setModalVisible(true);
   };
 
-    const handleNotificationAction = (notification) => {
+  const handleNotificationAction = (notification) => {
     setModalVisible(false);
     
-    // Handle different notification actions
     switch (notification.action) {
       case 'view_task':
         navigation.navigate('TaskDetails', { taskId: notification.taskId });
@@ -120,7 +176,6 @@ const handleNotificationPress = (notification) => {
     }
   };
 
-
   // Add a fallback in case notifications is undefined
   const safeNotifications = notifications || [];
   
@@ -131,16 +186,36 @@ const handleNotificationPress = (notification) => {
   });
 
   const unreadCount = safeNotifications.filter(n => !n.read).length;
-
   const NotificationItem = ({ notification }) => {
     const { icon, color } = getNotificationIcon(notification.type);
+    const isSelected = selectedNotifications.includes(notification._id);
     
     return (
       <TouchableOpacity
-        style={[styles.notificationItem, !notification.read && styles.unreadNotification]}
+        style={[
+          styles.notificationItem, 
+          !notification.read && styles.unreadNotification,
+          isSelected && styles.selectedNotification,
+          selectMode && styles.selectModeItem
+        ]}
         onPress={() => handleNotificationPress(notification)}
+        onLongPress={() => {
+          setSelectMode(true);
+          toggleSelection(notification._id);
+        }}
         activeOpacity={0.7}
+        delayLongPress={500}
       >
+        {selectMode && (
+          <View style={styles.selectionCheckbox}>
+            <Ionicons 
+              name={isSelected ? "checkbox" : "square-outline"} 
+              size={24} 
+              color={isSelected ? '#6366F1' : '#94A3B8'} 
+            />
+          </View>
+        )}
+        
         <View style={styles.notificationContent}>
           <View style={[styles.notificationIcon, { backgroundColor: color + '20' }]}>
             <Ionicons name={icon} size={20} color={color} />
@@ -156,10 +231,10 @@ const handleNotificationPress = (notification) => {
               {new Date(notification.createdAt).toLocaleDateString()}
             </Text>
           </View>
-          {!notification.read && (
+          {!notification.read && !selectMode && (
             <View style={styles.unreadBadge} />
           )}
-          {notification.important && (
+          {notification.important && !selectMode && (
             <Ionicons name="alert-circle" size={16} color="#EF4444" style={styles.importantIcon} />
           )}
         </View>
@@ -182,6 +257,70 @@ const handleNotificationPress = (notification) => {
     </View>
   );
 
+  // Render Header Actions Component
+  const renderHeaderActions = () => {
+    if (safeNotifications.length === 0) return null;
+
+    return (
+      <View style={styles.headerActions}>
+        {selectMode ? (
+          <>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={selectAll}
+            >
+              <Ionicons name="checkbox-outline" size={20} color="#6366F1" />
+              <Text style={styles.actionText}>
+                {selectedNotifications.length === filteredNotifications.length ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+            
+            {selectedNotifications.length > 0 && (
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={() => setShowDeleteConfirm(true)}
+              >
+                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                <Text style={[styles.actionText, styles.deleteText]}>
+                  Delete ({selectedNotifications.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => {
+                setSelectMode(false);
+                setSelectedNotifications([]);
+              }}
+            >
+              <Ionicons name="close" size={20} color="#6B7280" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={handleMarkAllAsRead}
+              disabled={isProcessing || unreadCount === 0}
+            >
+             
+              <Text style={styles.actionText}>Mark All Read</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => setSelectMode(true)}
+            >
+              <Ionicons name="checkbox-outline" size={20} color="#6366F1" />
+              <Text style={styles.actionText}>Select</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -193,9 +332,18 @@ const handleNotificationPress = (notification) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Fixed Header with Actions */}
+      <View style={styles.headerContainer}>
+        <Header 
+          title="Notifications" 
+           rightComponent={renderHeaderActions()}
+           showProfile={false}
+        />
+      </View>
+
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 0 }]} // Remove insets.top since Header handles it
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -206,22 +354,27 @@ const handleNotificationPress = (notification) => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Notifications</Text>
-            {/*<Text style={styles.headerSubtitle}>
-              {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All caught up!'}
-            </Text>*/}
-          </View>
-         {/* <View style={styles.headerActions}>
-            {safeNotifications.length > 0 && (
-              <TouchableOpacity style={styles.actionButton} onPress={clearAll}>
-                <Ionicons name="trash" size={20} color="#EF4444" />
-                <Text style={[styles.actionText, styles.clearText]}>Clear all</Text>
-              </TouchableOpacity>
-            )}
-          </View> */}
+        {/* Stats Overview */}
+        <View style={styles.statsCard}>
+          <LinearGradient
+            colors={['#6366F1', '#4F46E5']}
+            style={styles.statsGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={styles.statsContent}>
+              <View style={styles.statsHeader}>
+                <Ionicons name="notifications" size={24} color="#FFFFFF" />
+                <Text style={styles.statsTitle}>Notifications</Text>
+              </View>
+              <Text style={styles.statsSubtitle}>
+                {unreadCount > 0 
+                  ? `You have ${unreadCount} unread notifications`
+                  : 'You have no unread notifications'
+                }
+              </Text>
+            </View>
+          </LinearGradient>
         </View>
 
         {/* Filter Tabs */}
@@ -264,11 +417,29 @@ const handleNotificationPress = (notification) => {
           </TouchableOpacity>
         </ScrollView>
 
+        {/* Selection Info Bar */}
+        {selectMode && (
+          <View style={styles.selectionInfo}>
+            <Text style={styles.selectionText}>
+              {selectedNotifications.length} selected
+            </Text>
+            <TouchableOpacity 
+              style={styles.cancelSelectionButton}
+              onPress={() => {
+                setSelectMode(false);
+                setSelectedNotifications([]);
+              }}
+            >
+              <Ionicons name="close" size={16} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Notifications List */}
         <View style={styles.notificationsSection}>
           {filteredNotifications.length > 0 ? (
             filteredNotifications.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
+              <NotificationItem key={notification._id} notification={notification} />
             ))
           ) : (
             <View style={styles.emptyState}>
@@ -329,6 +500,58 @@ const handleNotificationPress = (notification) => {
           </View>
         </View>
       </Animated.ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteConfirm}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteConfirm(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="warning" size={24} color="#EF4444" />
+              <Text style={styles.modalTitle}>Confirm Deletion</Text>
+              <TouchableOpacity 
+                style={styles.modalCloseButton}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalMessage}>
+              Are you sure you want to delete {selectedNotifications.length} selected notification(s)? 
+              This action cannot be undone.
+            </Text>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowDeleteConfirm(false)}
+                disabled={isProcessing}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.deleteButtonModal]}
+                onPress={handleDeleteSelected}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.deleteButtonText}>
+                    Yes, Delete
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <NotificationDetailModal
         visible={modalVisible}
         notification={selectedNotification}
@@ -339,11 +562,13 @@ const handleNotificationPress = (notification) => {
   );
 };
 
-// Your styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFF',
+  },
+  headerContainer: {
+    // Ensure header has proper styling
   },
   loadingContainer: {
     flex: 1,
@@ -359,44 +584,74 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
- header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    marginBottom:20,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#64748B',
-  },
   headerActions: {
+    
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    padding: 8,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginHorizontal: 2,
   },
   actionText: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
     color: '#6366F1',
-    fontWeight: '500',
   },
   clearText: {
     color: '#EF4444',
+  },
+  deleteText: {
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  deleteButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  statsCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  statsGradient: {
+    padding: 20,
+    borderRadius: 16,
+  },
+  statsContent: {
+    gap: 8,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statsTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statsSubtitle: {
+    fontSize: 14,
+    color: '#E0E7FF',
   },
   filterContainer: {
     marginHorizontal: 16,
@@ -447,6 +702,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  selectionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  selectionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0369A1',
+  },
+  cancelSelectionButton: {
+    padding: 4,
+  },
   notificationsSection: {
     marginBottom: 24,
   },
@@ -455,14 +731,28 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   unreadNotification: {
     backgroundColor: '#F0F9FF',
+  },
+  selectedNotification: {
+    backgroundColor: '#EEF2FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366F1',
+  },
+  selectModeItem: {
+    paddingLeft: 8,
+  },
+  selectionCheckbox: {
+    marginRight: 12,
   },
   notificationContent: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
+    flex: 1,
   },
   notificationIcon: {
     width: 40,
@@ -563,6 +853,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
     lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F1F5F9',
+  },
+  cancelButtonText: {
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  deleteButtonModal: {
+    backgroundColor: '#EF4444',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
 });
 

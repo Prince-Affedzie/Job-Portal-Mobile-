@@ -73,14 +73,13 @@ export const BidModal = ({
               <View style={styles.formGroup}>
                 <View style={styles.formLabel}>
                   <Ionicons name="calendar-outline" size={16} color="#6366F1" />
-                  <Text style={styles.labelText}>Proposed Timeline (days)</Text>
+                  <Text style={styles.labelText}>Proposed Timeline (time)</Text>
                 </View>
                 <TextInput
                   style={styles.input}
                   value={bidData.timeline}
                   onChangeText={(text) => setBidData({...bidData, timeline: text})}
-                  placeholder="How many days will you need?"
-                  keyboardType="numeric"
+                  placeholder="How many hours or days will you need?"
                   placeholderTextColor="#94A3B8"
                 />
               </View>

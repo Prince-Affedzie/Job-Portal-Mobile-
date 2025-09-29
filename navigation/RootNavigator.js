@@ -1,6 +1,8 @@
 import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
 
 import AuthStack from "./AuthStack";
 import TaskerStack from "./TaskerStack";
@@ -9,8 +11,12 @@ import TaskerProfileScreen from "../screens/tasker/ProfileScreen";
 import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
 import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import TaskDetailsScreen from "../screens/tasker/TaskDetails";
+
+import TaskerOnboardingStack from './TaskerOnboardingStack'
+import ClientOnboarding from '../screens/auth/ClientOnboarding'
 import { AuthContext } from "../context/AuthContext";
 import { navigationRef } from '../services/navigationService';
+
 
 const Stack = createNativeStackNavigator();
 
@@ -21,17 +27,26 @@ export default function RootNavigator() {
     return null; // or a splash screen component
   }
 
-  return (
+ return (
+   <SafeAreaProvider>
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
-          <Stack.Screen name="Auth" component={AuthStack} />
+          //  Auth flow
+          <Stack.Screen name="AuthStack" component={AuthStack} />
         ) : user.role === "job_seeker" ? (
-          <Stack.Screen name="Tasker" component={TaskerStack} />
+          //  Tasker flow
+          <Stack.Screen name="TaskerStack" component={TaskerStack} />
         ) : (
-          <Stack.Screen name="Poster" component={PosterStack} />
+          //  Poster flow
+          <Stack.Screen name="PosterStack" component={PosterStack} />
         )}
+
+        {/* Shared/global routes */}
+        <Stack.Screen name="TaskerOnboarding" component={TaskerOnboardingStack} />
+        <Stack.Screen name="ClientOnboarding" component={ClientOnboarding} />
       </Stack.Navigator>
     </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
