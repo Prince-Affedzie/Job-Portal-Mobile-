@@ -7,6 +7,8 @@ import TaskerDashboard from "../screens/tasker/DashboardScreen";
 import TaskerProfileScreen from "../screens/tasker/ProfileScreen";
 import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
+import DashboardScreen from "../screens/poster/DashboardScreen";
+
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -72,7 +74,7 @@ export default function TaskerStack() {
       
       {/* Global screen available across tabs */}
       <Stack.Screen name="TaskDetails" component={TaskDetailsScreen} />
-       <Stack.Screen name="Available" component={AvailableTasksScreen} />
+       <Stack.Screen name="Available" component={DashboardScreen} />
     </Stack.Navigator>
   );
 }
