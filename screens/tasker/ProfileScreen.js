@@ -12,6 +12,7 @@ import {
   TextInput,
   Alert,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TaskerContext } from '../../context/TaskerContext';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
+import { navigate } from '../../services/navigationService';
+import Header from "../../component/tasker/Header";
 
 const { width } = Dimensions.get('window');
 
@@ -37,15 +40,15 @@ const TaskerProfileScreen = ({ navigation }) => {
     promotional: false,
   });
   const insets = useSafeAreaInsets();
+  const [fadeAnim] = useState(new Animated.Value(0));
   
-
   // Initialize profile data with user data and fallbacks
   const [profileData, setProfileData] = useState({
     name: user?.name || 'Tasker',
     email: user?.email || 'No email provided',
     phone: user?.phone || '+233 XX XXX XXXX',
-    location: user?.location.city || 'Location not set',
-    bio: user?.bio || 'Tell us about yourself and your skills...',
+    location: user?.location?.city || 'Location not set',
+    bio: user?.Bio || 'Tell us about yourself and your skills...',
     skills: user?.skills || ['Add your skills'],
     hourlyRate: user?.hourlyRate || 0,
     availability: user?.availability || 'Available',
@@ -57,10 +60,17 @@ const TaskerProfileScreen = ({ navigation }) => {
     profileImage: user?.profileImage || DEFAULT_PROFILE_IMAGE,
   });
 
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
   const handleSave = async () => {
     setLoading(true);
     try {
-      // Call updateProfile from TaskerContext
       await updateProfile(profileData);
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -90,7 +100,6 @@ const TaskerProfileScreen = ({ navigation }) => {
         ...profileData,
         profileImage: result.assets[0].uri,
       });
-      Alert.alert('Success', 'Profile picture updated!');
     }
   };
 
@@ -160,13 +169,11 @@ const TaskerProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  // Get primary skill for profile title
   const getPrimarySkill = () => {
     if (!profileData.skills || profileData.skills.length === 0) return 'Tasker';
     return profileData.skills[0];
   };
 
-  // Format member since date
   const formatMemberSince = () => {
     try {
       return new Date(profileData.memberSince).toLocaleDateString('en-US', {
@@ -178,77 +185,87 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
+  const getRatingColor = (rating) => {
+    if (rating >= 4.5) return '#10B981';
+    if (rating >= 4.0) return '#F59E0B';
+    if (rating >= 3.0) return '#F59E0B';
+    return '#EF4444';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top }]}
+      <Animated.ScrollView 
+        style={{ opacity: fadeAnim }}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#1E293B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          {editing ? (
-            <TouchableOpacity onPress={handleSave} disabled={loading}>
+        {/* Enhanced Header */}
+        <Header 
+          title="My Profile" 
+          rightComponent={
+            <TouchableOpacity 
+              style={[styles.headerButton, editing && styles.headerButtonActive]}
+              onPress={editing ? handleSave : () => setEditing(true)}
+              disabled={loading}
+            >
               {loading ? (
-                <ActivityIndicator color="#6366F1" />
+                <ActivityIndicator size="small" color="#6366F1" />
               ) : (
-                <Text style={styles.saveButton}>Save</Text>
+                <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
+                  {editing ? 'Save' : 'Edit'}
+                </Text>
               )}
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={() => setEditing(true)}>
-              <Text style={styles.editButton}>Edit</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          }
+        />
 
-        {/* Profile Header */}
+        {/* Enhanced Profile Header */}
         <LinearGradient
-          colors={['#6366F1', '#4F46E5']}
+          colors={['#1A1F3B', '#2D325D']}
           style={styles.profileHeader}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
           <View style={styles.profileImageContainer}>
             <Image
               source={{ uri: profileData.profileImage }}
               style={styles.profileImage}
               defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
-              onError={() => setProfileData({...profileData, profileImage: DEFAULT_PROFILE_IMAGE})}
             />
             {editing && (
               <TouchableOpacity style={styles.editImageButton} onPress={pickImage}>
-                <Ionicons name="camera" size={20} color="#6366F1" />
+                <Ionicons name="camera" size={18} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
           
-          <Text style={styles.profileName}>{profileData.name}</Text>
-          <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
-          
-          {profileData.verified && (
-            <View style={styles.verificationBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-              <Text style={styles.verificationText}>Verified Tasker</Text>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{profileData.name}</Text>
+            <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
+            
+            <View style={styles.ratingVerificationContainer}>
+              {profileData.rating > 0 && (
+                <View style={[styles.ratingContainer, { backgroundColor: getRatingColor(profileData.rating) }]}>
+                  <Ionicons name="star" size={14} color="#FFFFFF" />
+                  <Text style={styles.ratingText}>{parseFloat(profileData.rating).toFixed(1)}</Text>
+                </View>
+              )}
+              
+              {profileData.verified && (
+                <View style={styles.verificationBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                  <Text style={styles.verificationText}>Verified</Text>
+                </View>
+              )}
             </View>
-          )}
-
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color="#F59E0B" />
-            <Text style={styles.ratingText}>{profileData.rating || 'No ratings'}</Text>
-            <Text style={styles.ratingCount}>({profileData.completedTasks} tasks)</Text>
           </View>
         </LinearGradient>
 
-        {/* Stats Overview */}
+        {/* Enhanced Stats Overview */}
         <View style={styles.statsContainer}>
           <StatsCard 
             value={profileData.completedTasks} 
-            label="Tasks Completed" 
+            label="Completed" 
             icon="checkmark-done" 
             color="#10B981" 
           />
@@ -259,16 +276,19 @@ const TaskerProfileScreen = ({ navigation }) => {
             color="#6366F1" 
           />
           <StatsCard 
-            value={`₵${profileData.hourlyRate}/hr`} 
+            value={`₵${profileData.hourlyRate}`} 
             label="Hourly Rate" 
             icon="cash" 
             color="#F59E0B" 
           />
         </View>
 
-        {/* Profile Information */}
+        {/* Enhanced Profile Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="person-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+          </View>
           <View style={styles.sectionContent}>
             <ProfileField
               label="Full Name"
@@ -309,24 +329,24 @@ const TaskerProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Skills */}
+        {/* Enhanced Skills Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
+            <Ionicons name="construct-outline" size={20} color="#6366F1" />
             <Text style={styles.sectionTitle}>Skills & Expertise</Text>
-            {editing && (
-              <TouchableOpacity onPress={() => setEditing(true)}>
-                <Ionicons name="add-circle" size={24} color="#6366F1" />
-              </TouchableOpacity>
-            )}
           </View>
+          
           <View style={styles.skillsContainer}>
             {profileData.skills && profileData.skills.length > 0 ? (
               profileData.skills.map((skill, index) => (
                 <View key={index} style={styles.skillTag}>
                   <Text style={styles.skillText}>{skill}</Text>
                   {editing && (
-                    <TouchableOpacity onPress={() => removeSkill(skill)}>
-                      <Ionicons name="close-circle" size={16} color="#EF4444" />
+                    <TouchableOpacity 
+                      style={styles.removeSkillButton}
+                      onPress={() => removeSkill(skill)}
+                    >
+                      <Ionicons name="close" size={14} color="#EF4444" />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -335,6 +355,7 @@ const TaskerProfileScreen = ({ navigation }) => {
               <Text style={styles.noSkillsText}>No skills added yet</Text>
             )}
           </View>
+          
           {editing && (
             <View style={styles.addSkillContainer}>
               <TextInput
@@ -345,22 +366,35 @@ const TaskerProfileScreen = ({ navigation }) => {
                 onSubmitEditing={addSkill}
                 placeholderTextColor="#94A3B8"
               />
-              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
+              <TouchableOpacity 
+                style={[styles.addSkillButton, !newSkill.trim() && styles.addSkillButtonDisabled]} 
+                onPress={addSkill}
+                disabled={!newSkill.trim()}
+              >
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Availability */}
+        {/* Enhanced Availability */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Availability</Text>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="time-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Availability</Text>
+          </View>
           <View style={styles.availabilityContainer}>
             <View style={styles.availabilityInfo}>
-              <Ionicons name="time" size={20} color="#6366F1" />
+              <Ionicons 
+                name={profileData.availability === 'Available' ? "checkmark-circle" : "close-circle"} 
+                size={24} 
+                color={profileData.availability === 'Available' ? "#10B981" : "#EF4444"} 
+              />
               <View>
                 <Text style={styles.availabilityStatus}>{profileData.availability}</Text>
-                <Text style={styles.availabilityText}>For new tasks</Text>
+                <Text style={styles.availabilityText}>
+                  {profileData.availability === 'Available' ? 'Ready for new tasks' : 'Not accepting new tasks'}
+                </Text>
               </View>
             </View>
             <Switch
@@ -370,162 +404,173 @@ const TaskerProfileScreen = ({ navigation }) => {
                 availability: value ? 'Available' : 'Not Available'
               })}
               disabled={!editing}
+              trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
+              thumbColor={profileData.availability === 'Available' ? '#4F46E5' : '#9CA3AF'}
             />
           </View>
         </View>
 
-        {/* Notification Settings */}
+        {/* Enhanced Notification Settings */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Settings</Text>
-          <View style={styles.notificationItem}>
-            <View>
-              <Text style={styles.notificationLabel}>Task Alerts</Text>
-              <Text style={styles.notificationDescription}>Get notified about new tasks</Text>
-            </View>
-            <Switch
-              value={notifications.taskAlerts}
-              onValueChange={() => toggleNotification('taskAlerts')}
-            />
+          <View style={styles.sectionHeader}>
+            <Ionicons name="notifications-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Notifications</Text>
           </View>
-          <View style={styles.notificationItem}>
-            <View>
-              <Text style={styles.notificationLabel}>Message Notifications</Text>
-              <Text style={styles.notificationDescription}>Notify about new messages</Text>
+          
+          <View style={styles.notificationList}>
+            <View style={styles.notificationItem}>
+              <View style={styles.notificationInfo}>
+                <Ionicons name="briefcase-outline" size={20} color="#6366F1" />
+                <View style={styles.notificationText}>
+                  <Text style={styles.notificationLabel}>Task Alerts</Text>
+                  <Text style={styles.notificationDescription}>New tasks and updates</Text>
+                </View>
+              </View>
+              <Switch
+                value={notifications.taskAlerts}
+                onValueChange={() => toggleNotification('taskAlerts')}
+                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
+                thumbColor={notifications.taskAlerts ? '#4F46E5' : '#9CA3AF'}
+              />
             </View>
-            <Switch
-              value={notifications.messageNotifications}
-              onValueChange={() => toggleNotification('messageNotifications')}
-            />
-          </View>
-          <View style={styles.notificationItem}>
-            <View>
-              <Text style={styles.notificationLabel}>Email Updates</Text>
-              <Text style={styles.notificationDescription}>Receive email summaries</Text>
+            
+            <View style={styles.notificationItem}>
+              <View style={styles.notificationInfo}>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6366F1" />
+                <View style={styles.notificationText}>
+                  <Text style={styles.notificationLabel}>Messages</Text>
+                  <Text style={styles.notificationDescription}>New messages from clients</Text>
+                </View>
+              </View>
+              <Switch
+                value={notifications.messageNotifications}
+                onValueChange={() => toggleNotification('messageNotifications')}
+                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
+                thumbColor={notifications.messageNotifications ? '#4F46E5' : '#9CA3AF'}
+              />
             </View>
-            <Switch
-              value={notifications.emailUpdates}
-              onValueChange={() => toggleNotification('emailUpdates')}
-            />
           </View>
         </View>
 
-        {/* Account Actions */}
+        {/* Enhanced Account Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <TouchableOpacity style={styles.accountButton}>
-            <Ionicons name="lock-closed" size={20} color="#64748B" />
-            <Text style={styles.accountButtonText}>Change Password</Text>
-            <Ionicons name="chevron-forward" size={20} color="#64748B" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.accountButton}>
-            <Ionicons name="card" size={20} color="#64748B" />
-            <Text style={styles.accountButtonText}>Payment Methods</Text>
-            <Ionicons name="chevron-forward" size={20} color="#64748B" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.accountButton}>
-            <Ionicons name="help-circle" size={20} color="#64748B" />
-            <Text style={styles.accountButtonText}>Help & Support</Text>
-            <Ionicons name="chevron-forward" size={20} color="#64748B" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.accountButton, styles.logoutButton]}
-            onPress={handleLogout}
-          >
-            <Ionicons name="log-out" size={20} color="#EF4444" />
-            <Text style={[styles.accountButtonText, styles.logoutText]}>Log Out</Text>
-          </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="settings-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Account</Text>
+          </View>
+          
+          <View style={styles.accountActions}>
+            <TouchableOpacity style={styles.accountButton}>
+              <Ionicons name="lock-closed-outline" size={20} color="#6366F1" />
+              <Text style={styles.accountButtonText}>Change Password</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.accountButton}>
+              <Ionicons name="card-outline" size={20} color="#6366F1" />
+              <Text style={styles.accountButtonText}>Payment Methods</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.accountButton}>
+              <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
+              <Text style={styles.accountButtonText}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.accountButton, styles.logoutButton]}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              <Text style={[styles.accountButtonText, styles.logoutText]}>Log Out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Member Since */}
+        {/* Enhanced Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Member since {formatMemberSince()}
           </Text>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 };
 
-// Add these new styles to your existing styles
 const styles = StyleSheet.create({
- 
-  placeholderText: {
-    color: '#94A3B8',
-    fontStyle: 'italic',
-  },
-  noSkillsText: {
-    color: '#94A3B8',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    padding: 16,
-  },
-   container: {
+  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     paddingBottom: 40,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+  headerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
   },
-  backButton: {
-    padding: 4,
+  headerButtonActive: {
+    backgroundColor: '#6366F1',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  editButton: {
+  headerButtonText: {
     color: '#6366F1',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  saveButton: {
-    color: '#6366F1',
-    fontSize: 16,
     fontWeight: '600',
+    fontSize: 14,
+  },
+  headerButtonTextActive: {
+    color: '#FFFFFF',
   },
   profileHeader: {
     padding: 24,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    borderRadius:10,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   profileImageContainer: {
     position: 'relative',
-    marginBottom: 16,
-   
+    marginRight: 16,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     borderWidth: 3,
-    borderColor: '#FFFFFF',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   editImageButton: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#6366F1',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#6366F1',
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileInfo: {
+    flex: 1,
   },
   profileName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 4,
@@ -535,34 +580,37 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 12,
   },
+  ratingVerificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  ratingText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   verificationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
   },
   verificationText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '500',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 2,
-  },
-  ratingCount: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -576,10 +624,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
@@ -610,18 +658,22 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
- sectionHeader: {
+  sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 16,
   },
   sectionContent: {
     gap: 16,
@@ -639,20 +691,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1E293B',
     paddingVertical: 8,
+    lineHeight: 22,
   },
   fieldInput: {
     fontSize: 16,
     color: '#1E293B',
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
   },
   multilineInput: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  placeholderText: {
+    color: '#94A3B8',
+    fontStyle: 'italic',
   },
   skillsContainer: {
     flexDirection: 'row',
@@ -665,7 +722,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
     gap: 6,
   },
@@ -673,6 +730,9 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     fontSize: 14,
     fontWeight: '500',
+  },
+  removeSkillButton: {
+    padding: 2,
   },
   addSkillContainer: {
     flexDirection: 'row',
@@ -683,18 +743,35 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 14,
+    backgroundColor: '#FFFFFF',
   },
   addSkillButton: {
     backgroundColor: '#6366F1',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  addSkillButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  noSkillsText: {
+    color: '#94A3B8',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 16,
   },
   availabilityContainer: {
     flexDirection: 'row',
@@ -716,13 +793,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
   },
+  notificationList: {
+    gap: 8,
+  },
   notificationItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+  },
+  notificationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  notificationText: {
+    flex: 1,
   },
   notificationLabel: {
     fontSize: 16,
@@ -734,12 +821,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#64748B',
   },
+  accountActions: {
+    gap: 4,
+  },
   accountButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    borderRadius: 12,
     gap: 12,
   },
   accountButtonText: {
@@ -749,18 +839,21 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   logoutButton: {
-    borderBottomWidth: 0,
+    marginTop: 8,
+    backgroundColor: '#FEF2F2',
   },
   logoutText: {
     color: '#EF4444',
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
   },
   footerText: {
     fontSize: 14,
     color: '#94A3B8',
+    textAlign: 'center',
   },
 });
 

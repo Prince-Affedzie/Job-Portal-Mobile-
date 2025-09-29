@@ -12,11 +12,12 @@ export const TaskerProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   // Load available tasks for tasker
-  const loadAvailableTasks = async () => {
+  const loadAvailableTasks = async (params) => {
+    
     if (!token) return;
     setLoading(true);
     try {
-      const res = await getMiniTasks();
+      const res = await getMiniTasks(params);
       setAvailableTasks(res.data || []);
     } catch (err) {
       console.log("Failed to fetch available tasks:", err);
@@ -31,7 +32,7 @@ export const TaskerProvider = ({ children }) => {
     setLoading(true);
     try {
       const res = await getYourAppliedMiniTasks();
-      setMyTasks(res.data || []);
+      return res
     } catch (err) {
       console.log("Failed to fetch my tasks:", err);
     } finally {
