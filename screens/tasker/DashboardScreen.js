@@ -19,6 +19,7 @@ import { TaskerContext } from '../../context/TaskerContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
+import Header from "../../component/tasker/Header";
 
 
 const { width } = Dimensions.get('window');
@@ -31,7 +32,10 @@ const TaskerDashboard = () => {
   const [activeMetric, setActiveMetric] = useState('week');
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
+  const { loadMyTasks } = useContext(TaskerContext);
+  const [myTasks, setMyTasks] = useState([]);
+  const [myBids, setMyBids] = useState([]);
 
   const getTimeOfDay = () => {
     const hour = new Date().getHours();
@@ -40,31 +44,162 @@ const TaskerDashboard = () => {
     return 'evening';
   };
 
-  // Sample stats data - replace with actual API calls
-  const sampleStats = {
-    earnings: {
-      week: 2450,
-      month: 8920,
-      total: 15600,
-      trend: '+12%',
-    },
-    tasks: {
-      completed: 18,
-      inProgress: 3,
-      pending: 2,
-      successRate: '94%',
-    },
-    applications: {
-      submitted: 12,
-      accepted: 8,
-      pending: 4,
-      acceptanceRate: '67%',
-    },
-    ratings: {
-      average: 4.8,
-      total: 24,
-      trend: '+0.2',
-    },
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      if (loadMyTasks) {
+        const res = await loadMyTasks();
+       
+        // Extract applications and bids from the response
+        const applications = res.data?.applications || [];
+        const bids = res.data?.bids || [];
+        
+        setMyTasks(applications);
+        setMyBids(bids);
+        
+
+        // Calculate stats based on actual data
+        const calculatedStats = calculateStats(applications, bids);
+        setStats(calculatedStats);
+        setRecentActivities(sampleActivities);
+        
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }).start();
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  // Calculate stats based on actual tasks data
+  const calculateStats = (applications = [], bids = []) => {
+    if (!applications || !Array.isArray(applications)) {
+      return getDefaultStats();
+    }
+
+   
+
+    // Calculate task statistics
+    const completedTasks = applications.filter(task => task.status === "Completed").length;
+    const inProgressTasks = applications.filter(task => 
+      ["Assigned", "In-progress", "Review"].includes(task.status)
+    ).length;
+    const pendingTasks = applications.filter(task => 
+      ["Pending", "Open"].includes(task.status)
+    ).length;
+
+    // Calculate application statistics
+    const submittedApplications = applications.length;
+    const acceptedApplications = applications.filter(task => 
+      task.status !== "Open" && task.status !== "Rejected" && task.status !== "Pending"
+    ).length;
+    const pendingApplications = applications.filter(task => 
+      task.status === "Open" || task.status === "Pending"
+    ).length;
+
+    // Calculate acceptance rate
+    const acceptanceRate = submittedApplications > 0 
+      ? Math.round((acceptedApplications / submittedApplications) * 100) 
+      : 0;
+
+    // Calculate success rate (completed vs total accepted)
+    const successRate = acceptedApplications > 0 
+      ? Math.round((completedTasks / acceptedApplications) * 100)
+      : 0;
+
+    // Calculate earnings from completed tasks
+    const totalEarnings = applications
+      .filter(task => task.status === "Completed")
+      .reduce((sum, task) => sum + (task.budget || 0), 0);
+
+    // Calculate bids statistics
+    const submittedBids = bids.length;
+    const acceptedBids = bids.filter(bid => 
+      bid.bid?.status === "Accepted"
+    ).length;
+    const pendingBids = bids.filter(bid => 
+      bid.bid?.status === "Pending"
+    ).length;
+    return {
+      earnings: {
+        week: Math.round(totalEarnings * 0.2), // Placeholder - adjust based on your logic
+        month: Math.round(totalEarnings * 0.7), // Placeholder - adjust based on your logic
+        total: totalEarnings,
+        trend: totalEarnings > 0 ? '+12%' : '+0%',
+      },
+      tasks: {
+        completed: completedTasks,
+        inProgress: inProgressTasks,
+        pending: pendingTasks,
+        successRate: `${successRate}%`,
+      },
+      applications: {
+        submitted: submittedApplications,
+        accepted: acceptedApplications,
+        pending: pendingApplications,
+        acceptanceRate: `${acceptanceRate}%`,
+      },
+      bids: {
+        submitted: submittedBids,
+        accepted: acceptedBids,
+        pending: pendingBids,
+        acceptanceRate: submittedBids > 0 ? `${Math.round((acceptedBids / submittedBids) * 100)}%` : '0%',
+      },
+      ratings: {
+        average: user?.rating || 0,
+        total: user?.numberOfRatings || 0,
+        trend: user?.rating ? '+0.2' : '+0.0',
+      },
+    };
+  };
+
+  const getDefaultStats = () => {
+    return {
+      earnings: {
+        week: 0,
+        month: 0,
+        total: 0,
+        trend: '+0%',
+      },
+      tasks: {
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        successRate: '0%',
+      },
+      applications: {
+        submitted: 0,
+        accepted: 0,
+        pending: 0,
+        acceptanceRate: '0%',
+      },
+      bids: {
+        submitted: 0,
+        accepted: 0,
+        pending: 0,
+        acceptanceRate: '0%',
+      },
+      ratings: {
+        average: user?.rating || 0,
+        total: user?.numberOfRatings || 0,
+        trend: '+0.0',
+      },
+    };
   };
 
   const sampleActivities = [
@@ -112,34 +247,6 @@ const TaskerDashboard = () => {
       return () => {};
     }, [])
   );
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // Simulate API calls
-      await Promise.all([
-        new Promise(resolve => setTimeout(resolve, 1000)), // Load stats
-        new Promise(resolve => setTimeout(resolve, 1000)), // Load activities
-      ]);
-      setStats(sampleStats);
-      setRecentActivities(sampleActivities);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }).start();
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
 
   const MetricCard = ({ title, value, subtitle, icon, color, trend }) => (
     <View style={styles.metricCard}>
@@ -210,36 +317,40 @@ const TaskerDashboard = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-    <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
-  <View style={styles.header}>
-    <View style={styles.headerContent}>
-      <View style={styles.greetingContainer}>
-        <Text style={styles.welcomeText}>Good {getTimeOfDay()},</Text>
-        <Text style={styles.userName}>{user?.name || 'Tasker'}!</Text>
-      </View>
-      <Text style={styles.subtitle}>Your performance at a glance</Text>
-    </View>
-    
-    <TouchableOpacity style={styles.profileButton} onPress={() => navigate('Profile')}>
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          {user?.profileImage ? (
-            <Image 
-              source={{ uri: user.profileImage }} 
-              style={styles.avatarImage}
-            />
-          ) : (
-            <Text style={styles.avatarText}>
-              {user?.name?.charAt(0) || 'T'}
-            </Text>
-          )}
+        <Header 
+        title="Dashboard" 
+        showProfile={false}
+      />
+        <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <View style={styles.greetingContainer}>
+                <Text style={styles.welcomeText}>Good {getTimeOfDay()},</Text>
+                <Text style={styles.userName}>{user?.name || 'Tasker'}!</Text>
+              </View>
+              <Text style={styles.subtitle}>Your performance at a glance</Text>
+            </View>
+            <TouchableOpacity style={styles.profileButton} onPress={() => navigate('Profile')}>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar}>
+                  {user?.profileImage ? (
+                    <Image
+                      source={{ uri: user.profileImage }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {user?.name?.charAt(0) || 'T'}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.onlineIndicator} />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.onlineIndicator} />
-      </View>
-    </TouchableOpacity>
-  </View>
-  </View>
-        {/* Earnings Card */}
+
+        {/* Earnings Card 
         <LinearGradient
           colors={['#6366F1', '#4F46E5']}
           style={styles.earningsCard}
@@ -269,42 +380,44 @@ const TaskerDashboard = () => {
             </View>
           </View>
           <Text style={styles.earningsAmount}>
-            ₵{stats?.earnings[activeMetric]?.toLocaleString()}
+            ₵{stats?.earnings[activeMetric]?.toLocaleString() || 0}
           </Text>
         </LinearGradient>
+        */}
 
         {/* Metrics Grid */}
         <View style={styles.metricsGrid}>
           <MetricCard
             title="Tasks Completed"
-            value={stats?.tasks.completed}
-            subtitle={`${stats?.tasks.inProgress} in progress`}
+            value={stats?.tasks.completed || 0}
+            subtitle={`${stats?.tasks.inProgress || 0} in progress`}
             icon="checkmark-done"
             color="#10B981"
-            trend={stats?.tasks.successRate}
+            trend={stats?.tasks.successRate || '0%'}
           />
           <MetricCard
             title="Applications"
-            value={stats?.applications.submitted}
-            subtitle={`${stats?.applications.accepted} accepted`}
+            value={stats?.applications.submitted || 0}
+            subtitle={`${stats?.applications.accepted || 0} accepted`}
             icon="document-text"
             color="#6366F1"
-            trend={stats?.applications.acceptanceRate}
+            trend={stats?.applications.acceptanceRate || '0%'}
+          />
+          <MetricCard
+            title="Bids Submitted"
+            value={stats?.bids.submitted || 0}
+            subtitle={`${stats?.bids.accepted || 0} accepted`}
+            icon="hammer"
+            color="#F59E0B"
+            trend={stats?.bids.acceptanceRate || '0%'}
           />
           <MetricCard
             title="Average Rating"
-            value={stats?.ratings.average}
-            subtitle={`${stats?.ratings.total} reviews`}
+            value={stats?.ratings.average || 0}
+            subtitle={`${stats?.ratings.total || 0} reviews`}
             icon="star"
             color="#F59E0B"
-            trend={stats?.ratings.trend}
-          />
-          <MetricCard
-            title="Active Tasks"
-            value={stats?.tasks.inProgress}
-            subtitle={`${stats?.tasks.pending} pending`}
-            icon="time"
-            color="#F59E0B"
+            trend={stats?.ratings.trend || '+0.0'}
           />
         </View>
 
@@ -317,14 +430,14 @@ const TaskerDashboard = () => {
               description="Browse available opportunities"
               icon="search"
               color="#6366F1"
-              onPress={() => navigate('Available')}
+              onPress={() => navigate('AvailableTab')}
             />
             <QuickAction
               title="My Applications"
               description="View your submitted applications"
               icon="document-text"
               color="#10B981"
-              onPress={() => navigate('MyTasks')}
+              onPress={() => navigate('MyTasksTab')}
             />
             <QuickAction
               title="Earnings"
@@ -338,7 +451,7 @@ const TaskerDashboard = () => {
               description="Update your account details"
               icon="person"
               color="#EF4444"
-              onPress={() => navigate('Profile')}
+              onPress={() => navigate('ProfileTab')}
             />
           </View>
         </View>
@@ -393,24 +506,24 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
  headerContainer: {
-  backgroundColor: '#FFFFFF',
+  backgroundColor: '#1A1F3B', // New dark background
   borderBottomLeftRadius: 24,
   borderBottomRightRadius: 24,
   borderTopLeftRadius: 24,
   borderTopRightRadius: 24,
-  paddingHorizontal: 20,
+  paddingHorizontal: 10,
   paddingBottom: 16,
   shadowColor: '#000',
   shadowOffset: {
     width: 0,
     height: 2,
   },
-  shadowOpacity: 0.1,
-  shadowRadius: 3,
-  elevation: 3,
+  shadowOpacity: 0.2, // Slightly increased for visibility on dark background
+  shadowRadius: 4,
+  elevation: 4, // Slightly increased for better depth
   marginBottom: 8,
-  marginTop:50,
-  marginHorizontal: 20,
+ 
+  marginHorizontal: 10,
 },
 header: {
   flexDirection: 'row',
@@ -429,18 +542,18 @@ greetingContainer: {
 },
 welcomeText: {
   fontSize: 16,
-  color: '#64748B',
+  color: '#A3BFFA', // Light blue for contrast against dark background
   marginRight: 6,
 },
 userName: {
   fontSize: 24,
   fontWeight: '800',
-  color: '#1E293B',
+  color: '#E2E8F0', // Light gray for primary text
   marginBottom: 0,
 },
 subtitle: {
   fontSize: 14,
-  color: '#94A3B8',
+  color: '#94A3B8', // Kept subtle but readable
   fontWeight: '500',
 },
 profileButton: {
@@ -453,15 +566,15 @@ avatar: {
   width: 52,
   height: 52,
   borderRadius: 26,
-  backgroundColor: '#6366F1',
+  backgroundColor: '#4F46E5', // Indigo accent to complement dark theme
   justifyContent: 'center',
   alignItems: 'center',
-  shadowColor: '#6366F1',
+  shadowColor: '#4F46E5', // Matching shadow for consistency
   shadowOffset: {
     width: 0,
     height: 4,
   },
-  shadowOpacity: 0.3,
+  shadowOpacity: 0.4, // Slightly stronger shadow for depth
   shadowRadius: 8,
   elevation: 4,
 },
@@ -471,7 +584,7 @@ avatarImage: {
   borderRadius: 26,
 },
 avatarText: {
-  color: '#FFFFFF',
+  color: '#E2E8F0', // Light gray for contrast
   fontWeight: '700',
   fontSize: 20,
 },
@@ -482,9 +595,9 @@ onlineIndicator: {
   width: 14,
   height: 14,
   borderRadius: 7,
-  backgroundColor: '#10B981',
+  backgroundColor: '#22D3EE', // Cyan for a vibrant online indicator
   borderWidth: 2,
-  borderColor: '#FFFFFF',
+  borderColor: '#1A1F3B', // Matches header background for clean look
 },
   earningsCard: {
     marginHorizontal: 20,

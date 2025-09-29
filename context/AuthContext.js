@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginUser, fetchUser, logoutUser } from "../api/authApi";
+import { loginUser, fetchUser, logoutUser,signUp } from "../api/authApi";
+import { navigate } from '../services/navigationService';
+
 
 export const AuthContext = createContext();
 
@@ -28,9 +30,31 @@ export const AuthProvider = ({ children }) => {
     loadStoredAuth();
   }, []);
 
+
+   const register = async (credentials) => {
+    try {
+      const res = await signUp(credentials);
+      console.log(res)
+      if (res.data?.token) {
+        await AsyncStorage.setItem("authToken", res.data.token);
+        setToken(res.data.token);
+        return res;
+      }
+      return false;
+    } catch (err) {
+        const errorMessage =
+        err.res?.data?.message ||
+        err.message
+      console.log("Sign Up Failed:", errorMessage);
+      return false;
+    }
+  };
+
+
   const login = async (credentials) => {
     try {
       const res = await loginUser(credentials);
+      console.log(res)
       if (res.data?.token) {
         await AsyncStorage.setItem("authToken", res.data.token);
         setToken(res.data.token);
@@ -49,7 +73,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await logoutUser();
+      const res = await logoutUser();
+      if(res.status===200){
+         setUser(null);
+         setToken(null);
+         await AsyncStorage.removeItem("authToken");
+        navigate('AuthStack', { screen: 'Login' });
+      }
     } catch {}
     setUser(null);
     setToken(null);
@@ -65,7 +95,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout,  updateProfile, loading }}>
+    <AuthContext.Provider value={{ user, token,register, login, logout,  updateProfile, loading, setUser }}>
       {children}
     </AuthContext.Provider>
   );
