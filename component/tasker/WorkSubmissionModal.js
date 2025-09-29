@@ -10,6 +10,9 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  KeyboardAvoidingView, 
+  Platform,
+  Keyboard 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -18,6 +21,7 @@ import { getSignedUrl, sendFileToS3 } from '../../api/commonApi';
 import { submitWorkForReview } from '../../api/miniTaskApi';
 
 const { width } = Dimensions.get('window');
+
 
 const WorkSubmissionModal = ({ 
   isVisible, 
@@ -32,6 +36,26 @@ const WorkSubmissionModal = ({
   const [uploadProgress, setUploadProgress] = useState({});
   const [dragActive, setDragActive] = useState(false);
   const [errors, setErrors] = useState({});
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+
+
+
+   useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   // File size limit (10MB)
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -349,7 +373,7 @@ const WorkSubmissionModal = ({
         throw new Error('All file uploads failed');
       }
 
-      console.log('Submitting work with fileKeys:', fileKeys);
+     
 
       // Submit work with successful uploads
       await submitWorkForReview(taskId, {
@@ -432,9 +456,16 @@ const WorkSubmissionModal = ({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
+    ><KeyboardAvoidingView 
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+      <View style={[
+        styles.modalContainer,
+        keyboardVisible && styles.modalContainerKeyboardOpen
+      ]}>
+       
           {/* Header and rest of the JSX remains exactly the same */}
           <View style={styles.modalHeader}>
             <View style={styles.headerGradient}>
@@ -592,8 +623,9 @@ const WorkSubmissionModal = ({
               )}
             </TouchableOpacity>
           </View>
-        </View>
+       
       </View>
+       </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -606,6 +638,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '100%',
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalContainerKeyboardOpen: {
+    maxHeight: '95%', // Allow more height when keyboard is open
   },
   modalContainer: {
     backgroundColor: '#FFFFFF',

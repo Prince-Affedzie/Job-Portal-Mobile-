@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useContext} from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -10,6 +10,8 @@ import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import AppliedTaskDetailsScreen from "../screens/tasker/AppliedTaskDetailScreen";
 import SubmissionsScreen from "../screens/tasker/TaskSubmissionsScreen";
+import { NotificationContext } from "../context/NotificationContext";
+
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -67,6 +69,9 @@ function ProfileStack() {
 }
 
 export default function TaskerStack() {
+  const {notifications}  = useContext(NotificationContext)
+  const unreadNotifications = notifications.filter(n => !n.read);
+
   return (
      <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
     <Tab.Navigator 
@@ -128,7 +133,7 @@ export default function TaskerStack() {
               size={size} 
             />
           ),
-          tabBarBadge: 3, // You can dynamically set this based on unread count
+          tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, // You can dynamically set this based on unread count
         }}
       />
       <Tab.Screen

@@ -318,7 +318,8 @@ const TaskerDashboard = () => {
       >
         {/* Header */}
         <Header 
-        title="Dashboard"  
+        title="Dashboard" 
+        showProfile={false}
       />
         <View style={[styles.headerContainer, { paddingTop: insets.top + 16 }]}>
           <View style={styles.header}>

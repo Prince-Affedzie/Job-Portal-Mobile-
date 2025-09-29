@@ -380,7 +380,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       {/* Fixed Apply Button */}
       <LinearGradient
         colors={['rgba(248, 250, 252, 0.95)', 'rgba(248, 250, 252, 1)']}
-        style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}
+        style={[styles.footer, { paddingBottom: insets.bottom - 16 }]}
       >
         <View style={styles.footerContent}>
           <TouchableOpacity

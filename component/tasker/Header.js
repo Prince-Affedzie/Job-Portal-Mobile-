@@ -39,7 +39,7 @@ const Header = ({
   };
 
   const handleProfilePress = () => {
-    navigate('Profile');
+    navigate('ProfileTab');
   };
 
   const HeaderBackground = gradient ? LinearGradient : View;
