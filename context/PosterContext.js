@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import {getMiniTasksPosted, postMiniTask, assignApplicantToTask} from "../api/miniTaskApi";
+import {getMiniTasksPosted, postMiniTask, assignApplicantToTask,updateMiniTask} from "../api/miniTaskApi";
 import {getMicroTaskApplicants,getMicroTaskBids} from "../api/bidApi"
 import { AuthContext } from "./AuthContext";
 
@@ -28,9 +28,7 @@ export const PosterProvider = ({ children }) => {
   const addTask = async (taskData) => {
     try {
       const res = await postMiniTask(taskData);
-      if (res.success) {
-        loadPostedTasks();
-      }
+      return res
     } catch (err) {
       console.log("Failed to create task:", err);
     }
@@ -57,6 +55,17 @@ export const PosterProvider = ({ children }) => {
     }
   };
 
+  const editMiniTask = async(taskId, data)=>{
+    try{
+      const response = await updateMiniTask(taskId,data)
+      return response
+
+    }catch(err){
+        console.log(err)
+    }
+  }
+
+
   // Approve a tasker
   const approveApplicant = async (taskId, taskerId) => {
     try {
@@ -82,6 +91,7 @@ export const PosterProvider = ({ children }) => {
         loading,
         loadPostedTasks,
         addTask,
+        editMiniTask,
         getApplicants,
         approveApplicant,
         getTaskBids,

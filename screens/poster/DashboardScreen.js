@@ -1,609 +1,744 @@
-import { View, Text, ScrollView, StyleSheet,Dimensions,TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Dimensions, TouchableOpacity, RefreshControl ,ActivityIndicator} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useContext, useEffect } from 'react'
 import { LinearGradient } from 'expo-linear-gradient'
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import { CircularProgress } from 'react-native-circular-progress';
-import { StarRatingDisplay } from 'react-native-star-rating-widget';
-import Fontisto from '@expo/vector-icons/Fontisto';
+import Ionicons from '@expo/vector-icons/Ionicons'
+import { AuthContext } from "../../context/AuthContext" 
+import { PosterContext } from '../../context/PosterContext'
+import Header from "../../component/tasker/Header";
+import { navigate } from '../../services/navigationService'
 
-
-const width = Dimensions.get('window').width
+const { width } = Dimensions.get('window')
 
 export default function DashboardScreen() {
-    const user = 'User';
-    const totalTasks = 12;
-    const completedTasks = 2;
-    const progressPercentage = (completedTasks / totalTasks) * 100;
-    const all = 12;
+    const { user } = useContext(AuthContext)
+    const { postedTasks, loading, loadPostedTasks } = useContext(PosterContext)
+    const [refreshing, setRefreshing] = useState(false)
 
-const [tab, setTab] = useState('all'); // 'all' | 'active' | 'review' | 'in_progress'
+    // Refresh function
+    const onRefresh = async () => {
+        setRefreshing(true)
+        await loadPostedTasks(user.id)
+        setRefreshing(false)
+    }
 
-const jobs = [
-  { id: '1', title: 'Home Cleaning', budget: 300, applicants: 2, assignedTo: 'Adwoa Yeboah', status: 'in_progress', updatedAt: '9 days ago' },
-  { id: '2', title: 'Website Redesigning', budget: 500, applicants: 0, assignedTo: null,            status: 'active',       updatedAt: 'yesterday' },
-  { id: '3', title: 'Transcribe 10-Minute Audio', budget: 100, applicants: 1, assignedTo: 'Mike Obiri', status: 'in_progress', updatedAt: '27 days ago' },
-  { id: '4', title: 'Logo Touch-Up', budget: 120, applicants: 4, assignedTo: 'Not assigned', status: 'review', updatedAt: '2 days ago' },
-];
+    useEffect(() => {
+        loadPostedTasks()
+    }, [])
 
-const counts = useMemo(() => ({
-  all: jobs.length,
-  active: jobs.filter(j => j.status === 'active').length,
-  review: jobs.filter(j => j.status === 'review').length,
-  in_progress: jobs.filter(j => j.status === 'in_progress').length,
-}), [jobs]);
+    // Enhanced statistics calculation
+    const dashboardStats = useMemo(() => {
+        if (!postedTasks || postedTasks.length === 0) {
+            return {
+                totalTasks: 0,
+                completedTasks: 0,
+                activeTasks: 0,
+                inProgressTasks: 0,
+                reviewTasks: 0,
+                assignedTasks: 0,
+                totalSpent: 0,
+                successRate: 0,
+                monthlySpending: 0,
+                urgentTasks: 0,
+                avgTaskValue: 0
+            }
+        }
 
-const filtered = useMemo(() => (
-  tab === 'all' ? jobs : jobs.filter(j => j.status === tab)
-), [tab, jobs]);
+        const totalTasks = postedTasks.length
+        const completedTasks = postedTasks.filter(task => task.status === 'Completed').length
+        const activeTasks = postedTasks.filter(task => ['Open', 'Pending'].includes(task.status)).length
+        const inProgressTasks = postedTasks.filter(task => task.status === 'In-progress').length
+        const reviewTasks = postedTasks.filter(task => task.status === 'Review').length
+        const assignedTasks = postedTasks.filter(task => task.status === 'Assigned').length
+        
+        // Calculate urgent tasks (deadline within 2 days)
+        const urgentTasks = postedTasks.filter(task => {
+            if (!task.deadline) return false
+            const deadline = new Date(task.deadline)
+            const now = new Date()
+            const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+            return daysUntilDeadline <= 2 && !['Completed', 'Closed'].includes(task.status)
+        }).length
 
-const statusStyles = {
-  active:      { chipBg: '#d1fae5', chipText: '#065f46', iconBg: '#e8fff3', dot: '#10b981', label: 'Active' },
-  review:      { chipBg: '#ffe8d6', chipText: '#994600', iconBg: '#fff1e6', dot: '#f59e0b', label: 'Review' },
-  in_progress: { chipBg: '#ffedd5', chipText: '#9a3412', iconBg: '#fff3e6', dot: '#f97316', label: 'In Progress' },
-};
+        const totalSpent = postedTasks
+            .filter(task => task.status === 'Completed')
+            .reduce((sum, task) => sum + (task.budget || 0), 0)
 
-const StatusPill = ({ status, label }) => {
-  const s = statusStyles[status] || statusStyles.active;
-  return (
-    <View style={[styles.pill, { backgroundColor: s.chipBg }]}>
-      <Ionicons
-        name={status === 'active' ? 'checkmark-circle' : status === 'review' ? 'alert-circle' : 'play'}
-        size={14}
-        color={s.chipText}
-        style={{ marginRight: 6 }}
-      />
-      <Text style={[styles.pillText, { color: s.chipText }]}>{label}</Text>
-    </View>
-  );
-};
+        const monthlySpending = postedTasks
+            .filter(task => {
+                if (task.status !== 'Completed') return false
+                const completionDate = new Date(task.updatedAt || task.createdAt)
+                const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                return completionDate > thirtyDaysAgo
+            })
+            .reduce((sum, task) => sum + (task.budget || 0), 0)
 
+        const successRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+        const avgTaskValue = completedTasks > 0 ? Math.round(totalSpent / completedTasks) : 0
 
+        return {
+            totalTasks,
+            completedTasks,
+            activeTasks,
+            inProgressTasks,
+            reviewTasks,
+            assignedTasks,
+            totalSpent,
+            monthlySpending,
+            successRate,
+            urgentTasks,
+            avgTaskValue
+        }
+    }, [postedTasks])
+
+    // Navigation handler for quick actions
+    const handleQuickActionPress = (action) => {
+        if (action.navigation) {
+            if (action.navigation.navigator) {
+                // Nested navigation: Navigate to tab -> then to screen within that stack
+                navigate(action.navigation.navigator, {
+                    screen: action.navigation.screen,
+                    params: action.navigation.params
+                });
+            } else {
+                // Direct screen navigation (same navigator)
+                navigate(action.navigation.screen, action.navigation.params);
+            }
+        } else {
+            // Fallback to direct navigation (for backward compatibility)
+            navigate(action.screen);
+        }
+    }
+
+    // Quick actions with nested navigation support
+    const quickActions = [
+        {
+            id: 1,
+            title: 'Post New Task',
+            icon: 'add-circle-outline',
+            color: ['#1A1F3B', '#2D325D'],
+            description: 'Create a new task',
+            navigation: {
+                navigator: 'PostedTasks', // Tab navigator name
+                screen: 'CreateTask' // Screen inside the PostedTasksStack
+            }
+        },
+        {
+            id: 2,
+            title: 'Review Work',
+            icon: 'document-text-outline',
+            color: ['#059669', '#10B981'],
+            description: 'Check submissions',
+            navigation: {
+                navigator: 'PostedTasks', // Tab navigator name
+                screen: 'PostedTasksList' // Navigate to tasks list for now (Submissions screen doesn't exist)
+            }
+        },
+        {
+            id: 3,
+            title: 'Messages',
+            icon: 'chatbubble-ellipses-outline',
+            color: ['#7C3AED', '#8B5CF6'],
+            description: 'Chat with taskers',
+            navigation: {
+                screen: 'Messages' // Direct screen navigation (if it exists in root)
+            }
+        },
+        {
+            id: 4,
+            title: 'My Tasks',
+            icon: 'briefcase-outline',
+            color: ['#DC2626', '#EF4444'],
+            description: 'View all tasks',
+            navigation: {
+                navigator: 'PostedTasks', // Tab navigator name
+                screen: 'PostedTasksList' // Initial screen of PostedTasksStack
+            }
+        }
+    ]
+
+    // Priority tasks that need attention
+    const priorityTasks = useMemo(() => {
+        if (!postedTasks) return []
+        
+        return postedTasks
+            .filter(task => {
+                // Tasks that need immediate attention
+                if (task.status === 'Review') return true
+                if (task.status === 'Assigned' && !task.assignmentAccepted) return true
+                
+                // Urgent deadlines
+                if (task.deadline) {
+                    const deadline = new Date(task.deadline)
+                    const now = new Date()
+                    const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+                    return daysUntilDeadline <= 2 && !['Completed', 'Closed'].includes(task.status)
+                }
+                return false
+            })
+            .slice(0, 3)
+    }, [postedTasks])
+
+    const getPriorityIcon = (task) => {
+        if (task.status === 'Review') return { icon: 'alert-circle', color: '#F59E0B' }
+        if (!task.assignmentAccepted && task.status === 'Assigned') return { icon: 'time-outline', color: '#6366F1' }
+        return { icon: 'flag-outline', color: '#EF4444' }
+    }
+
+    const getPriorityText = (task) => {
+        if (task.status === 'Review') return 'Needs Review'
+        if (!task.assignmentAccepted && task.status === 'Assigned') return 'Pending Acceptance'
+        return 'Urgent Deadline'
+    }
+
+    // Navigation handler for task details with nested navigation
+    const handleTaskDetailPress = (taskId) => {
+        navigate('PostedTasks', {
+            screen: 'ClientTaskDetail',
+            params: { taskId }
+        });
+    }
+
+    if (loading && !refreshing) {
+        return (
+            <SafeAreaView style={styles.loadingContainer}>
+                <Header title="Dashboard" />
+                <View style={styles.loadingContent}>
+                    <ActivityIndicator size="large" color="#6366F1" />
+                    <Text style={styles.loadingText}>Loading your dashboard...</Text>
+                </View>
+            </SafeAreaView>
+        )
+    }
 
     return (
-        <SafeAreaView>
-            <ScrollView style={styles.scroll}>
-                <LinearGradient
-                    style={styles.welcomeContainer}
-                    colors={['#09287eff','#226be0ff']}
-                    start={{x:1,y:1}}
-                    end={{x:0,y:0}}
-                >
-                    <Text style={styles.welcomeText}>Welcome back, {user}</Text>
-                    <Text style={styles.subText}>You have 4 active tasks and 6 in progress</Text>
-                    
-                    {/* Progress Bar Section */}
-                    <View style={styles.progressContainer}>
-                        <View style={styles.progressHeader}>
-                            <Text style={styles.progressText}>Task Completion</Text>
-                            <Text style={styles.progressPercentage}>{Math.round(progressPercentage)}%</Text>
-                        </View>
-                        
-                        {/* Progress Bar */}
-                        <View style={styles.progressBarBackground}>
-                            <LinearGradient
-                                style={[styles.progressBarFill, { width: `${progressPercentage}%` }]}
-                                colors={['#4CD964', '#5DE24C']}
-                                start={{x:0,y:0}}
-                                end={{x:1,y:0}}
-                            />
-                        </View>
-                        
-                        <View style={styles.progressStats}>
-                            <Text style={styles.progressStatText}>{completedTasks} completed</Text>
-                            <Text style={styles.progressStatText}>{totalTasks} total tasks</Text>
+        <SafeAreaView style={styles.container}>
+            <Header title="Dashboard" />
+            <ScrollView 
+                style={styles.scrollView}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Welcome Section */}
+                <View style={styles.welcomeSection}>
+                    <View style={styles.welcomeContent}>
+                        <View>
+                            <Text style={styles.welcomeText}>Welcome back, {user?.name || "Client"}!<Text> 👋</Text></Text>
+                            <Text style={styles.subtitle}>
+                                {dashboardStats.totalTasks === 0 
+                                    ? "Ready to post your first task?" 
+                                    : `You have ${dashboardStats.activeTasks} active tasks and ${dashboardStats.urgentTasks} need attention`
+                                }
+                            </Text>
                         </View>
                     </View>
-                </LinearGradient>
+                </View>
 
-                {/* Rest of your existing code remains the same */}
-                <View style={styles.qucikActionContainer}>
-                    <Text style={styles.quickActionText}>Quick Actions</Text>
-                    {/* group Tile*/}
-                    <View style= {styles.groupTiles}>
-                        <TouchableOpacity style={styles.tile}>
-                            <LinearGradient
-                                style={styles.addIcon}
-                                colors={['#09287eff','#287affff']}
-                                start={{x:1,y:1}}
-                                end={{x:0,y:0}}
-                                >
+                {/* Key Metrics Grid */}
+                <View style={styles.metricsSection}>
+                    <View style={styles.metricsGrid}>
+                        <TouchableOpacity 
+                            style={[styles.metricCard, styles.primaryCard]}
+                            onPress={() => navigate('PostedTasks')}
+                        >
+                            <View style={styles.metricIcon}>
+                                <Ionicons name="briefcase-outline" size={24} color="#6366F1" />
+                            </View>
+                            <Text style={styles.metricValue}>{dashboardStats.totalTasks}</Text>
+                            <Text style={styles.metricLabel}>Total Tasks</Text>
+                            <Text style={styles.metricTrend}>
+                                {dashboardStats.activeTasks} active • {dashboardStats.completedTasks} completed
+                            </Text>
+                        </TouchableOpacity>
 
-                                <FontAwesome6 name="add" size={30} color="white" />
-                            </LinearGradient>
-                            <Text style={styles.tileText}>Post New Task</Text>
+                        <TouchableOpacity 
+                            style={[styles.metricCard, styles.successCard]}
+                            onPress={() => navigate('PostedTasks')}
+                        >
+                            <View style={styles.metricIcon}>
+                                <Ionicons name="checkmark-done" size={24} color="#10B981" />
+                            </View>
+                            <Text style={styles.metricValue}>{dashboardStats.successRate}%</Text>
+                            <Text style={styles.metricLabel}>Success Rate</Text>
+                            <Text style={styles.metricTrend}>
+                                {dashboardStats.completedTasks} completed successfully
+                            </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.tile}>
-                            <LinearGradient
-                                style={styles.addIcon}
-                                colors={['#0c5627ff','#2be06eff']}
-                                start={{x:1,y:1}}
-                                end={{x:0,y:0}}
-                                >
-                                <Ionicons name="checkmark-sharp" size={30} color="white" />
-                            </LinearGradient>
-                            <Text style={styles.tileText}>Review Submissions</Text>
+
+                        <TouchableOpacity 
+                            style={[styles.metricCard, styles.warningCard]}
+                        >
+                            <View style={styles.metricIcon}>
+                                <Ionicons name="alert-circle" size={24} color="#F59E0B" />
+                            </View>
+                            <Text style={styles.metricValue}>{dashboardStats.urgentTasks}</Text>
+                            <Text style={styles.metricLabel}>Need Attention</Text>
+                            <Text style={styles.metricTrend}>
+                                {dashboardStats.reviewTasks} to review
+                            </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.tile}>
-                            <LinearGradient
-                                style={styles.addIcon}
-                                colors={['#3f1d5eff','#c07efeff']}
-                                start={{x:1,y:1}}
-                                end={{x:0,y:0}}
-                                >
-                                <Ionicons name="chatbubbles-sharp" size={30} color="white" />
-                            </LinearGradient>
-                            <Text style={styles.tileText}>Message Taskers</Text>
+
+                        <TouchableOpacity 
+                            style={[styles.metricCard, styles.infoCard]}
+                        >
+                            <View style={styles.metricIcon}>
+                                <Ionicons name="cash-outline" size={24} color="#3B82F6" />
+                            </View>
+                            <Text style={styles.metricValue}>GHS {dashboardStats.monthlySpending}</Text>
+                            <Text style={styles.metricLabel}>This Month</Text>
+                            <Text style={styles.metricTrend}>
+                                GHS {dashboardStats.totalSpent} total spent
+                            </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
-                    <TouchableOpacity style={styles.taskContainer}>
-                        <View style={styles.taskCol}>
-                            <Text style={styles.taskHeader}>Active Tasks</Text>
-                            <Text style={styles.taskMiddle}>4</Text>
-                            <Text style={styles.taskFooter}>+2 from last week</Text>
-                        </View>
-                        <View style={styles.taskIcon}>
-                            <FontAwesome6 name="list" size={18} color="#226be0ff" />
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.taskContainer}>
-                        <View style={styles.taskCol}>
-                            <Text style={styles.taskHeader}>In Progress</Text>
-                            <Text style={styles.taskMiddle}>4</Text>
-                            <Text style={styles.taskFooter}>+2 from last week</Text>
-                        </View>
-                        <View style={styles.progressIcon}>
-                            <MaterialCommunityIcons name="progress-clock" size={18} color="#c5a800ff" />
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.taskContainer}>
-                        <View style={styles.taskCol}>
-                            <Text style={styles.taskHeader}>Pending Review</Text>
-                            <Text style={styles.taskMiddle}>4</Text>
-                            <Text style={styles.taskFooter}>+2 from last week</Text>
-                        </View>
-                        <View style={styles.pendingIcon}>
-                            <FontAwesome5 name="exclamation" size={18} color="#f88000ff" />
-                        </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.taskContainer}>
-                        <View style={styles.taskCol}>
-                            <Text style={styles.taskHeader}>Total spent</Text>
-                            <Text style={styles.taskMiddle}>4</Text>
-                            <Text style={styles.taskFooter}>+2 from last week</Text>
-                        </View>
-                        <View style={styles.totalIcon}>
-                            <FontAwesome5 name="money-bill-wave" size={18} color="#008122ff" />
-                        </View>
-                    </TouchableOpacity>
-                    
-                    {/* Micro Jobs */}
-                    <View style={styles.microWrap}>
-                    <Text style={styles.microTitle}>Your Micro Jobs</Text>
 
-                    <View style={styles.tabsRow}>
-                        {[
-                        { key: 'all',         label: `All (${counts.all})` },
-                        { key: 'active',      label: `Active (${counts.active})` },
-                        { key: 'review',      label: `Review (${counts.review})` },
-                        { key: 'in_progress', label: `In-Progress (${counts.in_progress})` },
-                        ].map(t => {
-                        const isActive = tab === t.key;
-                        return (
-                            <TouchableOpacity key={t.key} onPress={() => setTab(t.key)}
-                            style={[styles.tabBtn, isActive && styles.tabBtnActive]}>
-                            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{t.label}</Text>
+                {/* Quick Actions */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Quick Actions</Text>
+                    <View style={styles.actionsGrid}>
+                        {quickActions.map((action) => (
+                            <TouchableOpacity 
+                                key={action.id} 
+                                style={styles.actionCard}
+                                onPress={() => handleQuickActionPress(action)}
+                            >
+                                <LinearGradient
+                                    colors={action.color}
+                                    style={styles.actionIcon}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                >
+                                    <Ionicons name={action.icon} size={24} color="#fff" />
+                                </LinearGradient>
+                                <View style={styles.actionContent}>
+                                    <Text style={styles.actionText}>{action.title}</Text>
+                                    <Text style={styles.actionDescription}>{action.description}</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                             </TouchableOpacity>
-                        );
-                        })}
+                        ))}
                     </View>
+                </View>
 
-                    {filtered.map(job => {
-                        const s = statusStyles[job.status] || statusStyles.active;
-                        return (
-                        <TouchableOpacity key={job.id} style={styles.jobCard}>
-                            <View style={styles.jobHeaderRow}>
-                            <View style={[styles.iconCircle, { backgroundColor: s.iconBg }]}>
-                                <FontAwesome5 name="briefcase" size={16} color={s.dot} />
-                            </View>
-                            <Text numberOfLines={1} style={styles.jobTitle}>{job.title}</Text>
-                            </View>
+                {/* Priority Tasks */}
+                {priorityTasks.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Priority Tasks</Text>
+                            <TouchableOpacity onPress={() => navigate('PostedTasks')}>
+                                <Text style={styles.seeAllText}>View All</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.priorityList}>
+                            {priorityTasks.map((task) => {
+                                const priority = getPriorityIcon(task)
+                                return (
+                                    <TouchableOpacity 
+                                        key={task._id}
+                                        style={styles.priorityItem}
+                                        onPress={() => handleTaskDetailPress(task._id)}
+                                    >
+                                        <View style={[styles.priorityIcon, { backgroundColor: priority.color + '20' }]}>
+                                            <Ionicons name={priority.icon} size={16} color={priority.color} />
+                                        </View>
+                                        <View style={styles.priorityContent}>
+                                            <Text style={styles.priorityTitle} numberOfLines={1}>
+                                                {task.title}
+                                            </Text>
+                                            <Text style={styles.priorityType} numberOfLines={1}>
+                                                {getPriorityText(task)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.priorityMeta}>
+                                            <Text style={styles.priorityBudget}>GHS {task.budget}</Text>
+                                            <Text style={styles.priorityTime}>
+                                                {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                )
+                            })}
+                        </View>
+                    </View>
+                )}
 
-                            <View style={styles.metaRow}>
-                            <Text style={styles.metaText}>{job.budget}</Text>
-                            <View style={styles.dot}/>
-                            <Text style={styles.metaText}>{job.applicants} applicants</Text>
-                            </View>
-
-                            <Text style={styles.assignedText}>
-                            Assigned to: {job.assignedTo ?? 'Not assigned'}
-                            </Text>
-
-                            <View style={styles.statusRow}>
-                            <StatusPill status={job.status} label={s.label} />
-                            </View>
-
-                            <Text style={styles.timeAgo}>{job.updatedAt}</Text>
+                {/* Recent Activity */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Recent Activity</Text>
+                        <TouchableOpacity onPress={() => navigate('PostedTasks')}>
+                            <Text style={styles.seeAllText}>View All</Text>
                         </TouchableOpacity>
-                        );
-                    })}
                     </View>
-                    <View style={styles.performanceContainer}>
-                        <Text style={styles.performanceHeader}>Performance Insights</Text>
-                        <View style={styles.circularProgressContainer}>
-                            <CircularProgress
-                            size={220}
-                            width={15}
-                            fill={90} // Percentage fill
-                            tintColor="#6f35a5ff"
-                            backgroundColor="#c2c2c2ff"
-                            onAnimationComplete={() => console.log('onAnimationComplete')}
-                            rotation={0}
-                            lineCap='round'
-                            
-                            />
-                            <View style={styles.progressInner}>
-                                <Text style={styles.progressInnerText}>90%</Text>
-                                <Text style={styles.progressInnerSub}>Completion Rate</Text>
-                            </View>
-                        </View>
-                        <View style= {styles.starContainer}>
-                            <StarRatingDisplay rating={4.5} starSize={45} color="#f59e0b" />
-                            <Text style={styles.progressInnerText}>4.5/5</Text>
-                            <Text style={styles.progressInnerSub}>Tasker Satisfaction</Text>
-                        </View>
-                        <View style={styles.response}>
-                            <Fontisto name="stopwatch" size={50} color="#008122ff" style={{padding:5}} />
-                            <View style={{height:10}}/>
-                            <Text style={styles.progressInnerText}>2.4h</Text>
-                            <Text style={styles.progressInnerSub}>Average Response Time</Text>
-                        </View>
-                        <View style={styles.line}/>
-                        <Text style={styles.update}>Updated 2 hours ago</Text>
+                    <View style={styles.activityList}>
+                        {postedTasks && postedTasks.slice(0, 4).map((task) => (
+                            <TouchableOpacity 
+                                key={task._id}
+                                style={styles.activityItem}
+                                onPress={() => handleTaskDetailPress(task._id)}
+                            >
+                                <View style={[
+                                    styles.activityStatus,
+                                    { backgroundColor: 
+                                        task.status === 'Completed' ? '#10B98120' :
+                                        task.status === 'In-progress' ? '#6366F120' :
+                                        task.status === 'Review' ? '#F59E0B20' : '#6B728020'
+                                    }
+                                ]}>
+                                    <Ionicons 
+                                        name={
+                                            task.status === 'Completed' ? 'checkmark-circle' :
+                                            task.status === 'In-progress' ? 'play-circle' :
+                                            task.status === 'Review' ? 'alert-circle' : 'time-outline'
+                                        } 
+                                        size={16} 
+                                        color={
+                                            task.status === 'Completed' ? '#10B981' :
+                                            task.status === 'In-progress' ? '#6366F1' :
+                                            task.status === 'Review' ? '#F59E0B' : '#6B7280'
+                                        } 
+                                    />
+                                </View>
+                                <View style={styles.activityContent}>
+                                    <Text style={styles.activityTitle} numberOfLines={1}>
+                                        {task.title}
+                                    </Text>
+                                    <Text style={styles.activityMeta}>
+                                        {task.category} • GHS {task.budget}
+                                    </Text>
+                                </View>
+                                <Text style={styles.activityTime}>
+                                    {new Date(task.updatedAt).toLocaleDateString()}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </View>
+                </View>
 
+                {/* Empty State for New Users */}
+                {dashboardStats.totalTasks === 0 && (
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIllustration}>
+                            <Ionicons name="rocket-outline" size={60} color="#6366F1" />
+                        </View>
+                        <Text style={styles.emptyTitle}>Ready to get started?</Text>
+                        <Text style={styles.emptyDescription}>
+                            Post your first task and find skilled taskers to help you get things done
+                        </Text>
+                        <TouchableOpacity 
+                            style={styles.primaryButton}
+                            onPress={() => handleQuickActionPress(quickActions[0])} // Use the first quick action (Post New Task)
+                        >
+                            <Ionicons name="add" size={20} color="#FFFFFF" />
+                            <Text style={styles.primaryButtonText}>Post Your First Task</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </ScrollView>
         </SafeAreaView>
     )
 }
 
+// Your existing styles remain the same...
 const styles = StyleSheet.create({
-    scroll:{
-        marginBottom:-35,
+    container: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
     },
-    welcomeContainer:{
-        marginHorizontal:20,
-        flex:1,
-        backgroundColor:'blue',
-        height:220, // Increased height to accommodate progress bar
-        borderRadius: 20,
-        padding:20,
-        elevation:5,
-        justifyContent:'space-around'
+    scrollView: {
+        flex: 1,
     },
-    subText:{
-        color:'white',
-        fontSize:16,
-        marginBottom:10
+    loadingContainer: {
+        flex: 1,
+        backgroundColor: '#F8FAFC',
     },
-    welcomeText:{
-        color:'white',
-        fontSize:22,
-        fontWeight:'bold',
-        marginBottom:10
+    loadingContent: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    // Progress Bar Styles
-    progressContainer: {
-        marginTop: 10,
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#6B7280',
     },
-    progressHeader: {
+    welcomeSection: {
+        padding: 20,
+        backgroundColor: '#4F46E5',
+        marginHorizontal:10,
+        borderRadius:20,
+    },
+    welcomeContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
     },
-    progressText: {
-        color: 'white',
+    welcomeText: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#FFFF',
+        marginBottom: 4,
+    },
+    subtitle: {
+        fontSize: 16,
+        color: '#FFFF',
+        lineHeight: 22,
+    },
+    avatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#6366F1',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '600',
+    },
+    metricsSection: {
+        padding: 20,
+    },
+    metricsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    metricCard: {
+        flex: 1,
+        minWidth: (width - 52) / 2,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    primaryCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#6366F1',
+    },
+    successCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+    },
+    warningCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#F59E0B',
+    },
+    infoCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#3B82F6',
+    },
+    metricIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    metricValue: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    metricLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#6B7280',
+        marginBottom: 4,
+    },
+    metricTrend: {
+        fontSize: 12,
+        color: '#9CA3AF',
+    },
+    section: {
+        padding: 20,
+        backgroundColor: '#FFFFFF',
+        marginTop: 8,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1F2937',
+    },
+    seeAllText: {
+        fontSize: 14,
+        color: '#6366F1',
+        fontWeight: '600',
+    },
+    actionsGrid: {
+        gap: 12,
+    },
+    actionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    actionIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    actionContent: {
+        flex: 1,
+    },
+    actionText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    actionDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    priorityList: {
+        gap: 12,
+    },
+    priorityItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        padding: 16,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#EF4444',
+    },
+    priorityIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    priorityContent: {
+        flex: 1,
+    },
+    priorityTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    priorityType: {
+        fontSize: 12,
+        color: '#EF4444',
+        fontWeight: '500',
+    },
+    priorityMeta: {
+        alignItems: 'flex-end',
+    },
+    priorityBudget: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    priorityTime: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    activityList: {
+        gap: 12,
+    },
+    activityItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+    },
+    activityStatus: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    activityContent: {
+        flex: 1,
+    },
+    activityTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 2,
+    },
+    activityMeta: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    activityTime: {
+        fontSize: 12,
+        color: '#9CA3AF',
+    },
+    emptyState: {
+        alignItems: 'center',
+        padding: 40,
+        backgroundColor: '#FFFFFF',
+        margin: 20,
+        borderRadius: 16,
+    },
+    emptyIllustration: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1F2937',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptyDescription: {
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 22,
+    },
+    primaryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#6366F1',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 8,
+    },
+    primaryButtonText: {
+        color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
     },
-    progressPercentage: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    progressBarBackground: {
-        width: '100%',
-        height: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-        borderRadius: 4,
-        overflow: 'hidden',
-    },
-    progressBarFill: {
-        height: '100%',
-        borderRadius: 4,
-    },
-    progressStats: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 6,
-    },
-    progressStatText: {
-        color: 'rgba(255, 255, 255, 0.8)',
-        fontSize: 12,
-    },
-    quickActionText:{
-        marginTop:20,
-        fontSize:22,
-        fontWeight:'bold',
-        marginBottom:10,
-    },
-    qucikActionContainer:{
-        margin:20,
-        flex:1,
-    },
-    groupTiles:{
-        flexDirection:'row',
-    },
-    tile:{
-        flex:1,
-        height:120,
-        borderRadius:20,
-        padding:10,
-        justifyContent:'center',
-        alignItems:'center',
-        justifyContent:'space-between'
-    },
-    tileText:{
-        color:'#434343ff',
-        fontWeight:'bold',
-        fontSize: 15,
-        textAlign:'center'
-    },
-    addIcon:{
-        paddingVertical:10,
-        paddingHorizontal:12,
-        backgroundColor:'#226be0ff',
-        borderRadius:60
-    },
-    reviewIcon:{
-        paddingVertical:10,
-        paddingHorizontal:12,
-        borderRadius:60
-    },
-    messageIcon:{
-        paddingVertical:10,
-        paddingHorizontal:12,
-        borderRadius:60
-    },
-    taskContainer:{
-        flexDirection:"row",
-        justifyContent:'space-between',
-        padding:20,
-        marginVertical:10,
-        marginHorizontal:20,
-        flex:1,
-        backgroundColor:'white',
-        height:140,
-        borderRadius:20,
-        elevation:3,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.15,
-        shadowRadius: 2.84,
-    },
-    taskHeader:{
-        fontSize:16,
-        fontWeight:'bold',
-        color:'#434343ff'
-    },
-    taskMiddle:{
-        fontSize:30,
-        fontWeight:'700'
-    },
-    taskFooter:{
-        color:'#17833fff'
-    },
-    taskCol:{
-        justifyContent:'space-around'
-    },
-    taskIcon:{
-        backgroundColor:'#dce9fdff',
-        height:40,
-        width:40,
-        borderRadius:30,
-        alignItems:'center',
-        justifyContent:'center'
-    },
-    progressIcon:{
-        backgroundColor:'#faf5d9ff',
-        height:40,
-        width:40,
-        borderRadius:30,
-        alignItems:'center',
-        justifyContent:'center'
-    },
-    pendingIcon:{
-        backgroundColor:'#ffe5caff',
-        height:40,
-        width:40,
-        borderRadius:30,
-        alignItems:'center',
-        justifyContent:'center'
-    },
-    totalIcon:{
-        backgroundColor:'#b7f4c7ff',
-        height:40,
-        width:40,
-        borderRadius:30,
-        alignItems:'center',
-        justifyContent:'center'
-    },
-    microWrap: {
-    margin: 20,
-    marginBottom: 24,
-    marginTop:30
-    },
-    microTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    },
-    tabsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-    },
-    tabBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: '#d5dcf2ff',
-    },
-    tabBtnActive: {
-    backgroundColor: '#7caae5ff',
-    //borderColor:'#1d4ed8',
-    //borderWidth:2
-    },
-    tabText: {
-    color: '#475569',
-    fontWeight: '600',
-    },
-    tabTextActive: {
-    color: '#0033bfff',
-    },
-
-    jobCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 12,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    },
-    jobHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 10,
-    },
-    iconCircle: {
-    height: 36,
-    width: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    },
-    jobTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    },
-    metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    marginBottom: 6,
-    },
-    metaText: {
-    color: '#6b7280',
-    fontSize: 13,
-    },
-    dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#d1d5db',
-    marginHorizontal: 8,
-    },
-    assignedText: {
-    color: '#6b7280',
-    marginBottom: 10,
-    },
-    statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    },
-    pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 30,
-    borderRadius: 999,
-    },
-    pillText: {
-    fontWeight: '600',
-    fontSize: 13,
-    },
-    timeAgo: {
-    color: '#9ca3af',
-    fontSize: 12,
-    },
-    performanceContainer: {
-        backgroundColor: 'white',
-        margin: 20,
-        padding: 20,
-        borderRadius: 20,
-        elevation: 3,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-    },
-    performanceHeader:{
-        marginBottom:40,
-        fontSize:22,
-        fontWeight: '700',
-        color: '#111827',
-    },
-    circularProgressContainer:{
-        alignItems:'center',
-    },
-    progressInner:{
-        position:'absolute',
-        alignItems:'center',
-        alignContent:'center',
-        justifyContent:'center',
-        height:220
-    },
-    progressInnerText:{
-        fontSize:'30',
-        fontWeight:'800',
-        //color:'#6f35a5ff'
-    },
-    progressInnerSub:{
-        fontSize:16,
-        fontWeight:'bold'
-    },
-    starContainer:{
-        alignItems:'center',
-        marginTop:60
-    },
-    response:{
-        marginTop:60,
-        alignItems:'center'
-    },
-    line:{
-        margin:10,
-        flex:1,
-        borderBottomColor:'#cecacaff',
-        borderBottomWidth: 1.5,
-    },
-    update:{
-        margin:10,
-        fontSize:15,
-        fontWeight:'500',
-        color:'#3e3e3eff'
-    }
-});
+})
