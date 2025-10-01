@@ -8,7 +8,9 @@ import {
   SafeAreaView,
   Image,
   ActivityIndicator,
+  TouchableWithoutFeedback,
   Dimensions,
+  Animated,
   StatusBar,
   Alert,
 } from 'react-native';
@@ -21,6 +23,7 @@ import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal'
 import { AuthContext } from '../../context/AuthContext';
 import {getMiniTaskInfo,acceptMiniTaskAssignment,rejectMiniTaskAssignment,markTaskAsDoneTasker} from '../../api/miniTaskApi'
 import { navigate } from '../../services/navigationService';
+import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
 
 
 const { width } = Dimensions.get('window');
@@ -33,6 +36,21 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const { user } = useContext(AuthContext);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showWorkModal, setShowWorkModal] = useState(false);
+
+
+const [fabExpanded, setFabExpanded] = useState(false);
+const [fabAnimation] = useState(new Animated.Value(0));
+
+const toggleFAB = () => {
+  const toValue = fabExpanded ? 0 : 1;
+  setFabExpanded(!fabExpanded);
+  Animated.spring(fabAnimation, {
+    toValue,
+    useNativeDriver: true,
+    tension: 100,
+    friction: 8,
+  }).start();
+};
  
 
   useEffect(() => {
@@ -631,82 +649,7 @@ const handleReportPress = () => {
 
         {/* Quick Actions Sidebar */}
         <View style={styles.sidebar}>
-          {isAssignedToUser && task?.assignmentAccepted ? (
-         <View style={styles.actionsCard}>
-         <Text style={styles.actionsTitle}>Quick Actions</Text>
-    
-          {canSubmitWork && (
-          <ActionButton
-           title="Submit Work"
-           icon="cloud-upload-outline"
-           color="#8B5CF6"
-           onPress={() => setShowWorkModal(true)}
-         />
-        )}
-    
-        <ActionButton
-        title="View Submissions"
-        icon="document-text-outline"
-        color="#6366F1"
-        onPress={() => navigate('Submissions', { taskId: task._id,taskTitle: task.title  })}
-       />
-    
-       <ActionButton
-       title="Report Issue"
-        icon="flag-outline"
-        color="#EF4444"
-        onPress={handleReportPress}
-       />
-    
-       {/* Updated Mark as Done Logic */}
-       {hasTaskerMarkedDone ? (
-         <View style={styles.alreadyDoneSection}>
-           <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-           <Text style={styles.alreadyDoneText}>You marked this as done</Text>
-           {task.taskerDoneAt && (
-             <Text style={styles.doneTimeText}>
-               on {formatDateTime(task.taskerDoneAt)}
-             </Text>
-           )}
-         </View>
-       ) : canMarkAsDone ? (
-         <TouchableOpacity 
-           style={styles.markDoneButton}
-           onPress={handleMarkAsDone}
-         >
-           <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-           <Text style={styles.markDoneText}>Mark as Done</Text>
-         </TouchableOpacity>
-       ) : null}
-    
-         {isTaskCompleted && (
-           <View style={styles.completionBadge}>
-           <Ionicons name="checkmark-done" size={24} color="#10B981" />
-          <Text style={styles.completionText}>Task Completed</Text>
-          </View>
-        )}
-          </View>
-        ) : isAssignedToUser && !task?.assignmentAccepted ? (
-             <View style={styles.actionsCard}>
-            <Text style={styles.actionsTitle}>Assignment Pending</Text>
-             <View style={styles.pendingAssignment}>
-              <Ionicons name="time-outline" size={40} color="#F59E0B" />
-              <Text style={styles.pendingText}>
-               Please accept or decline the task assignment to unlock task actions.
-              </Text>
-              </View>
-            </View>
-          ) : (
-           <View style={styles.actionsCard}>
-           <Text style={styles.actionsTitle}>Task Actions</Text>
-            <View style={styles.lockedSection}>
-            <Ionicons name="lock-closed" size={40} color="#6B7280" />
-              <Text style={styles.lockedText}>
-              Task actions available after assignment
-              </Text>
-              </View>
-             </View>
-            )}
+
           {/* Safety Guidelines */}
           <View style={styles.safetyCard}>
             <View style={styles.sectionHeader}>
@@ -732,38 +675,179 @@ const handleReportPress = () => {
               />
             </View>
           </View>
-
-          {/* Task Progress
-          {isAssignedToUser && !isTaskCompleted && (
-            <View style={styles.progressCard}>
-              <Text style={styles.sectionTitle}>Task Progress</Text>
-              
-              <View style={styles.progressSection}>
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressLabel}>Completion</Text>
-                  <Text style={styles.progressPercent}>0%</Text>
-                </View>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: '0%' }]} />
-                </View>
-              </View>
-              
-              <View style={styles.progressStats}>
-                <View style={styles.progressStat}>
-                  <Text style={styles.progressStatValue}>0</Text>
-                  <Text style={styles.progressStatLabel}>Days Worked</Text>
-                </View>
-                <View style={styles.progressStat}>
-                  <Text style={styles.progressStatValue}>
-                    {moment(task.deadline).diff(moment(), 'days')}
-                  </Text>
-                  <Text style={styles.progressStatLabel}>Days Left</Text>
-                </View>
-              </View>
-            </View>
-          )}  */}
         </View>
       </ScrollView>
+
+       {/* FAB System */}
+<View style={styles.fabContainer}>
+  {/* Backdrop */}
+  {fabExpanded && (
+    <TouchableWithoutFeedback onPress={toggleFAB}>
+      <View style={styles.fabBackdrop} />
+    </TouchableWithoutFeedback>
+  )}
+
+  {/* Action Buttons */}
+  <Animated.View 
+    style={[
+      styles.fabActionButtons,
+      {
+        opacity: fabAnimation,
+        transform: [{
+          translateY: fabAnimation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [50, 0]
+          })
+        }]
+      }
+    ]}
+  >
+    {isAssignedToUser && task?.assignmentAccepted && (
+      <>
+        {canSubmitWork && (
+          <TouchableOpacity 
+            style={[styles.fabActionButton, { backgroundColor: '#8B5CF6' }]}
+            onPress={() => {
+              toggleFAB();
+              setShowWorkModal(true);
+            }}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.fabActionText}>Submit Work</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#6366F1' }]}
+          onPress={() => {
+            toggleFAB();
+            navigate('Submissions', { taskId: task._id, taskTitle: task.title });
+          }}
+        >
+          <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.fabActionText}>View Submissions</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#EF4444' }]}
+          onPress={() => {
+            toggleFAB();
+            handleReportPress();
+          }}
+        >
+          <Ionicons name="flag-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.fabActionText}>Report Issue</Text>
+        </TouchableOpacity>
+
+        {/* Mark as Done Button */}
+        {hasTaskerMarkedDone ? (
+          <View style={styles.fabActionButtonDisabled}>
+            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+            <Text style={styles.fabActionTextDisabled}>Already Marked Done</Text>
+          </View>
+        ) : canMarkAsDone ? (
+          <TouchableOpacity 
+            style={[styles.fabActionButton, { backgroundColor: '#10B981' }]}
+            onPress={() => {
+              toggleFAB();
+              handleMarkAsDone();
+            }}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.fabActionText}>Mark as Done</Text>
+          </TouchableOpacity>
+        ) : null}
+      </>
+    )}
+
+    {/* Assignment Acceptance Buttons */}
+    {isAssignmentPending && (
+      <>
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#10B981' }]}
+          onPress={() => {
+            toggleFAB();
+            handleAcceptAssignment();
+          }}
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+          <Text style={styles.fabActionText}>Accept Task</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#EF4444' }]}
+          onPress={() => {
+            toggleFAB();
+            handleDeclineAssignment();
+          }}
+        >
+          <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+          <Text style={styles.fabActionText}>Decline Task</Text>
+        </TouchableOpacity>
+      </>
+    )}
+
+    {/* Hint for Open Tasks - Show when task is open and not assigned to user */}
+    {!isAssignedToUser && task?.status?.toLowerCase() === 'open' && (
+      <View style={styles.fabHintCard}>
+        <Ionicons name="information-circle-outline" size={20} color="#6366F1" />
+        <View style={styles.hintTextContainer}>
+          <Text style={styles.hintTitle}>Task Actions</Text>
+          <Text style={styles.hintDescription}>
+            Task actions will appear here once you're assigned to this task
+          </Text>
+        </View>
+      </View>
+    )}
+
+    {/* Hint for Other Non-Assigned Statuses */}
+    {!isAssignedToUser && task?.status?.toLowerCase() !== 'open' && task?.status?.toLowerCase() !== 'assigned' && (
+      <View style={styles.fabHintCard}>
+        <Ionicons name="time-outline" size={20} color="#F59E0B" />
+        <View style={styles.hintTextContainer}>
+          <Text style={styles.hintTitle}>No Actions Available</Text>
+          <Text style={styles.hintDescription}>
+            Task actions are only available for assigned tasks
+          </Text>
+        </View>
+      </View>
+    )}
+  </Animated.View>
+
+  {/* Main FAB - Show different icon/color based on state */}
+  <TouchableOpacity 
+    style={[
+      styles.mainFAB,
+      !isAssignedToUser && styles.mainFABDisabled
+    ]}
+    onPress={toggleFAB}
+  >
+    <Animated.View style={{
+      transform: [{
+        rotate: fabAnimation.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '45deg']
+        })
+      }]
+    }}>
+      <Ionicons 
+        name={
+          fabExpanded ? "close" : 
+          !isAssignedToUser ? "information-circle-outline" : "ellipsis-horizontal"
+        } 
+        size={24} 
+        color="#FFFFFF" 
+      />
+    </Animated.View>
+  </TouchableOpacity>
+
+  {/* Tooltip for non-assigned state */}
+  {!isAssignedToUser && !fabExpanded && (
+    <View style={styles.tooltip}>
+      <Text style={styles.tooltipText}>Task Info</Text>
+    </View>
+  )}
+</View>
        <ReportForm
         isVisible={showReportModal}
         onClose={() => setShowReportModal(false)}
@@ -785,706 +869,6 @@ const handleReportPress = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748B',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#64748B',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  titleContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  taskTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  assignmentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  assignmentText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    marginLeft: 4,
-  },
-  metaInfo: {
-    gap: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#64748B',
-    marginLeft: 6,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    gap: 4,
-  },
-  tabButtonActive: {
-    backgroundColor: '#6366F1',
-  },
-  tabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  tabContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  infoGrid: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-    gap: 12,
-  },
-  infoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  locationSection: {
-    marginTop: 16,
-  },
-  locationGrid: {
-    gap: 8,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  locationLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  locationValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  timeline: {
-    gap: 12,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  timelineLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  timelineDate: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  employerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  employerAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  employerInfo: {
-    flex: 1,
-  },
-  employerName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 2,
-    marginBottom: 4,
-  },
-  verifiedText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#065F46',
-  },
-  employerBio: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  contactSection: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  contactLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  skillsSection: {
-    marginBottom: 16,
-  },
-  subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  skillTag: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  skillText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
-  verificationNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FCD34D',
-    borderWidth: 1,
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-    marginBottom: 16,
-  },
-  verificationText: {
-    fontSize: 14,
-    color: '#92400E',
-    flex: 1,
-  },
-  instructionsSection: {
-    marginTop: 16,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
-  },
-  sidebar: {
-    padding: 16,
-    gap: 16,
-  },
-  actionsCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  actionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    gap: 8,
-  },
-  actionButtonDisabled: {
-    opacity: 0.6,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  markDoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#10B981',
-    borderRadius: 8,
-    gap: 8,
-    marginBottom: 8,
-  },
-  markDoneText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  completionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#D1FAE5',
-    padding: 12,
-    borderRadius: 8,
-    gap: 8,
-  },
-  completionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#065F46',
-  },
-  lockedSection: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-  },
-  lockedText: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  safetyCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  safetyList: {
-    gap: 8,
-  },
-  safetyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-  },
-  safetyText: {
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
-  progressCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  progressSection: {
-    marginBottom: 16,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  progressPercent: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#6366F1',
-    borderRadius: 3,
-  },
-  progressStats: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  progressStat: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-  },
-  progressStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  progressStatLabel: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  assignmentAcceptanceCard: {
-  backgroundColor: '#FFFBEB',
-  margin: 16,
-  marginTop: 8,
-  padding: 16,
-  borderRadius: 12,
-  borderLeftWidth: 4,
-  borderLeftColor: '#F59E0B',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3,
-},
-assignmentHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 8,
-  gap: 8,
-},
-assignmentTitle: {
-  fontSize: 18,
-  fontWeight: '700',
-  color: '#92400E',
-},
-assignmentMessage: {
-  fontSize: 14,
-  color: '#92400E',
-  lineHeight: 20,
-  marginBottom: 16,
-},
-assignmentButtons: {
-  flexDirection: 'row',
-  gap: 12,
-},
-assignmentButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 12,
-  paddingHorizontal: 16,
-  borderRadius: 8,
-  gap: 8,
-},
-acceptButton: {
-  backgroundColor: '#10B981',
-},
-declineButton: {
-  backgroundColor: '#EF4444',
-},
-acceptButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-declineButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-pendingAssignment: {
-  alignItems: 'center',
-  padding: 20,
-  backgroundColor: '#FFFBEB',
-  borderRadius: 8,
-},
-pendingText: {
-  fontSize: 14,
-  color: '#92400E',
-  textAlign: 'center',
-  marginTop: 8,
-  lineHeight: 20,
-},completionStatusSection: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  completionStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  completionStatusItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  completionStatusText: {
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  completionStatusTextDone: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  completionTimeText: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  mutualCompletionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'center',
-  },
-  mutualCompletionText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  alreadyDoneSection: {
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#D1FAE5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  alreadyDoneText: {
-    fontSize: 14,
-    color: '#065F46',
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  doneTimeText: {
-    fontSize: 12,
-    color: '#047857',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  markDoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  markDoneText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-});
+
 
 export default AppliedTaskDetailsScreen;

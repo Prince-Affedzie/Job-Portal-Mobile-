@@ -45,6 +45,27 @@ const subcategories = {
   "Others": ["General Tasks", "Miscellaneous"]
 };
 
+
+const InputField = ({ label, value, onChange, placeholder, error, multiline = false, numberOfLines = 1 }) => (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          multiline && styles.textArea,
+          error && styles.inputError
+        ]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={multiline ? 'top' : 'center'}
+      />
+      {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+  );
+
 const EditTaskScreen = ({ route, navigation }) => {
   const { taskId, task: initialTask } = route.params;
   const { editMiniTask , loading } = useContext(PosterContext);
@@ -168,25 +189,7 @@ const EditTaskScreen = ({ route, navigation }) => {
     }
   };
 
-  const InputField = ({ label, value, onChange, placeholder, error, multiline = false, numberOfLines = 1 }) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={[
-          styles.textInput,
-          multiline && styles.textArea,
-          error && styles.inputError
-        ]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        multiline={multiline}
-        numberOfLines={numberOfLines}
-        textAlignVertical={multiline ? 'top' : 'center'}
-      />
-      {error && <Text style={styles.errorText}>{error}</Text>}
-    </View>
-  );
+  
 
   const SectionHeader = ({ title, icon }) => (
     <View style={styles.sectionHeader}>

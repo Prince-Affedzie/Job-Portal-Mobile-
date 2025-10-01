@@ -12,6 +12,8 @@ import { NotificationContext } from "../context/NotificationContext";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import ApplicantsScreen from "../screens/poster/TaskApplicantsScreen"
 import ApplicantProfileScreen from "../screens/poster/ApplicantProfileScreen";
+import ClientViewSubmissionsScreen from "../screens/poster/ClientSubmissionsScreen"
+import ClientProfileScreen from "../screens/poster/ClientProfileScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -55,6 +57,12 @@ function PostedTasksStack() {
         name="ApplicantProfile" 
         component={ApplicantProfileScreen}
         options={{ title: "Applicant Profile" }}
+      />
+
+       <Stack.Screen 
+        name="TaskSubmissions" 
+        component={ClientViewSubmissionsScreen}
+        options={{ title: "Task Submissions" }}
       />
     </Stack.Navigator>
   );
@@ -134,13 +142,18 @@ export default function PosterStack() {
             />
 
       <Tab.Screen
-        name="Payments"
-        component={PaymentsScreen}
+        name="Profile"
+        component={ClientProfileScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card-outline" color={color} size={size} />
-          ),
-        }}
+                  tabBarLabel: 'Profile',
+                  tabBarIcon: ({ color, size, focused }) => (
+                    <Ionicons 
+                      name={focused ? "person" : "person-outline"} 
+                      color={color} 
+                      size={size} 
+                    />
+                  ),
+                }}
       />
     </Tab.Navigator>
     </SafeAreaView>

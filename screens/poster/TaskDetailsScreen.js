@@ -17,10 +17,12 @@ import { Ionicons, MaterialIcons, FontAwesome, Feather } from '@expo/vector-icon
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
+import ReportForm from '../../component/common/reportForm';
 import { AuthContext } from '../../context/AuthContext';
 import { PosterContext } from '../../context/PosterContext';
 import {clientGetTaskInfo,markTaskAsDoneClient} from '../../api/miniTaskApi'
 import { navigate } from '../../services/navigationService'
+import { Animated, TouchableWithoutFeedback } from 'react-native';
 //import MarkDoneSwitch from '../../components/MiniTaskManagementComponents/MarkDoneButton';
 
 const { width } = Dimensions.get('window');
@@ -33,6 +35,21 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState('task');
   const { user } = useContext(AuthContext);
   const { getTaskDetails } = useContext(PosterContext);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const [fabAnimation] = useState(new Animated.Value(0));
+
+
+  const toggleFAB = () => {
+  const toValue = fabExpanded ? 0 : 1;
+  setFabExpanded(!fabExpanded);
+  Animated.spring(fabAnimation, {
+    toValue,
+    useNativeDriver: true,
+    tension: 100,
+    friction: 8,
+  }).start();
+};
 
   useEffect(() => {
     loadTaskDetails();
@@ -75,7 +92,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   };
 
   const handleViewSubmissions = () => {
-    navigation.navigate('TaskSubmissions', { taskId: task._id });
+    navigation.navigate('TaskSubmissions', { taskId: task._id,taskTitle : task.title });
   };
 
 
@@ -107,6 +124,19 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           Alert.alert(errorMessage);
     }
   };
+
+
+  const handleReportPress = () => {
+      
+      setShowReportModal(true);
+    };
+
+  const handleReportSubmitted = () => {
+      
+      Alert.alert('Success', 'Your report has been submitted successfully!');
+      
+    };
+  
   
 
   const getStatusColor = (status) => {
@@ -192,16 +222,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
     </View>
   );
 
-  const ActionButton = ({ title, icon, color, onPress, disabled = false }) => (
-    <TouchableOpacity
-      style={[styles.actionButton, { backgroundColor: color }, disabled && styles.actionButtonDisabled]}
-      onPress={onPress}
-      disabled={disabled}
-    >
-      <Ionicons name={icon} size={20} color="#FFFFFF" />
-      <Text style={styles.actionButtonText}>{title}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -269,7 +289,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                     styles.completionStatusText,
                     task.markedDoneByEmployer && styles.completionStatusTextDone
                   ]}>
-                    You marked as done
+                    Your marked as done
                   </Text>
                   {task.employerDoneAt && (
                     <Text style={styles.completionTimeText}>
@@ -414,14 +434,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                     <Text style={styles.timelineLabel}>Deadline</Text>
                     <Text style={styles.timelineDate}>{formatDate(task.deadline)}</Text>
                   </View>
-                  {/*task.assignedTo && (
-                    <View style={styles.timelineItem}>
-                      <Text style={styles.timelineLabel}>Assigned</Text>
-                      <Text style={styles.timelineDate}>
-                        {task.assignmentDate ? formatDate(task.assignmentDate) : 'N/A'}
-                      </Text>
-                    </View>
-                  )*/}
                 </View>
               </View>
             </>
@@ -464,10 +476,10 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.statValue}>{task.assignedTo.rating || 0}</Text>
                   <Text style={styles.statLabel}>Rating</Text>
                 </View>
-                <View style={styles.statItem}>
+                {/*<View style={styles.statItem}>
                   <Text style={styles.statValue}>{task.assignedTo.completedTasks || 0}</Text>
                   <Text style={styles.statLabel}>Completed</Text>
-                </View>
+                </View>*/}
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
                     {task.assignedTo.completionRate ? `${task.assignedTo.completionRate}%` : 'N/A'}
@@ -511,67 +523,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             </View>
           )}
         </View>
-
-        {/* Quick Actions Sidebar */}
         <View style={styles.sidebar}>
-          <View style={styles.actionsCard}>
-            <Text style={styles.actionsTitle}>Quick Actions</Text>
-            
-            {hasApplicants && (
-              <ActionButton
-                title={`View Applicants (${task.applicants?.length || 0})`}
-                icon="people-outline"
-                color="#10B981"
-                onPress={handleViewApplicants}
-              />
-            )}
-
-            <ActionButton
-              title="Edit Task"
-              icon="create-outline"
-              color="#6366F1"
-              onPress={handleEditTask}
-            />
-
-            {task.status === "In-progress" && (
-              <ActionButton
-                title="View Submissions"
-                icon="document-text-outline"
-                color="#8B5CF6"
-                onPress={handleViewSubmissions}
-              />
-            )}
-
-            {/* Mark as Done Section */}
-            {canMarkAsDone && (
-              <View style={styles.markDoneSection}>
-                <View style={styles.markDoneHeader}>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-                  <Text style={styles.markDoneTitle}>Completion Status</Text>
-                </View>
-                <View style={styles.markDoneContent}>
-                  <Text style={styles.markDoneText}>
-                    Mark this task as completed when the work meets your requirements
-                  </Text>
-                  <TouchableOpacity 
-                             style={styles.markDoneButton}
-                             onPress={handleMarkAsDone}
-                           >
-                             <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-                             <Text style={styles.markDoneText}>Mark as Done</Text>
-                           </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {isTaskCompleted && (
-              <View style={styles.completionBadge}>
-                <Ionicons name="checkmark-done" size={24} color="#10B981" />
-                <Text style={styles.completionText}>Task Completed</Text>
-              </View>
-            )}
-          </View>
-
           {/* Task Metrics */}
           <View style={styles.metricsCard}>
             <View style={styles.sectionHeader}>
@@ -596,7 +548,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           </View>
 
           {/* Recent Applicants Preview */}
-          {hasApplicants && (
+          {hasApplicants && task.status !=="Completed" && (
             <View style={styles.applicantsCard}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="people-outline" size={20} color="#6366F1" />
@@ -638,6 +590,123 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           )}
         </View>
       </ScrollView>
+        {/* Quick Actions Sidebar */}
+       <View style={styles.fabContainer}>
+         {/* Backdrop */}
+        {fabExpanded && (
+        <TouchableWithoutFeedback onPress={toggleFAB}>
+        <View style={styles.fabBackdrop} />
+       </TouchableWithoutFeedback>
+        )}
+
+       {/* Action Buttons */}
+       <Animated.View 
+        style={[
+         styles.fabActionButtons,
+         {
+          opacity: fabAnimation,
+           transform: [{
+          translateY: fabAnimation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [50, 0]
+           })
+          }]
+        }
+       ]}
+      >
+        {hasApplicants && task.status !== "Completed" && (
+        <TouchableOpacity 
+         style={[styles.fabActionButton, { backgroundColor: '#10B981' }]}
+          onPress={() => {
+          toggleFAB();
+          handleViewApplicants();
+        }}
+        >
+        <Ionicons name="people-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.fabActionText}>Applicants ({task.applicants?.length || 0})</Text>
+      </TouchableOpacity>
+      )}
+
+       <TouchableOpacity 
+        style={[styles.fabActionButton, { backgroundColor: '#6366F1' }]}
+        onPress={() => {
+          toggleFAB();
+          handleEditTask();
+        }}
+       >
+        <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.fabActionText}>Edit Task</Text>
+       </TouchableOpacity>
+
+       {task.status !== "Open" && (
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#8B5CF6' }]}
+          onPress={() => {
+          toggleFAB();
+          handleViewSubmissions();
+          }}
+        >
+        <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.fabActionText}>Submissions</Text>
+        </TouchableOpacity>
+        )}
+
+        {(task.status === "Assigned" || task.status === "In-progress") && (
+        <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#EF4444' }]}
+          onPress={() => {
+          toggleFAB();
+          handleReportPress();
+          }}
+        >
+         <Ionicons name="flag-outline" size={20} color="#FFFFFF" />
+         <Text style={styles.fabActionText}>Report</Text>
+        </TouchableOpacity>
+       )}
+
+       {canMarkAsDone && (
+         <TouchableOpacity 
+          style={[styles.fabActionButton, { backgroundColor: '#10B981' }]}
+          onPress={() => {
+           toggleFAB();
+           handleMarkAsDone();
+          }}
+        >
+        <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.fabActionText}>Mark Done</Text>
+        </TouchableOpacity>
+        )}
+      </Animated.View>
+
+     {/* Main FAB */}
+      <TouchableOpacity 
+       style={styles.mainFAB}
+       onPress={toggleFAB}
+      >
+      <Animated.View style={{
+         transform: [{
+           rotate: fabAnimation.interpolate({
+           inputRange: [0, 1],
+          outputRange: ['0deg', '45deg']
+          })
+        }]
+       }}>
+        <Ionicons 
+        name={fabExpanded ? "close" : "ellipsis-horizontal"} 
+        size={24} 
+        color="#FFFFFF" 
+        />
+      </Animated.View>
+  </TouchableOpacity>
+</View>
+
+
+      <ReportForm
+          isVisible={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          task={task}
+          onReportSubmitted={handleReportSubmitted}
+        />
     </SafeAreaView>
   );
 };
@@ -1229,6 +1298,96 @@ markDoneButtonText: {
     fontSize: 14,
     color: '#6366F1',
     fontWeight: '600',
+  },
+
+ fabContainer: {
+  position: 'absolute',
+  top: '90%', // Center vertically
+  right: 20,
+  zIndex: 1000,
+  alignItems: 'flex-end',
+  transform: [{ translateY:0}], // Adjust for FAB height (56/2 = 28)
+},
+
+ // Backdrop for when FAB is expanded
+  fabBackdrop: {
+    position: 'absolute',
+    top: -Dimensions.get('window').height,
+    left: -Dimensions.get('window').width,
+    right: -Dimensions.get('window').width,
+    bottom: -Dimensions.get('window').height,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  
+  // Container for action buttons
+  fabActionButtons: {
+    position: 'absolute',
+    bottom: 70,
+    right: 0,
+    gap: 12,
+    alignItems: 'flex-end',
+    minWidth: 160,
+  },
+  
+  // Individual action button
+  fabActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { 
+      width: 0, 
+      height: 2 
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    gap: 8,
+    minWidth: 160,
+    justifyContent: 'flex-start',
+  },
+  
+  // Action button text
+  fabActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  
+  // Main FAB button
+  mainFAB: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { 
+      width: 0, 
+      height: 4 
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    // Optional: Add a subtle border for better visibility
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+
+  // Additional styles for better visual hierarchy
+  fabActionButtonHighlight: {
+    shadowColor: '#000',
+    shadowOffset: { 
+      width: 0, 
+      height: 3 
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
 });
 
