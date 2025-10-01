@@ -1,52 +1,148 @@
-import React from "react";
+import React, {useContext} from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createStackNavigator } from "@react-navigation/stack";
+import { SafeAreaView } from "react-native-safe-area-context";
 import DashboardScreen from "../screens/poster/DashboardScreen";
 import PostedTasksScreen from "../screens/poster/PostedTasksScreen";
-import ApplicantsScreen from "../screens/poster/ApplicantsScreen";
 import PaymentsScreen from "../screens/poster/PaymentsScreen";
+import ClientTaskDetailScreen from "../screens/poster/TaskDetailsScreen";
+import EditTaskScreen from "../screens/poster/EditTaskScreen"
+import CreateTaskScreen from "../screens/poster/CreateTaskScreen";
+import { NotificationContext } from "../context/NotificationContext";
+import NotificationsScreen from "../screens/tasker/NotificationsScreen";
+import ApplicantsScreen from "../screens/poster/TaskApplicantsScreen"
+import ApplicantProfileScreen from "../screens/poster/ApplicantProfileScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+// Create a Stack Navigator for Posted Tasks
+function PostedTasksStack() {
+  return (
+    <Stack.Navigator 
+    screenOptions={{ 
+    headerShown: false,
+    }}
+        > 
+      <Stack.Screen 
+        name="PostedTasksList" 
+        component={PostedTasksScreen}
+        options={{ title: "My Posted Tasks" }}
+      />
+      <Stack.Screen 
+        name="ClientTaskDetail" 
+        component={ClientTaskDetailScreen}
+        options={{ title: "Task Details" }}
+      />
+
+      <Stack.Screen 
+        name="EditTask" 
+        component={EditTaskScreen}
+        options={{ title: "Edit Task" }}
+      />
+       <Stack.Screen 
+        name="CreateTask" 
+        component={CreateTaskScreen}
+        options={{ title: "Post Task" }}
+      />
+       <Stack.Screen 
+        name="TaskApplicants" 
+        component={ApplicantsScreen}
+        options={{ title: "Task Applicants" }}
+      />
+       <Stack.Screen 
+        name="ApplicantProfile" 
+        component={ApplicantProfileScreen}
+        options={{ title: "Applicant Profile" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Create a Stack Navigator for Applicants
+function ApplicantsStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="ApplicantsList" 
+        component={ApplicantsScreen}
+        options={{ title: "Applicants" }}
+      />
+      {/* You can add more applicant-related screens here */}
+    </Stack.Navigator>
+  );
+}
 
 export default function PosterStack() {
+  const {notifications}  = useContext(NotificationContext)
+  const unreadNotifications = notifications.filter(n => !n.read);
   return (
-    <Tab.Navigator screenOptions={{ headerShown: true }}>
+     <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
+    <Tab.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E5E5E5',
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#6B7280',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
+      }}
+    >
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
+            <Ionicons name="home-outline" color={color} size={size} />
           ),
         }}
       />
       <Tab.Screen
-        name="Posted"
-        component={PostedTasksScreen}
+        name="PostedTasks"
+        component={PostedTasksStack}
         options={{
+          tabBarLabel: "Posted Tasks",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="create" color={color} size={size} />
+            <Ionicons name="list-outline" color={color} size={size} />
           ),
         }}
       />
       <Tab.Screen
-        name="Applicants"
-        component={ApplicantsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" color={color} size={size} />
-          ),
-        }}
-      />
+              name="Notifications"
+              component={NotificationsScreen }
+              options={{
+              tabBarLabel: 'Notifications',
+              tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons 
+              name={focused ? "notifications" : "notifications-outline"} 
+              color={color} 
+              size={size} 
+              />
+              ),
+              tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, // You can dynamically set this based on unread count
+              }}
+            />
+
       <Tab.Screen
         name="Payments"
         component={PaymentsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card" color={color} size={size} />
+            <Ionicons name="card-outline" color={color} size={size} />
           ),
         }}
       />
     </Tab.Navigator>
+    </SafeAreaView>
   );
 }

@@ -67,3 +67,7 @@ export const bidOnMiniTask =(Id,bidData)=>API.post(`/api/h1/v2/mini_task/apply/$
 //MarkTaskAsDone 
 export const markTaskAsDoneTasker = (Id)=>API.put(`/api/h1/v2/mark_task_as_done/tasker/${Id}`)
 export const markTaskAsDoneClient = (Id)=>API.put(`/api/h1/v2/mark_task_as_done/client/${Id}`)
+
+// client 
+export const clientGetTaskInfo =(Id)=>API.get(`/api/h1/v2/get_task/details/${Id}`)
+
