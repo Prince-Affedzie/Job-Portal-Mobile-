@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginUser, fetchUser, logoutUser,signUp } from "../api/authApi";
+import { loginUser, fetchUser, logoutUser,signUp,modifyProfile } from "../api/authApi";
 import { navigate } from '../services/navigationService';
 
 
@@ -86,10 +86,13 @@ export const AuthProvider = ({ children }) => {
     await AsyncStorage.removeItem("authToken");
   };
 
-  const updateProfile = async()=>{
+  const updateProfile = async(data)=>{
     try{
+      const response = await modifyProfile(data)
+      return response
 
     }catch(err){
+      console.log(err)
 
     }
   }

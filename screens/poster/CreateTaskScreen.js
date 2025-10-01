@@ -332,7 +332,7 @@ const CreateTaskScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {task.biddingType === 'fixed' && (
+          
             <InputField
               label="Budget (GHS)"
               value={task.budget}
@@ -342,7 +342,7 @@ const CreateTaskScreen = ({ navigation }) => {
               error={errors.budget}
               required={true}
             />
-          )}
+          
         </View>
 
         {/* Timeline Section */}

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import {getMiniTasksPosted, postMiniTask, assignApplicantToTask,updateMiniTask} from "../api/miniTaskApi";
+import {getMiniTasksPosted, postMiniTask, assignApplicantToTask,updateMiniTask,deleteMiniTask} from "../api/miniTaskApi";
 import {getMicroTaskApplicants,getMicroTaskBids} from "../api/bidApi"
 import { AuthContext } from "./AuthContext";
 
@@ -33,6 +33,16 @@ export const PosterProvider = ({ children }) => {
       console.log("Failed to create task:", err);
     }
   };
+
+  const deleteTask = async(taskId)=>{
+    try{
+      const res = deleteMiniTask(taskId)
+      return res
+
+    }catch(err){
+      console.log(err)
+    }
+  }
 
   // Fetch applicants for a given task
   const getApplicants = async (taskId) => {
@@ -95,6 +105,7 @@ export const PosterProvider = ({ children }) => {
         getApplicants,
         approveApplicant,
         getTaskBids,
+        deleteTask,
       }}
     >
       {children}

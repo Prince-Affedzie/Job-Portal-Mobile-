@@ -236,49 +236,76 @@ export default function ApplicantProfileScreen({ route }) {
     </View>
   );
 
-  const renderPortfolio = () => (
-    <View>
-      {/* Work Portfolio */}
-      {applicant?.workPortfolio && applicant.workPortfolio.length > 0 ? (
-        <InfoSection title="Portfolio" icon="images-outline">
-          <View style={styles.portfolioGrid}>
-            {applicant.workPortfolio.map((item, index) => (
-              <View key={index} style={styles.portfolioItem}>
-                {item.type === 'image' && item.url ? (
-                  <Image
-                    source={{ uri: item.url }}
-                    style={styles.portfolioImage}
-                    resizeMode="cover"
-                  />
+ const renderPortfolio = () => (
+  <View>
+    {applicant?.workPortfolio && applicant.workPortfolio.length > 0 ? (
+      <InfoSection title="Portfolio" icon="images-outline">
+        <View style={styles.portfolioGrid}>
+          {applicant.workPortfolio.map((item, index) => (
+            <View key={index} style={styles.portfolioCard}>
+              {/* Title */}
+              <Text style={styles.portfolioTitle} numberOfLines={1}>
+                {item.title || 'Project'}
+              </Text>
+
+              {/* Files Preview */}
+              <View style={styles.filesContainer}>
+                {item.files && item.files.length > 0 ? (
+                  item.files.map((file, i) =>
+                    file.publicUrl.endsWith('.jpg') ||
+                    file.publicUrl.endsWith('.png') ||
+                    file.publicUrl.endsWith('.jpeg') ? (
+                      <Image
+                        key={i}
+                        source={{ uri: file.publicUrl }}
+                        style={styles.portfolioImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <TouchableOpacity key={i} style={styles.fileItem}>
+                        <Ionicons name="document-text-outline" size={20} color="#4B5563" />
+                        <Text style={styles.fileName} numberOfLines={1}>
+                          {file.name || 'File'}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  )
                 ) : (
                   <View style={styles.portfolioPlaceholder}>
-                    <Ionicons name="document-text-outline" size={24} color="#6B7280" />
-                    <Text style={styles.portfolioText}>{item.title || 'Project'}</Text>
+                    <Ionicons name="folder-outline" size={24} color="#6B7280" />
+                    <Text style={styles.portfolioText}>No files</Text>
                   </View>
                 )}
-                <Text style={styles.portfolioTitle} numberOfLines={1}>
-                  {item.title || 'Project'}
-                </Text>
-                {item.description && (
-                  <Text style={styles.portfolioDescription} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                )}
               </View>
-            ))}
-          </View>
-        </InfoSection>
-      ) : (
-        <View style={styles.emptyPortfolio}>
-          <Ionicons name="images-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.emptyPortfolioText}>No portfolio items yet</Text>
-          <Text style={styles.emptyPortfolioSubtext}>
-            {applicant.name} hasn't added any work to their portfolio
-          </Text>
+
+              {/* Description */}
+              {item.description && (
+                <Text style={styles.portfolioDescription} numberOfLines={3}>
+                  {item.description}
+                </Text>
+              )}
+
+              {/* External Link */}
+              {item.link && (
+                <TouchableOpacity onPress={() => Linking.openURL(item.link)}>
+                  <Text style={styles.portfolioLink}>View Project ↗</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
         </View>
-      )}
-    </View>
-  );
+      </InfoSection>
+    ) : (
+      <View style={styles.emptyPortfolio}>
+        <Ionicons name="images-outline" size={48} color="#9CA3AF" />
+        <Text style={styles.emptyPortfolioText}>No portfolio items yet</Text>
+        <Text style={styles.emptyPortfolioSubtext}>
+          {applicant.name} hasn’t added any work to their portfolio
+        </Text>
+      </View>
+    )}
+  </View>
+);
 
   const renderReviews = () => (
     <View>
@@ -394,9 +421,9 @@ export default function ApplicantProfileScreen({ route }) {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{applicant?.name || 'User'}</Text>
               <Text style={styles.profileEmail}>{applicant?.email}</Text>
-              {applicant?.phone && (
+              {/*{applicant?.phone && (
                 <Text style={styles.profilePhone}>{applicant.phone}</Text>
-              )}
+              )}*/}              
               <Text style={styles.memberSince}>
                 Member since {stats.memberSince}
               </Text>
@@ -457,7 +484,7 @@ export default function ApplicantProfileScreen({ route }) {
           </View>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons 
         <View style={styles.actionButtons}>
           <TouchableOpacity 
             style={[styles.actionButton, styles.contactButton]}
@@ -485,6 +512,7 @@ export default function ApplicantProfileScreen({ route }) {
             </TouchableOpacity>
           )}
         </View>
+        */}
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
@@ -535,7 +563,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 40,
     marginHorizontal:10,
-    borderRadius: 10,
+    borderRadius: 20,
   },
   avatarSection: {
     flexDirection: 'row',
@@ -720,6 +748,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginTop:12,
   },
   tabButton: {
     flex: 1,
@@ -875,21 +904,72 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#475569',
   },
-  portfolioGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  portfolioItem: {
-    width: (width - 64) / 2,
-    marginBottom: 16,
-  },
-  portfolioImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
+ portfolioGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 12,
+},
+
+portfolioCard: {
+  flexBasis: '48%',
+  backgroundColor: '#fff',
+  borderRadius: 12,
+  padding: 10,
+  marginBottom: 12,
+  shadowColor: '#000',
+  shadowOpacity: 0.05,
+  shadowRadius: 4,
+  elevation: 2,
+},
+
+filesContainer: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  marginVertical: 6,
+  gap: 6,
+},
+
+portfolioImage: {
+  width: 70,
+  height: 70,
+  borderRadius: 8,
+},
+
+fileItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 4,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 6,
+},
+
+fileName: {
+  marginLeft: 6,
+  fontSize: 12,
+  color: '#374151',
+  maxWidth: 100,
+},
+
+portfolioTitle: {
+  fontSize: 14,
+  fontWeight: 'bold',
+  color: '#111827',
+  marginBottom: 4,
+},
+
+portfolioDescription: {
+  fontSize: 12,
+  color: '#4B5563',
+  marginVertical: 4,
+},
+
+portfolioLink: {
+  fontSize: 12,
+  color: '#2563EB',
+  marginTop: 4,
+},
+
   portfolioPlaceholder: {
     width: '100%',
     height: 120,

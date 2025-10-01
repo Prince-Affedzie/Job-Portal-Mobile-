@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, FlatList, Modal, RefreshControl, TextInput } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Dimensions,Alert, TouchableOpacity, FlatList, Modal, RefreshControl, TextInput, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import React, { useState, useContext, useEffect } from 'react'
 import Entypo from '@expo/vector-icons/Entypo';
@@ -16,7 +16,7 @@ const categoryFilters = ['All', 'Home Services', 'Delivery & Errands', 'Digital 
 
 export default function PostedTasksScreen() {
   const { user } = useContext(AuthContext);
-  const { postedTasks, loading, loadPostedTasks } = useContext(PosterContext);
+  const { postedTasks, loading, loadPostedTasks,deleteTask } = useContext(PosterContext);
   
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -25,6 +25,10 @@ export default function PostedTasksScreen() {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Deletion status tracking
+  const [deletingTasks, setDeletingTasks] = useState({}); // Track deleting tasks by ID
+  const [deletionError, setDeletionError] = useState(null);
 
   // Load tasks on component mount
   useEffect(() => {
@@ -36,6 +40,66 @@ export default function PostedTasksScreen() {
     setRefreshing(true);
     await loadPostedTasks();
     setRefreshing(false);
+  };
+
+  // Clear deletion error when modal closes or component unmounts
+  useEffect(() => {
+    if (!actionModalVisible) {
+      setDeletionError(null);
+    }
+  }, [actionModalVisible]);
+
+  const deleteATask = async (taskId, taskTitle) => {
+    // Set deleting status for this specific task
+    setDeletingTasks(prev => ({ ...prev, [taskId]: true }));
+    setDeletionError(null);
+
+    return new Promise((resolve) => {
+      Alert.alert(
+        "Delete Task",
+        `Are you sure you want to delete "${taskTitle}"? This action cannot be undone.`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              setDeletingTasks(prev => ({ ...prev, [taskId]: false }));
+              resolve({ success: false, cancelled: true });
+            }
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const res = await deleteTask(taskId);
+                if (res.status === 200) {
+                  Alert.alert("Success", "Task deleted successfully!", [{ text: "OK" }]);
+                  resolve({ success: true, data: res.data });
+                  
+                  // Refresh the task list
+                  await loadPostedTasks();
+                } else {
+                  throw new Error(res.data?.message || 'Failed to delete task');
+                }
+              } catch (error) {
+                const errorMessage = error.response?.data?.message ||
+                                   error.response?.data?.error ||
+                                   error.message ||
+                                   "An unexpected error occurred while deleting the task.";
+                
+                setDeletionError(errorMessage);
+                Alert.alert("Delete Failed", errorMessage, [{ text: "OK" }]);
+                resolve({ success: false, error: errorMessage });
+              } finally {
+                // Clear deleting status regardless of outcome
+                setDeletingTasks(prev => ({ ...prev, [taskId]: false }));
+              }
+            }
+          }
+        ]
+      );
+    });
   };
 
   // Filter tasks based on selected filters and search
@@ -77,17 +141,26 @@ export default function PostedTasksScreen() {
     setActionModalVisible(true);
   };
 
-  const handleActionSelect = (action) => {
-    if (action === 'View Details' && selectedTask) {
+  const handleActionSelect = async (action) => {
+    if (!selectedTask) return;
+    
+    if (action === 'View Details') {
       navigate('ClientTaskDetail', { taskId: selectedTask._id });
-    } else if (action === 'Edit' && selectedTask) {
+    } else if (action === 'Edit') {
       navigate('EditTask', { taskId: selectedTask._id, task: selectedTask });
-    } else if (action === 'View Applicants' && selectedTask) {
+    } else if (action === 'View Applicants') {
       navigate('TaskApplicants', { 
         taskId: selectedTask._id,
         applicants: selectedTask.applicants || []
       });
+    } else if (action === 'Delete') {
+      const result = await deleteATask(selectedTask._id, selectedTask.title);
+      
+      if (result.success) {
+        loadPostedTasks(); 
+      }
     }
+    
     setActionModalVisible(false);
   };
 
@@ -124,6 +197,9 @@ export default function PostedTasksScreen() {
   };
 
   const renderTaskItem = ({ item }) => {
+    // Check if this task is currently being deleted
+    const isDeleting = deletingTasks[item._id];
+    
     // Map your actual statuses to display names and colors
     const getStatusDisplay = (status) => {
       switch(status) {
@@ -220,9 +296,20 @@ export default function PostedTasksScreen() {
 
     return (
       <TouchableOpacity 
-        style={styles.taskCard}
-        onPress={() => navigate('ClientTaskDetail', { taskId: item._id })}
+        style={[
+          styles.taskCard,
+          isDeleting && styles.deletingTaskCard
+        ]}
+        onPress={() => !isDeleting && navigate('ClientTaskDetail', { taskId: item._id })}
+        disabled={isDeleting}
       >
+        {isDeleting && (
+          <View style={styles.deletingOverlay}>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={styles.deletingText}>Deleting...</Text>
+          </View>
+        )}
+        
         <View style={styles.taskHeader}>
           <View style={styles.titleContainer}>
             <View style={[styles.iconCircle, { backgroundColor: statusStyles.iconBg }]}>
@@ -232,14 +319,22 @@ export default function PostedTasksScreen() {
                 color={statusStyles.iconColor} 
               />
             </View>
-            <Text style={styles.taskTitle}>{item.title}</Text>
+            <Text style={[
+              styles.taskTitle,
+              isDeleting && styles.deletingText
+            ]}>{item.title}</Text>
           </View>
 
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => handleActionPress(item)}
+            onPress={() => !isDeleting && handleActionPress(item)}
+            disabled={isDeleting}
           >
-            <Entypo name="dots-three-vertical" size={18} color="#666" />
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#666" />
+            ) : (
+              <Entypo name="dots-three-vertical" size={18} color="#666" />
+            )}
           </TouchableOpacity>
         </View>
         
@@ -490,6 +585,14 @@ export default function PostedTasksScreen() {
               </TouchableOpacity>
             </View>
             
+            {/* Show deletion error if any */}
+            {deletionError && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="warning-outline" size={18} color="#FFF" />
+                <Text style={styles.errorText}>Deletion failed: {deletionError}</Text>
+              </View>
+            )}
+            
             <View style={styles.actionList}>
               <TouchableOpacity 
                 style={styles.actionItem}
@@ -516,19 +619,21 @@ export default function PostedTasksScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() => handleActionSelect('Change Status')}
-              >
-                <MaterialIcons name="swap-vert" size={22} color="#4CAF50" />
-                <Text style={styles.actionText}>Change Status</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionItem}
+                style={[
+                  styles.actionItem,
+                  deletingTasks[selectedTask?._id] && styles.disabledAction
+                ]}
                 onPress={() => handleActionSelect('Delete')}
+                disabled={deletingTasks[selectedTask?._id]}
               >
-                <Ionicons name="trash-outline" size={22} color="#F44336" />
-                <Text style={[styles.actionText, styles.deleteText]}>Delete Task</Text>
+                {deletingTasks[selectedTask?._id] ? (
+                  <ActivityIndicator size="small" color="#F44336" />
+                ) : (
+                  <Ionicons name="trash-outline" size={22} color="#F44336" />
+                )}
+                <Text style={[styles.actionText, styles.deleteText]}>
+                  {deletingTasks[selectedTask?._id] ? 'Deleting...' : 'Delete Task'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -537,7 +642,6 @@ export default function PostedTasksScreen() {
     </SafeAreaView>
   );
 }
-
 // Updated styles with search and filter components
 const styles = StyleSheet.create({
   safe: {
@@ -821,29 +925,43 @@ resultsSubtitle: {
     shadowRadius: 4,
     elevation: 5,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+ modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'flex-end',
+},
+modalContent: {
+  backgroundColor: 'white',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  padding: 20,
+  maxHeight: height * 0.6,
+  // Add shadow for depth
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: -2,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: height * 0.6,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  elevation: 5,
+  // Smooth entrance animation
+  transform: [{ translateY: 0 }],
+},
+modalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 20,
+  paddingBottom: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#f0f0f0',
+},
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#333',
+},
   actionList: {
     // Action list container
   },
@@ -861,5 +979,44 @@ resultsSubtitle: {
   },
   deleteText: {
     color: '#F44336',
+  },
+  deletingTaskCard: {
+    opacity: 0.6,
+  },
+  deletingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  deletingText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  disabledAction: {
+    opacity: 0.5,
+  },
+  errorBanner: {
+    backgroundColor: '#F44336',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  errorText: {
+    color: '#FFFFFF',
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

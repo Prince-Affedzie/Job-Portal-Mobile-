@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Alert,
   Dimensions,
   Animated,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
+import { ProfileField } from '../../component/tasker/ProfileField';
+import { LocationField } from '../../component/tasker/LocationField';
+import { styles } from '../../styles/auth/ProfileScreen.Styles';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
 
 const { width } = Dimensions.get('window');
 
@@ -33,32 +39,91 @@ const TaskerProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
   const [newSkill, setNewSkill] = useState('');
+  const [showExperienceModal, setShowExperienceModal] = useState(false);
+  const [editingExperience, setEditingExperience] = useState(null);
+  const [profileData, setProfileData] = useState({});
   const [notifications, setNotifications] = useState({
     taskAlerts: true,
     messageNotifications: true,
     emailUpdates: false,
     promotional: false,
   });
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
   
-  // Initialize profile data with user data and fallbacks
-  const [profileData, setProfileData] = useState({
-    name: user?.name || 'Tasker',
-    email: user?.email || 'No email provided',
-    phone: user?.phone || '+233 XX XXX XXXX',
-    location: user?.location?.city || 'Location not set',
-    bio: user?.Bio || 'Tell us about yourself and your skills...',
-    skills: user?.skills || ['Add your skills'],
-    hourlyRate: user?.hourlyRate || 0,
-    availability: user?.availability || 'Available',
-    verified: user?.verified || false,
-    completedTasks: user?.completedTasks || 0,
-    successRate: user?.successRate || '0%',
-    rating: user?.rating || 0,
-    memberSince: user?.createdAt || new Date().toISOString(),
-    profileImage: user?.profileImage || DEFAULT_PROFILE_IMAGE,
+
+
+  const onStartDateChange = (event, selectedDate) => {
+  setShowStartDatePicker(false);
+  if (selectedDate) {
+    setExperienceForm({ 
+      ...experienceForm, 
+      startDate: selectedDate.toISOString().split('T')[0] 
+    });
+  }
+};
+
+const onEndDateChange = (event, selectedDate) => {
+  setShowEndDatePicker(false);
+  if (selectedDate) {
+    setExperienceForm({ 
+      ...experienceForm, 
+      endDate: selectedDate.toISOString().split('T')[0] 
+    });
+  }
+};
+
+// Format date for display
+const formatDisplayDate = (dateString) => {
+  if (!dateString) return 'Select Date';
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return 'Select Date';
+  }
+};
+  // Work Experience Form State
+  const [experienceForm, setExperienceForm] = useState({
+    jobTitle: '',
+    company: '',
+    startDate: '',
+    endDate: '',
+    description: '',
+    currentlyWorking: false,
   });
+
+  // Initialize profile data with user data and proper schema structure
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        location: user.location || {
+          region: '',
+          city: '',
+          town: '',
+          street: ''
+        },
+        Bio: user.Bio || '',
+        skills: user.skills || [],
+        hourlyRate: user.hourlyRate || 0,
+        availability: user.availability || 'Available',
+        profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
+        workExperience: user.workExperience || [],
+        education: user.education || [],
+        workPortfolio: user.workPortfolio || [],
+        // Add other schema fields as needed
+        ...user
+      });
+    }
+  }, [user]);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -69,17 +134,103 @@ const TaskerProfileScreen = ({ navigation }) => {
   }, []);
 
   const handleSave = async () => {
-    setLoading(true);
-    try {
-      await updateProfile(profileData);
+  setLoading(true);
+  try {
+    // Prepare data for FormData
+    const formData = new FormData();
+    
+    // Add all profile data fields
+    formData.append('name', profileData.name);
+    formData.append('email', profileData.email);
+    formData.append('phone', profileData.phone);
+    formData.append('Bio', profileData.Bio);
+    formData.append('hourlyRate', profileData.hourlyRate.toString());
+    formData.append('availability', profileData.availability);
+    
+    // Handle location object
+    if (profileData.location) {
+      formData.append('location[region]', profileData.location.region || '');
+      formData.append('location[city]', profileData.location.city || '');
+      formData.append('location[town]', profileData.location.town || '');
+      formData.append('location[street]', profileData.location.street || '');
+    }
+    
+    // Handle arrays
+    if (profileData.skills) {
+      profileData.skills.forEach((skill, index) => {
+        formData.append(`skills[${index}]`, skill);
+      });
+    }
+    
+    // FIX: Properly handle work experience dates
+    if (profileData.workExperience) {
+      profileData.workExperience.forEach((exp, index) => {
+        formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
+        formData.append(`workExperience[${index}][company]`, exp.company || '');
+        
+        // Ensure startDate is a valid date string
+        if (exp.startDate && exp.startDate instanceof Date) {
+          formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
+        } else if (exp.startDate && typeof exp.startDate === 'string') {
+          // If it's already a string, validate it's a proper date
+          const date = new Date(exp.startDate);
+          if (!isNaN(date.getTime())) {
+            formData.append(`workExperience[${index}][startDate]`, date.toISOString());
+          } else {
+            console.warn('Invalid startDate:', exp.startDate);
+            // Skip this experience entry or handle error
+            return;
+          }
+        } else {
+          console.warn('Missing or invalid startDate for experience:', exp);
+          // Skip this experience entry
+          return;
+        }
+        
+        // Handle endDate (can be null if currently working)
+        if (exp.endDate && exp.endDate instanceof Date) {
+          formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
+        } else if (exp.endDate && typeof exp.endDate === 'string') {
+          const date = new Date(exp.endDate);
+          if (!isNaN(date.getTime())) {
+            formData.append(`workExperience[${index}][endDate]`, date.toISOString());
+          }
+        }
+        // If endDate is null/undefined, don't send it (handles "currently working" case)
+        
+        formData.append(`workExperience[${index}][description]`, exp.description || '');
+      });
+    }
+    
+    // Handle profile image if it's a local file URI
+    if (profileData.profileImage && profileData.profileImage.startsWith('file://')) {
+      const filename = profileData.profileImage.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image';
+      
+      formData.append('profileImage', {
+        uri: profileData.profileImage,
+        name: filename,
+        type,
+      });
+    } else if (profileData.profileImage) {
+      // If it's a URL, just send the URL
+      formData.append('profileImageUrl', profileData.profileImage);
+    }
+
+    const res = await updateProfile(formData);
+    if (res?.status === 200) {
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Update error:', error);
+    Alert.alert('Error', 'Failed to update profile. Please try again.');
+  } finally {
+    setLoading(false);
+    setEditing(false);
+  }
+};
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -104,10 +255,10 @@ const TaskerProfileScreen = ({ navigation }) => {
   };
 
   const addSkill = () => {
-    if (newSkill.trim() && !profileData.skills.includes(newSkill.trim())) {
+    if (newSkill.trim() && !profileData.skills?.includes(newSkill.trim())) {
       setProfileData({
         ...profileData,
-        skills: [...profileData.skills, newSkill.trim()],
+        skills: [...(profileData.skills || []), newSkill.trim()],
       });
       setNewSkill('');
     }
@@ -116,8 +267,128 @@ const TaskerProfileScreen = ({ navigation }) => {
   const removeSkill = (skillToRemove) => {
     setProfileData({
       ...profileData,
-      skills: profileData.skills.filter(skill => skill !== skillToRemove),
+      skills: profileData.skills?.filter(skill => skill !== skillToRemove) || [],
     });
+  };
+
+  // Work Experience Functions
+  const openExperienceModal = (experience = null) => {
+    if (experience) {
+      setExperienceForm({
+        jobTitle: experience.jobTitle || '',
+        company: experience.company || '',
+        startDate: experience.startDate ? new Date(experience.startDate).toISOString().split('T')[0] : '',
+        endDate: experience.endDate ? new Date(experience.endDate).toISOString().split('T')[0] : '',
+        description: experience.description || '',
+        currentlyWorking: !experience.endDate,
+      });
+      setEditingExperience(experience);
+    } else {
+      setExperienceForm({
+        jobTitle: '',
+        company: '',
+        startDate: '',
+        endDate: '',
+        description: '',
+        currentlyWorking: false,
+      });
+      setEditingExperience(null);
+    }
+    setShowExperienceModal(true);
+  };
+
+  const closeExperienceModal = () => {
+    setShowExperienceModal(false);
+    setEditingExperience(null);
+    setExperienceForm({
+      jobTitle: '',
+      company: '',
+      startDate: '',
+      endDate: '',
+      description: '',
+      currentlyWorking: false,
+    });
+  };
+
+  const saveExperience = () => {
+  const { jobTitle, company, startDate, description } = experienceForm;
+  
+  if (!jobTitle.trim() || !company.trim() || !startDate || !description.trim()) {
+    Alert.alert('Error', 'Please fill in all required fields');
+    return;
+  }
+
+  // FIX: Ensure we have valid Date objects
+  let startDateObj;
+  try {
+    startDateObj = new Date(startDate);
+    if (isNaN(startDateObj.getTime())) {
+      Alert.alert('Error', 'Invalid start date');
+      return;
+    }
+  } catch (error) {
+    Alert.alert('Error', 'Invalid start date format');
+    return;
+  }
+
+  let endDateObj = null;
+  if (!experienceForm.currentlyWorking && experienceForm.endDate) {
+    try {
+      endDateObj = new Date(experienceForm.endDate);
+      if (isNaN(endDateObj.getTime())) {
+        Alert.alert('Error', 'Invalid end date');
+        return;
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Invalid end date format');
+      return;
+    }
+  }
+
+  const newExperience = {
+    jobTitle: jobTitle.trim(),
+    company: company.trim(),
+    startDate: startDateObj, // Use the Date object
+    endDate: endDateObj, // Use the Date object or null
+    description: description.trim(),
+  };
+
+  let updatedExperience;
+  if (editingExperience) {
+    updatedExperience = profileData.workExperience?.map(exp => 
+      exp === editingExperience ? newExperience : exp
+    ) || [];
+  } else {
+    updatedExperience = [...(profileData.workExperience || []), newExperience];
+  }
+
+  setProfileData({
+    ...profileData,
+    workExperience: updatedExperience,
+  });
+
+  closeExperienceModal();
+  Alert.alert('Success', `Experience ${editingExperience ? 'updated' : 'added'} successfully!`);
+};
+
+  const removeExperience = (experienceToRemove) => {
+    Alert.alert(
+      'Remove Experience',
+      'Are you sure you want to remove this work experience?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setProfileData({
+              ...profileData,
+              workExperience: profileData.workExperience?.filter(exp => exp !== experienceToRemove) || [],
+            });
+          }
+        }
+      ]
+    );
   };
 
   const toggleNotification = (type) => {
@@ -148,26 +419,40 @@ const TaskerProfileScreen = ({ navigation }) => {
     </View>
   );
 
-  const ProfileField = ({ label, value, editable = false, onChange, multiline = false, placeholder = '' }) => (
-    <View style={styles.profileField}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {editing && editable ? (
-        <TextInput
-          style={[styles.fieldInput, multiline && styles.multilineInput]}
-          value={value}
-          onChangeText={onChange}
-          multiline={multiline}
-          numberOfLines={multiline ? 3 : 1}
-          placeholder={placeholder}
-          placeholderTextColor="#94A3B8"
-        />
-      ) : (
-        <Text style={[styles.fieldValue, !value && styles.placeholderText]}>
-          {value || placeholder}
-        </Text>
-      )}
-    </View>
-  );
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Present';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+      });
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
+  const calculateDuration = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : new Date();
+    
+    const years = end.getFullYear() - start.getFullYear();
+    const months = end.getMonth() - start.getMonth();
+    
+    let totalMonths = years * 12 + months;
+    if (totalMonths < 0) totalMonths = 0;
+    
+    const yearsPart = Math.floor(totalMonths / 12);
+    const monthsPart = totalMonths % 12;
+    
+    if (yearsPart === 0) {
+      return `${monthsPart} mos`;
+    } else if (monthsPart === 0) {
+      return `${yearsPart} yr${yearsPart > 1 ? 's' : ''}`;
+    } else {
+      return `${yearsPart} yr${yearsPart > 1 ? 's' : ''} ${monthsPart} mos`;
+    }
+  };
 
   const getPrimarySkill = () => {
     if (!profileData.skills || profileData.skills.length === 0) return 'Tasker';
@@ -176,7 +461,7 @@ const TaskerProfileScreen = ({ navigation }) => {
 
   const formatMemberSince = () => {
     try {
-      return new Date(profileData.memberSince).toLocaleDateString('en-US', {
+      return new Date(profileData.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long'
       });
@@ -228,7 +513,7 @@ const TaskerProfileScreen = ({ navigation }) => {
         >
           <View style={styles.profileImageContainer}>
             <Image
-              source={{ uri: profileData.profileImage }}
+              source={{ uri: profileData.profileImage || DEFAULT_PROFILE_IMAGE }}
               style={styles.profileImage}
               defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
             />
@@ -240,18 +525,18 @@ const TaskerProfileScreen = ({ navigation }) => {
           </View>
           
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profileData.name}</Text>
+            <Text style={styles.profileName}>{profileData.name || 'Tasker'}</Text>
             <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
             
             <View style={styles.ratingVerificationContainer}>
               {profileData.rating > 0 && (
                 <View style={[styles.ratingContainer, { backgroundColor: getRatingColor(profileData.rating) }]}>
                   <Ionicons name="star" size={14} color="#FFFFFF" />
-                  <Text style={styles.ratingText}>{parseFloat(profileData.rating).toFixed(1)}</Text>
+                  <Text style={styles.ratingText}>{parseFloat(profileData.rating || 0).toFixed(1)}</Text>
                 </View>
               )}
               
-              {profileData.verified && (
+              {profileData.isVerified && (
                 <View style={styles.verificationBadge}>
                   <Ionicons name="checkmark-circle" size={14} color="#10B981" />
                   <Text style={styles.verificationText}>Verified</Text>
@@ -264,19 +549,19 @@ const TaskerProfileScreen = ({ navigation }) => {
         {/* Enhanced Stats Overview */}
         <View style={styles.statsContainer}>
           <StatsCard 
-            value={profileData.completedTasks} 
+            value={profileData.completedTasks || 0} 
             label="Completed" 
             icon="checkmark-done" 
             color="#10B981" 
           />
           <StatsCard 
-            value={profileData.successRate} 
+            value={`${profileData.successRate || 0}%`} 
             label="Success Rate" 
             icon="trending-up" 
             color="#6366F1" 
           />
           <StatsCard 
-            value={`₵${profileData.hourlyRate}`} 
+            value={`₵${profileData.hourlyRate || 0}`} 
             label="Hourly Rate" 
             icon="cash" 
             color="#F59E0B" 
@@ -296,6 +581,8 @@ const TaskerProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, name: text })}
               placeholder="Enter your full name"
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
             <ProfileField
               label="Email"
@@ -303,6 +590,8 @@ const TaskerProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, email: text })}
               placeholder="Enter your email"
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
             <ProfileField
               label="Phone"
@@ -310,21 +599,59 @@ const TaskerProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, phone: text })}
               placeholder="Enter your phone number"
+              editing = {editing}
+              setProfileData ={setProfileData}
+              profileData={profileData}
             />
-            <ProfileField
-              label="Location"
-              value={profileData.location}
+            
+            {/* Location Fields */}
+            <LocationField
+              label="City"
+              field="city"
+              value={profileData.location?.city}
               editable
-              onChange={(text) => setProfileData({ ...profileData, location: text })}
-              placeholder="Enter your location"
+              editing = {editing}
+              setProfileData ={setProfileData}
+              profileData={profileData}
             />
+            <LocationField
+              label="Region"
+              field="region"
+              value={profileData.location?.region}
+              editable
+              editing = {editing}
+              setProfileData ={setProfileData}
+              profileData={profileData}
+
+            />
+            <LocationField
+              label="Town"
+              field="town"
+              value={profileData.location?.town}
+              editable
+              editing = {editing}
+              setProfileData ={setProfileData}
+              profileData={profileData}
+            />
+            <LocationField
+              label="Street"
+              field="street"
+              value={profileData.location?.street}
+              editable
+              editing = {editing}
+              setProfileData ={setProfileData}
+              profileData={profileData}
+            />
+            
             <ProfileField
               label="Bio"
-              value={profileData.bio}
+              value={profileData.Bio}
               editable
-              onChange={(text) => setProfileData({ ...profileData, bio: text })}
+              onChange={(text) => setProfileData({ ...profileData, Bio: text })}
               multiline
               placeholder="Tell us about yourself and your skills..."
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
           </View>
         </View>
@@ -377,6 +704,85 @@ const TaskerProfileScreen = ({ navigation }) => {
           )}
         </View>
 
+        {/* Work Experience Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="briefcase-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Work Experience</Text>
+            {editing && (
+              <TouchableOpacity 
+                style={styles.addExperienceButton}
+                onPress={() => openExperienceModal()}
+              >
+                <Ionicons name="add" size={20} color="#6366F1" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {profileData.workExperience && profileData.workExperience.length > 0 ? (
+            <View style={styles.experienceList}>
+              {profileData.workExperience.map((experience, index) => (
+                <View key={index} style={styles.experienceItem}>
+                  <View style={styles.experienceContent}>
+                    <View style={styles.experienceHeader}>
+                      <Text style={styles.experienceJobTitle}>{experience.jobTitle}</Text>
+                      {editing && (
+                        <View style={styles.experienceActions}>
+                          <TouchableOpacity 
+                            style={styles.experienceActionButton}
+                            onPress={() => openExperienceModal(experience)}
+                          >
+                            <Ionicons name="create-outline" size={16} color="#6366F1" />
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={styles.experienceActionButton}
+                            onPress={() => removeExperience(experience)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <Text style={styles.experienceCompany}>{experience.company}</Text>
+                    
+                    <View style={styles.experienceMeta}>
+                      <Text style={styles.experienceDuration}>
+                        {formatDate(experience.startDate)} - {formatDate(experience.endDate)}
+                      </Text>
+                      <Text style={styles.experienceLength}>
+                        {calculateDuration(experience.startDate, experience.endDate)}
+                      </Text>
+                    </View>
+                    
+                    {experience.description && (
+                      <Text style={styles.experienceDescription}>
+                        {experience.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyExperience}>
+              <Ionicons name="briefcase-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyExperienceText}>No work experience added</Text>
+              <Text style={styles.emptyExperienceSubtext}>
+                Add your professional experience to showcase your expertise
+              </Text>
+              {editing && (
+                <TouchableOpacity 
+                  style={styles.addFirstExperienceButton}
+                  onPress={() => openExperienceModal()}
+                >
+                  <Text style={styles.addFirstExperienceText}>Add First Experience</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+
         {/* Enhanced Availability */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -391,7 +797,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                 color={profileData.availability === 'Available' ? "#10B981" : "#EF4444"} 
               />
               <View>
-                <Text style={styles.availabilityStatus}>{profileData.availability}</Text>
+                <Text style={styles.availabilityStatus}>{profileData.availability || 'Not Available'}</Text>
                 <Text style={styles.availabilityText}>
                   {profileData.availability === 'Available' ? 'Ready for new tasks' : 'Not accepting new tasks'}
                 </Text>
@@ -495,366 +901,168 @@ const TaskerProfileScreen = ({ navigation }) => {
           </Text>
         </View>
       </Animated.ScrollView>
+
+      {/* Work Experience Modal */}
+      <Modal
+        visible={showExperienceModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeExperienceModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingExperience ? 'Edit Experience' : 'Add Work Experience'}
+              </Text>
+              <TouchableOpacity onPress={closeExperienceModal}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+           <ScrollView style={styles.modalForm}>
+  <View style={styles.formGroup}>
+    <Text style={styles.formLabel}>Job Title *</Text>
+    <TextInput
+      style={styles.formInput}
+      value={experienceForm.jobTitle}
+      onChangeText={(text) => setExperienceForm({ ...experienceForm, jobTitle: text })}
+      placeholder="e.g., Freelance Handyman"
+      placeholderTextColor="#94A3B8"
+    />
+  </View>
+
+  <View style={styles.formGroup}>
+    <Text style={styles.formLabel}>Company or Client *</Text>
+    <TextInput
+      style={styles.formInput}
+      value={experienceForm.company}
+      onChangeText={(text) => setExperienceForm({ ...experienceForm, company: text })}
+      placeholder="e.g., Self-Employed or ABC Properties"
+      placeholderTextColor="#94A3B8"
+    />
+  </View>
+
+  {/* Updated Date Fields with Pickers */}
+  <View style={styles.formRow}>
+    <View style={styles.formGroupHalf}>
+      <Text style={styles.formLabel}>Start Date *</Text>
+      <TouchableOpacity 
+        style={styles.dateInput}
+        onPress={() => setShowStartDatePicker(true)}
+      >
+        <Text style={[
+          styles.dateInputText, 
+          !experienceForm.startDate && styles.placeholderText
+        ]}>
+          {formatDisplayDate(experienceForm.startDate)}
+        </Text>
+        <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+      </TouchableOpacity>
+    </View>
+    
+    <View style={styles.formGroupHalf}>
+      <Text style={styles.formLabel}>End Date</Text>
+      <TouchableOpacity 
+        style={[
+          styles.dateInput,
+          experienceForm.currentlyWorking && styles.dateInputDisabled
+        ]}
+        onPress={() => !experienceForm.currentlyWorking && setShowEndDatePicker(true)}
+        disabled={experienceForm.currentlyWorking}
+      >
+        <Text style={[
+          styles.dateInputText, 
+          !experienceForm.endDate && styles.placeholderText,
+          experienceForm.currentlyWorking && styles.disabledText
+        ]}>
+          {experienceForm.currentlyWorking ? 'Present' : formatDisplayDate(experienceForm.endDate)}
+        </Text>
+        {!experienceForm.currentlyWorking && (
+          <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+        )}
+      </TouchableOpacity>
+    </View>
+  </View>
+
+  <View style={styles.formGroup}>
+    <TouchableOpacity 
+      style={styles.checkboxContainer}
+      onPress={() => setExperienceForm({ 
+        ...experienceForm, 
+        currentlyWorking: !experienceForm.currentlyWorking,
+        endDate: !experienceForm.currentlyWorking ? '' : experienceForm.endDate
+      })}
+    >
+      <View style={[styles.checkbox, experienceForm.currentlyWorking && styles.checkboxChecked]}>
+        {experienceForm.currentlyWorking && (
+          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+        )}
+      </View>
+      <Text style={styles.checkboxLabel}>I currently work here</Text>
+    </TouchableOpacity>
+  </View>
+
+  <View style={styles.formGroup}>
+    <Text style={styles.formLabel}>Description *</Text>
+    <TextInput
+      style={[styles.formInput, styles.textArea]}
+      value={experienceForm.description}
+      onChangeText={(text) => setExperienceForm({ ...experienceForm, description: text })}
+      placeholder="Describe your responsibilities, skills used, and achievements..."
+      placeholderTextColor="#94A3B8"
+      multiline
+      numberOfLines={4}
+      textAlignVertical="top"
+    />
+  </View>
+
+  {/* Date Pickers */}
+  {showStartDatePicker && (
+    <DateTimePicker
+      value={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date()}
+      mode="date"
+      display="default"
+      onChange={onStartDateChange}
+      maximumDate={new Date()}
+    />
+  )}
+
+  {showEndDatePicker && (
+    <DateTimePicker
+      value={experienceForm.endDate ? new Date(experienceForm.endDate) : new Date()}
+      mode="date"
+      display="default"
+      onChange={onEndDateChange}
+      minimumDate={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date(1900, 0, 1)}
+      maximumDate={new Date()}
+    />
+  )}
+</ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={closeExperienceModal}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.saveButton}
+                onPress={saveExperience}
+              >
+                <Text style={styles.saveButtonText}>
+                  {editingExperience ? 'Update' : 'Save'} Experience
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  headerButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-  },
-  headerButtonActive: {
-    backgroundColor: '#6366F1',
-  },
-  headerButtonText: {
-    color: '#6366F1',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  headerButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  profileHeader: {
-    padding: 24,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  profileImageContainer: {
-    position: 'relative',
-    marginRight: 16,
-  },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  editImageButton: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    backgroundColor: '#6366F1',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  profileTitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 12,
-  },
-  ratingVerificationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  ratingText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  verificationText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  statsCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  statsIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statsValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  statsLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  sectionContent: {
-    gap: 16,
-  },
-  profileField: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  fieldValue: {
-    fontSize: 16,
-    color: '#1E293B',
-    paddingVertical: 8,
-    lineHeight: 22,
-  },
-  fieldInput: {
-    fontSize: 16,
-    color: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  multilineInput: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  placeholderText: {
-    color: '#94A3B8',
-    fontStyle: 'italic',
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  skillTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  skillText: {
-    color: '#6366F1',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  removeSkillButton: {
-    padding: 2,
-  },
-  addSkillContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  skillInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  addSkillButton: {
-    backgroundColor: '#6366F1',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  addSkillButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  noSkillsText: {
-    color: '#94A3B8',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    padding: 16,
-  },
-  availabilityContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  availabilityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  availabilityStatus: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  availabilityText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  notificationList: {
-    gap: 8,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  notificationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  notificationText: {
-    flex: 1,
-  },
-  notificationLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  notificationDescription: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  accountActions: {
-    gap: 4,
-  },
-  accountButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    gap: 12,
-  },
-  accountButtonText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1E293B',
-    fontWeight: '500',
-  },
-  logoutButton: {
-    marginTop: 8,
-    backgroundColor: '#FEF2F2',
-  },
-  logoutText: {
-    color: '#EF4444',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-});
+
 
 export default TaskerProfileScreen;

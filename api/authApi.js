@@ -27,3 +27,11 @@ export const uploadImage = (file) => {
 };
 
 export const addPortfolio = (data) => API.post("/api/user/upload_portfolio", data);
+
+export const modifyProfile = (formData) => 
+    API.put("/api/user/edit_profile", formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
