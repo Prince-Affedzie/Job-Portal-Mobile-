@@ -10,6 +10,7 @@ import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import AppliedTaskDetailsScreen from "../screens/tasker/AppliedTaskDetailScreen";
 import SubmissionsScreen from "../screens/tasker/TaskSubmissionsScreen";
+import ChatScreen from "../screens/tasker/ChatScreen";
 import { NotificationContext } from "../context/NotificationContext";
 
 import { Ionicons } from "@expo/vector-icons";
@@ -136,6 +137,23 @@ export default function TaskerStack() {
           tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, // You can dynamically set this based on unread count
         }}
       />
+      
+
+      <Tab.Screen
+        name="Chat"
+        component={ChatScreen}
+        options={{
+          tabBarLabel: 'Chat',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+               name={focused ? "chatbox" : "chatbox-outline"}  
+              color={color} 
+              size={size} 
+            />
+          ),
+        }}
+      />
+
       <Tab.Screen
         name="DashboardTab"
         component={DashboardStack}

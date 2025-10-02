@@ -12,8 +12,9 @@ import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
 import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import TaskDetailsScreen from "../screens/tasker/TaskDetails";
 
+
 import TaskerOnboardingStack from './TaskerOnboardingStack'
-import ClientOnboarding from '../screens/auth/ClientOnboarding'
+import TaskPosterOnboarding from "../screens/auth/ClientOnboarding";
 import { AuthContext } from "../context/AuthContext";
 import { navigationRef } from '../services/navigationService';
 
@@ -44,7 +45,7 @@ export default function RootNavigator() {
 
         {/* Shared/global routes */}
         <Stack.Screen name="TaskerOnboarding" component={TaskerOnboardingStack} />
-        <Stack.Screen name="ClientOnboarding" component={ClientOnboarding} />
+        <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
       </Stack.Navigator>
     </NavigationContainer>
     </SafeAreaProvider>

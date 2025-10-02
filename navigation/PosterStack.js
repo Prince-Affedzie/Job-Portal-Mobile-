@@ -14,6 +14,7 @@ import ApplicantsScreen from "../screens/poster/TaskApplicantsScreen"
 import ApplicantProfileScreen from "../screens/poster/ApplicantProfileScreen";
 import ClientViewSubmissionsScreen from "../screens/poster/ClientSubmissionsScreen"
 import ClientProfileScreen from "../screens/poster/ClientProfileScreen";
+import ChatScreen from "../screens/tasker/ChatScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -140,6 +141,22 @@ export default function PosterStack() {
               tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, // You can dynamically set this based on unread count
               }}
             />
+
+
+             <Tab.Screen
+             name="Chat"
+             component={ChatScreen}
+             options={{
+              tabBarLabel: 'Chat',
+             tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+               name={focused ? "chatbox" : "chatbox-outline"}  
+              color={color} 
+              size={size} 
+            />
+            ),
+           }}
+          />
 
       <Tab.Screen
         name="Profile"

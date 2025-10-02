@@ -21,6 +21,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { NotificationContext } from '../../context/NotificationContext';
 import NotificationDetailModal from '../../component/common/NotificationDetailModal';
 import Header from "../../component/tasker/Header";
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -323,10 +324,7 @@ const NotificationsScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading notifications...</Text>
-      </View>
+      <LoadingIndicator text='Loading Notifications'/>
     );
   }
 

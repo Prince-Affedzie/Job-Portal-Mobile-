@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
-import { navigate,goBack } from '../../services/navigationService';
+import { NotificationContext } from "../../context/NotificationContext";
+import { navigate, goBack } from '../../services/navigationService';
+import { useContext } from 'react';
 
 const Header = ({ 
   title, 
@@ -21,25 +23,32 @@ const Header = ({
   rightIcon, 
   onRightPress,
   rightComponent,
-  showProfile = true,
+  showProfile = false,
+  showNotifications = true, // New prop to show notification icon
   backgroundColor = '#1A1F3B',
   gradient = true,
   customContent,
 }) => {
   const { user } = React.useContext(AuthContext);
   const insets = useSafeAreaInsets();
-
+  const {notifications}  = useContext(NotificationContext)
+  const unreadNotifications = notifications.filter(n => !n.read);
+ const notificationCount = unreadNotifications.length > 0 ? unreadNotifications.length :0
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
     } else {
       // Default back behavior
-     goBack();
+      goBack();
     }
   };
 
   const handleProfilePress = () => {
     navigate('ProfileTab');
+  };
+
+  const handleNotificationPress = () => {
+   user?.role==="job_seeker"? navigate('NotificationsTab'):navigate('Notifications'); // Replace with your actual notification screen name
   };
 
   const HeaderBackground = gradient ? LinearGradient : View;
@@ -104,6 +113,29 @@ const Header = ({
               </View>
             ) : (
               <>
+                {/* Notification Icon */}
+                {showNotifications && (
+                  <TouchableOpacity 
+                    style={styles.notificationButton} 
+                    onPress={handleNotificationPress}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <View style={styles.notificationContainer}>
+                      <Ionicons name="notifications-outline" size={22} color="#E2E8F0" />
+                      {notificationCount > 0 && (
+                        <View style={[
+                          styles.notificationBadge,
+                          notificationCount > 9 && styles.notificationBadgeSmall
+                        ]}>
+                          <Text style={styles.notificationText}>
+                            {notificationCount > 9 ? '9+' : notificationCount}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                
                 {rightIcon && (
                   <TouchableOpacity 
                     style={styles.rightButton} 
@@ -150,8 +182,8 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
     paddingBottom: 10,
-    marginTop:0,
-    marginBottom:15,
+    marginTop: 0,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -193,6 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     flexShrink: 0,
+    gap: 8, // Added gap for better spacing
   },
   rightComponentContainer: {
     flexDirection: 'row',
@@ -208,7 +241,39 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginRight: 8,
+  },
+  notificationButton: {
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  notificationContainer: {
+    position: 'relative',
+    padding: 2,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#1A1F3B',
+  },
+  notificationBadgeSmall: {
+    minWidth: 16,
+    height: 16,
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 12,
   },
   title: {
     fontSize: 18,

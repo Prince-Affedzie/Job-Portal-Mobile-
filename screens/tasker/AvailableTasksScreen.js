@@ -21,6 +21,7 @@ import HeroSection from "../../component/tasker/HeroSection";
 import CategoryCards from "../../component/tasker/CategoryCards";
 import Header from "../../component/tasker/Header";
 import moment from "moment";
+import LoadingIndicator from "../../component/common/LoadingIndicator";
 
 const { width } = Dimensions.get('window');
 
@@ -195,10 +196,7 @@ const AvailableTasksScreen = () => {
   // Show full screen loading only on initial load
   if (loading && !refreshing && availableTasks.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Finding available tasks...</Text>
-      </View>
+     <LoadingIndicator text="Finding available tasks..."/>
     );
   }
 

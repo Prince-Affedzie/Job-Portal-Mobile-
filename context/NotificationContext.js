@@ -1,5 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { Alert } from "react-native";
+import io from 'socket.io-client'
+import Constants from "expo-constants";
+
 import { 
   createNotification, 
   getNotifications, 
@@ -9,12 +12,16 @@ import {
 } from "../api/notificationApi"
 import { AuthContext } from "./AuthContext";
 
+const BackendURL = Constants.expoConfig.extra?.EXPO_PUBLIC_BACKEND_URL;
+
 export const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [socket, setSocket] = useState(null);
+  
 
   // Load notifications
   const loadNotifications = async () => {
@@ -111,6 +118,40 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [token]);
 
+
+
+
+  useEffect(()=>{
+       const newSocket  = io(BackendURL,{
+        auth: {
+            token: token 
+        },
+       
+    })
+    setSocket(newSocket)
+    newSocket.on('connections',()=>{
+    console.log('Socket connected',socket.id)
+    })
+  
+   newSocket.on("connect_error", (err) => {
+      console.error("Socket connection error:", err.message);
+    });
+  
+    newSocket.on('notification',(notification)=>{
+      setNotifications((prevNotifications)=>[
+        notification,
+        ...prevNotifications
+      ])
+    })
+  
+    return ()=>{ 
+     newSocket.off('notification')
+      newSocket.disconnect()
+  }   
+    },[BackendURL, token])
+  
+    
+
   return (
     <NotificationContext.Provider
       value={{
@@ -120,7 +161,8 @@ export const NotificationProvider = ({ children }) => {
         addNotification,
         markAllNotificationsAsRead,
         deleteBulkNotifications: deleteMultipleNotifications, // Use the fixed function
-        deleteNotification: deleteSingleNotification, // Use the fixed function
+        deleteNotification: deleteSingleNotification,
+        socket // Use the fixed function
       }}
     >
       {children}
