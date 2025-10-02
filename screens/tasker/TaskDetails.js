@@ -28,6 +28,7 @@ import { BidModal } from '../../component/tasker/BidModal';
 import { ScamAlertModal } from '../../component/tasker/ScamAlertModal';
 const HANDYMAN_AVATAR = require('../../assets/HandyManAvatar.png');
 import Header from "../../component/tasker/Header";
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -182,10 +183,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading task details...</Text>
-      </View>
+      <LoadingIndicator text='Loading task details...'/>
     );
   }
 

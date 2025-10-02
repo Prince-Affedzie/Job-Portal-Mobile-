@@ -22,6 +22,7 @@ import { navigate } from '../../services/navigationService';
 import { TaskerContext } from '../../context/TaskerContext';
 import { getYourAppliedMiniTasks } from '../../api/miniTaskApi'
 import Header from '../../component/tasker/Header';
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -623,10 +624,7 @@ const MyApplicationsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Loading your activities...</Text>
-      </View>
+      <LoadingIndicator text='Loading Tasks'/>
     );
   }
 

@@ -128,7 +128,7 @@ const ReviewScreen = () => {
         [
           { 
             text: 'Start Earning', 
-            onPress: () => navigate('TaskerStack', { screen: 'TaskerTabs' }),
+            onPress: () => navigate('TaskerStack', { screen: 'AvailableTab' }),
             style: 'default'
           }
         ]

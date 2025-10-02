@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext,useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../../context/AuthContext';
 import { PosterContext } from '../../context/PosterContext';
+import { ProfileField } from '../../component/tasker/ProfileField';
+import { LocationField } from '../../component/tasker/LocationField';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
 
@@ -33,6 +35,7 @@ const ClientProfileScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
   const { postedTasks } = useContext(PosterContext);
+  const [profileData, setProfileData] = useState({});
   const [notifications, setNotifications] = useState({
     taskUpdates: true,
     applicantAlerts: true,
@@ -53,18 +56,23 @@ const ClientProfileScreen = ({ navigation }) => {
   const totalSpent = postedTasks?.reduce((sum, task) => sum + (task.budget || 0), 0) || 0;
 
   // Initialize profile data with user data and fallbacks
-  const [profileData, setProfileData] = useState({
-    name: user?.name || 'Client',
-    email: user?.email || 'No email provided',
-    phone: user?.phone || '+233 XX XXX XXXX',
-    company: user?.company || 'Individual',
-    location: user?.location?.city || 'Location not set',
-    bio: user?.Bio || 'Tell us about your business and what tasks you need help with...',
-    industry: user?.industry || 'Not specified',
-    verified: user?.verified || false,
-    memberSince: user?.createdAt || new Date().toISOString(),
-    profileImage: user?.profileImage || DEFAULT_PROFILE_IMAGE,
-  });
+ useEffect(() => {
+     if (user) {
+       setProfileData({
+         name: user.name || '',
+         email: user.email || '',
+         phone: user.phone || '',
+         location: user.location || {
+           region: '',
+           city: '',
+           town: '',
+           street: ''
+         },
+         profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
+         ...user
+       });
+     }
+   }, [user]);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -77,7 +85,35 @@ const ClientProfileScreen = ({ navigation }) => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await updateProfile(profileData);
+      const formData = new FormData();
+    
+    // Add all profile data fields
+    formData.append('name', profileData.name);
+    formData.append('email', profileData.email);
+    formData.append('phone', profileData.phone);
+
+   if (profileData.location) {
+      formData.append('location[region]', profileData.location.region || '');
+      formData.append('location[city]', profileData.location.city || '');
+      formData.append('location[town]', profileData.location.town || '');
+      formData.append('location[street]', profileData.location.street || '');
+    }
+
+    if (profileData.profileImage && profileData.profileImage.startsWith('file://')) {
+      const filename = profileData.profileImage.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image';
+      
+      formData.append('profileImage', {
+        uri: profileData.profileImage,
+        name: filename,
+        type,
+      });
+    } else if (profileData.profileImage) {
+      // If it's a URL, just send the URL
+      formData.append('profileImageUrl', profileData.profileImage);
+    }
+      await updateProfile(formData);
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
@@ -136,28 +172,6 @@ const ClientProfileScreen = ({ navigation }) => {
       <Text style={styles.statsLabel}>{label}</Text>
     </View>
   );
-
-  const ProfileField = ({ label, value, editable = false, onChange, multiline = false, placeholder = '' }) => (
-    <View style={styles.profileField}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {editing && editable ? (
-        <TextInput
-          style={[styles.fieldInput, multiline && styles.multilineInput]}
-          value={value}
-          onChangeText={onChange}
-          multiline={multiline}
-          numberOfLines={multiline ? 3 : 1}
-          placeholder={placeholder}
-          placeholderTextColor="#94A3B8"
-        />
-      ) : (
-        <Text style={[styles.fieldValue, !value && styles.placeholderText]}>
-          {value || placeholder}
-        </Text>
-      )}
-    </View>
-  );
-
   const formatMemberSince = () => {
     try {
       return new Date(profileData.memberSince).toLocaleDateString('en-US', {
@@ -225,9 +239,6 @@ const ClientProfileScreen = ({ navigation }) => {
           
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profileData.name}</Text>
-            <Text style={styles.profileTitle}>{profileData.company}</Text>
-            <Text style={styles.profileIndustry}>{profileData.industry}</Text>
-            
             <View style={styles.verificationContainer}>
               {profileData.verified && (
                 <View style={styles.verificationBadge}>
@@ -272,7 +283,7 @@ const ClientProfileScreen = ({ navigation }) => {
               title="Post Task"
               icon="add-circle"
               color="#10B981"
-              onPress={() => navigate('CreateTask')}
+              onPress={() => navigate('PostedTasks',{ screen: 'CreateTask' })}
             />
             <QuickActionButton
               title="My Tasks"
@@ -284,7 +295,7 @@ const ClientProfileScreen = ({ navigation }) => {
               title="Messages"
               icon="chatbubbles"
               color="#8B5CF6"
-              onPress={() => navigate('Messages')}
+              onPress={() => navigate('Chat')}
             />
             <QuickActionButton
               title="Payments"
@@ -308,20 +319,8 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, name: text })}
               placeholder="Enter your full name"
-            />
-            <ProfileField
-              label="Company/Organization"
-              value={profileData.company}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, company: text })}
-              placeholder="Enter company name"
-            />
-            <ProfileField
-              label="Industry"
-              value={profileData.industry}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, industry: text })}
-              placeholder="Enter your industry"
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
             <ProfileField
               label="Email"
@@ -329,6 +328,8 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, email: text })}
               placeholder="Enter your email"
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
             <ProfileField
               label="Phone"
@@ -336,22 +337,49 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, phone: text })}
               placeholder="Enter your phone number"
+              editing = {editing}
+              setProfileData ={setProfileData}
             />
-            <ProfileField
-              label="Location"
-              value={profileData.location}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, location: text })}
-              placeholder="Enter your location"
-            />
-            {/*<ProfileField
-              label="About Your Business"
-              value={profileData.bio}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, bio: text })}
-              multiline
-              placeholder="Tell us about your business and what tasks you need help with..."
-            />*/}
+            
+            {/* Location Fields */}
+               <LocationField
+                label="City"
+                field="city"
+                value={profileData.location?.city}
+                editable
+                editing = {editing}
+                setProfileData ={setProfileData}
+                profileData={profileData}
+                />
+                <LocationField
+                label="Region"
+                field="region"
+                value={profileData.location?.region}
+                editable
+                editing = {editing}
+                setProfileData ={setProfileData}
+                profileData={profileData}
+            
+                  />
+                 <LocationField
+                  label="Town"
+                  ield="town"
+                  value={profileData.location?.town}
+                  editable
+                  editing = {editing}
+                  setProfileData ={setProfileData}
+                  profileData={profileData}
+                  />
+                  <LocationField
+                  label="Street"
+                  field="street"
+                  value={profileData.location?.street}
+                  editable
+                  editing = {editing}
+                  setProfileData ={setProfileData}
+                  profileData={profileData}
+                />
+            
           </View>
         </View>
 

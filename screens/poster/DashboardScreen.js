@@ -141,7 +141,7 @@ export default function DashboardScreen() {
             color: ['#7C3AED', '#8B5CF6'],
             description: 'Chat with taskers',
             navigation: {
-                screen: 'Messages' // Direct screen navigation (if it exists in root)
+                screen: 'Chat' // Direct screen navigation (if it exists in root)
             }
         },
         {
@@ -509,33 +509,33 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     metricCard: {
-        flex: 1,
-        minWidth: (width - 52) / 2,
-        backgroundColor: '#FFFFFF',
-        padding: 12,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    primaryCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#6366F1',
-    },
-    successCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#10B981',
-    },
-    warningCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#F59E0B',
-    },
-    infoCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#3B82F6',
-    },
+    flex: 1,
+    minWidth: (width - 52) / 2,
+    backgroundColor: '#FFFFFF',
+    padding: 8, 
+    borderRadius: 12, 
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, 
+    shadowOpacity: 0.04, 
+    shadowRadius: 6, 
+    elevation: 1, 
+},
+primaryCard: {
+    borderLeftWidth: 3, 
+    borderLeftColor: '#6366F1',
+},
+successCard: {
+    borderLeftWidth: 3, 
+    borderLeftColor: '#10B981',
+},
+warningCard: {
+    borderLeftWidth: 3, 
+    borderLeftColor: '#F59E0B',
+},
+infoCard: {
+    borderLeftWidth: 3, 
+    borderLeftColor: '#3B82F6',
+},
     metricIcon: {
         width: 40,
         height: 40,
