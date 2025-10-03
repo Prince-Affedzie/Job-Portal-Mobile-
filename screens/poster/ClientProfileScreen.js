@@ -24,6 +24,7 @@ import { ProfileField } from '../../component/tasker/ProfileField';
 import { LocationField } from '../../component/tasker/LocationField';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
+import ReviewsComponent from '../../component/common/ReviewsComponent';
 
 const { width } = Dimensions.get('window');
 
@@ -382,6 +383,34 @@ const ClientProfileScreen = ({ navigation }) => {
             
           </View>
         </View>
+
+           {/* Reviews & Ratings Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+               <Ionicons name="star-outline" size={20} color="#6366F1" />
+             <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+             {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
+               <TouchableOpacity 
+                 style={styles.viewAllButton}
+                 onPress={() => navigation.navigate('AllReviews', { 
+                  reviews: profileData.ratingsReceived || [],
+                  userName: profileData.name,
+                  averageRating: profileData.rating || 0,
+                  totalReviews: profileData.numberOfRatings || 0
+                })}
+               >
+                 <Text style={styles.viewAllText}>View All</Text>
+                 <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+               </TouchableOpacity>
+             )}
+           </View>
+           
+             <ReviewsComponent 
+             reviews={profileData.ratingsReceived || []}
+             averageRating={profileData.rating || 0}
+             totalReviews={profileData.numberOfRatings || 0}
+           />
+           </View>
 
         {/* Task Preferences */}
         <View style={styles.section}>

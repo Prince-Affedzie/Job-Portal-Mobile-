@@ -111,7 +111,9 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               const res = await markTaskAsDoneClient(taskId)
               if (res.status ===200){
               Alert.alert("Success", "Task marked as completed! ");
-              setRatingModalVisible(true)
+               setTimeout(() => {
+                setRatingModalVisible(true);
+              }, 750);
               loadTaskDetails();
               }
              

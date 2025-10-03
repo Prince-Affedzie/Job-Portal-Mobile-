@@ -15,6 +15,7 @@ import ApplicantProfileScreen from "../screens/poster/ApplicantProfileScreen";
 import ClientViewSubmissionsScreen from "../screens/poster/ClientSubmissionsScreen"
 import ClientProfileScreen from "../screens/poster/ClientProfileScreen";
 import ChatScreen from "../screens/tasker/ChatScreen";
+import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
