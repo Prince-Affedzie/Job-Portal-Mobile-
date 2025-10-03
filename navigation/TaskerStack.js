@@ -12,6 +12,7 @@ import AppliedTaskDetailsScreen from "../screens/tasker/AppliedTaskDetailScreen"
 import SubmissionsScreen from "../screens/tasker/TaskSubmissionsScreen";
 import ChatScreen from "../screens/tasker/ChatScreen";
 import { NotificationContext } from "../context/NotificationContext";
+import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 
 import { Ionicons } from "@expo/vector-icons";
 
@@ -54,6 +55,7 @@ function DashboardStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Dashboard" component={TaskerDashboard} />
+       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       {/* Add any dashboard-related stack screens here */}
     </Stack.Navigator>
   );
@@ -64,6 +66,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Profile" component={TaskerProfileScreen} />
+      <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
       {/* Add any profile-related stack screens here */}
     </Stack.Navigator>
   );
@@ -122,7 +125,7 @@ export default function TaskerStack() {
           ),
         }}
       />
-      <Tab.Screen
+    {/* <Tab.Screen
         name="NotificationsTab"
         component={NotificationsStack}
         options={{
@@ -134,9 +137,9 @@ export default function TaskerStack() {
               size={size} 
             />
           ),
-          tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, // You can dynamically set this based on unread count
+          tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined, 
         }}
-      />
+      />*/}
       
 
       <Tab.Screen

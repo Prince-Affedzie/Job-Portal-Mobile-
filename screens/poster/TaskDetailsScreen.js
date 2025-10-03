@@ -23,8 +23,8 @@ import { PosterContext } from '../../context/PosterContext';
 import {clientGetTaskInfo,markTaskAsDoneClient} from '../../api/miniTaskApi'
 import { navigate } from '../../services/navigationService'
 import { Animated, TouchableWithoutFeedback } from 'react-native';
-//import MarkDoneSwitch from '../../components/MiniTaskManagementComponents/MarkDoneButton';
-
+import LoadingIndicator from '../../component/common/LoadingIndicator';
+import RatingModal from '../../component/common/RatingModal';
 const { width } = Dimensions.get('window');
 
 const ClientTaskDetailScreen = ({ route, navigation }) => {
@@ -38,6 +38,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [fabExpanded, setFabExpanded] = useState(false);
   const [fabAnimation] = useState(new Animated.Value(0));
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
 
 
   const toggleFAB = () => {
@@ -110,6 +111,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               const res = await markTaskAsDoneClient(taskId)
               if (res.status ===200){
               Alert.alert("Success", "Task marked as completed! ");
+              setRatingModalVisible(true)
               loadTaskDetails();
               }
              
@@ -169,10 +171,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="Task Details" showBackButton={true} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading task details...</Text>
-        </View>
+        <LoadingIndicator text='Loading Task Details....' />
       </SafeAreaView>
     );
   }
@@ -472,14 +471,11 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 
               {/* Tasker Stats */}
               <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{task.assignedTo.rating || 0}</Text>
-                  <Text style={styles.statLabel}>Rating</Text>
-                </View>
-                {/*<View style={styles.statItem}>
-                  <Text style={styles.statValue}>{task.assignedTo.completedTasks || 0}</Text>
-                  <Text style={styles.statLabel}>Completed</Text>
-                </View>*/}
+                <View style={styles.ratingBadge}>
+                 <Ionicons name="star" size={14} color="#F59E0B" />
+                <Text style={styles.ratingBadgeValue}>{task.assignedTo.rating?.toFixed(1) || '0.0'}</Text>
+                <Text style={styles.ratingBadgeLabel}>Rating</Text>
+               </View>
                 <View style={styles.statItem}>
                   <Text style={styles.statValue}>
                     {task.assignedTo.completionRate ? `${task.assignedTo.completionRate}%` : 'N/A'}
@@ -707,6 +703,15 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           task={task}
           onReportSubmitted={handleReportSubmitted}
         />
+
+        <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        userId={task.assignedTo?._id}
+        userName={task.assignedTo?.name}
+        userRole='tasker' // 'client' or 'tasker'
+       
+      />
     </SafeAreaView>
   );
 };

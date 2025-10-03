@@ -224,12 +224,6 @@ export default function ApplicantsScreen({ route }) {
           <Text style={styles.applicantName} numberOfLines={1}>
             {applicant.name || 'Applicant'}
           </Text>
-          <Text style={styles.applicantEmail} numberOfLines={1}>
-            {applicant.email}
-          </Text>
-          {applicant.phone && (
-            <Text style={styles.applicantPhone}>{applicant.phone}</Text>
-          )}
         </View>
 
         <View style={styles.scoreContainer}>
@@ -381,12 +375,7 @@ export default function ApplicantsScreen({ route }) {
           <Text style={styles.applicantName} numberOfLines={1}>
             {bidder?.name || 'Bidder'}
           </Text>
-          <Text style={styles.applicantEmail} numberOfLines={1}>
-            {bidder?.email || 'No email available'}
-          </Text>
-          {bidder?.phone && (
-            <Text style={styles.applicantPhone}>{bidder.phone}</Text>
-          )}
+          
         </View>
 
         <View style={styles.scoreContainer}>
@@ -558,6 +547,7 @@ export default function ApplicantsScreen({ route }) {
           <View style={styles.assignedUserInfo}>
             <Text style={styles.assignedUserName}>{userData?.name || 'Assigned Tasker'}</Text>
             <Text style={styles.assignedUserEmail}>{userData?.email || 'No email available'}</Text>
+             <Text style={styles.assignedUserEmail}>{userData?.phone || 'No email available'}</Text>
             {biddingType === 'open-bid' && assignedUser?.amount && (
               <Text style={styles.assignedBidAmount}>Accepted Bid: ₵{assignedUser.amount}</Text>
             )}
