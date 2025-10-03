@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -338,10 +339,7 @@ const TaskerDashboard = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading your dashboard...</Text>
-      </View>
+      <LoadingIndicator text='Loading your Dashboard...'/>
     );
   }
 

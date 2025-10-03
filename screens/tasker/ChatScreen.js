@@ -16,6 +16,7 @@ import { getAllChatRooms } from '../../api/chatApi';
 import RoomList from '../../component/Messaging/RoomList';
 import ChatWindow from '../../component/Messaging/ChatWindow';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
+import Header from '../../component/tasker/Header';
 
 const { width } = Dimensions.get('window');
 
@@ -133,7 +134,10 @@ const ChatScreen = () => {
 
   if (loading) {
     return (
+      <View style={styles.container}>
+      <Header title='Chats'/>
       <LoadingIndicator text='Loading Conversations'/>
+      </View>
     );
   }
 

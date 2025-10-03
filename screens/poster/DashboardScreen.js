@@ -7,6 +7,7 @@ import { AuthContext } from "../../context/AuthContext"
 import { PosterContext } from '../../context/PosterContext'
 import Header from "../../component/tasker/Header";
 import { navigate } from '../../services/navigationService'
+import LoadingIndicator from '../../component/common/LoadingIndicator'
 
 const { width } = Dimensions.get('window')
 
@@ -123,7 +124,7 @@ export default function DashboardScreen() {
                 screen: 'CreateTask' // Screen inside the PostedTasksStack
             }
         },
-        {
+        /*{
             id: 2,
             title: 'Review Work',
             icon: 'document-text-outline',
@@ -133,7 +134,7 @@ export default function DashboardScreen() {
                 navigator: 'PostedTasks', // Tab navigator name
                 screen: 'PostedTasksList' // Navigate to tasks list for now (Submissions screen doesn't exist)
             }
-        },
+        },*/
         {
             id: 3,
             title: 'Messages',
@@ -203,10 +204,7 @@ export default function DashboardScreen() {
         return (
             <SafeAreaView style={styles.loadingContainer}>
                 <Header title="Dashboard" />
-                <View style={styles.loadingContent}>
-                    <ActivityIndicator size="large" color="#6366F1" />
-                    <Text style={styles.loadingText}>Loading your dashboard...</Text>
-                </View>
+                <LoadingIndicator text='Loading your Dashboard'/>
             </SafeAreaView>
         )
     }
@@ -502,6 +500,7 @@ const styles = StyleSheet.create({
     },
     metricsSection: {
         padding: 20,
+        paddingBottom:0,
     },
     metricsGrid: {
         flexDirection: 'row',
@@ -512,7 +511,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: (width - 52) / 2,
     backgroundColor: '#FFFFFF',
-    padding: 8, 
+    padding: 3, 
     borderRadius: 12, 
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 }, 

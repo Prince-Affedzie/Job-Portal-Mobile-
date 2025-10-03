@@ -24,6 +24,7 @@ import { AuthContext } from '../../context/AuthContext';
 import {getMiniTaskInfo,acceptMiniTaskAssignment,rejectMiniTaskAssignment,markTaskAsDoneTasker} from '../../api/miniTaskApi'
 import { navigate } from '../../services/navigationService';
 import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 
 const { width } = Dimensions.get('window');
@@ -216,10 +217,7 @@ const handleReportPress = () => {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="Task Details" showBackButton={true} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading task details...</Text>
-        </View>
+        <LoadingIndicator text='Loading Task Details...'/>
       </SafeAreaView>
     );
   }
@@ -741,11 +739,11 @@ const handleReportPress = () => {
 
         {/* Mark as Done Button */}
         {hasTaskerMarkedDone ? (
-          <View style={styles.fabActionButtonDisabled}>
-            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-            <Text style={styles.fabActionTextDisabled}>Already Marked Done</Text>
-          </View>
-        ) : canMarkAsDone ? (
+       <View style={[styles.fabActionButtonDisabled, styles.markedDoneEmerald]}>
+         <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+           <Text style={styles.fabActionText}>Already Marked Done</Text>
+        </View>
+         ) : canMarkAsDone ? (
           <TouchableOpacity 
             style={[styles.fabActionButton, { backgroundColor: '#10B981' }]}
             onPress={() => {

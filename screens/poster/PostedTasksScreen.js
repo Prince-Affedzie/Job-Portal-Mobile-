@@ -8,6 +8,7 @@ import { PosterContext } from '../../context/PosterContext';
 import { AuthContext } from "../../context/AuthContext";
 import { navigate } from '../../services/navigationService'
 import Header from "../../component/tasker/Header";
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { height, width } = Dimensions.get('window')
 
@@ -404,9 +405,7 @@ export default function PostedTasksScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title="My Tasks" />
-        <View style={styles.loadingContainer}>
-          <Text>Loading your tasks...</Text>
-        </View>
+        <LoadingIndicator text='Loading your Tasks...'/>
       </SafeAreaView>
     );
   }

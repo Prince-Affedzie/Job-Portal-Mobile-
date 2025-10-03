@@ -23,85 +23,81 @@ const { width } = Dimensions.get('window');
 
 export default function ApplicantProfileScreen({ route }) {
   const { applicant, taskId } = route.params;
+  
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
   // Check if this is a bidder (from open-bid) or applicant (from fixed)
   const isBidder = applicant?.amount !== undefined;
   
-  // Stats data
-  const stats = {
-    rating: applicant?.rating || 0,
-    completedTasks: applicant?.completedTasks || 0,
-    completionRate: applicant?.completionRate || 0,
-    responseRate: applicant?.responseRate || 85,
-    avgRating: applicant?.avgRating || 4.5,
-    memberSince: applicant?.createdAt ? moment(applicant.createdAt).format('MMM YYYY') : 'Recently',
-  };
-
-  const handleContact = () => {
-    if (applicant?.phone) {
-      Alert.alert(
-        "Contact Applicant",
-        `Would you like to call or message ${applicant.name}?`,
-        [
-          { text: "Call", onPress: () => Linking.openURL(`tel:${applicant.phone}`) },
-          { text: "Message", onPress: () => handleChat() },
-          { text: "Cancel", style: "cancel" }
-        ]
-      );
-    } else {
-      handleChat();
+  // Calculate ratings properly from the schema
+  const calculateRatings = () => {
+    const ratingsReceived = applicant?.ratingsReceived || [];
+    const numberOfRatings = ratingsReceived.length;
+    
+    // Calculate average rating from individual ratings
+    let averageRating = 0;
+    if (numberOfRatings > 0) {
+      const totalRating = ratingsReceived.reduce((sum, review) => sum + review.rating, 0);
+      averageRating = totalRating / numberOfRatings;
     }
+    
+    // Use the calculated average or fallback to stored rating
+    const finalRating = numberOfRatings > 0 ? averageRating : applicant?.rating || 0;
+    
+    return {
+      rating: parseFloat(finalRating.toFixed(1)), // Round to 1 decimal place
+      numberOfRatings,
+      completedTasks: applicant?.completedTasks || 0,
+      completionRate: applicant?.completionRate || 0,
+      responseRate: applicant?.responseRate || 85,
+      memberSince: applicant?.createdAt ? moment(applicant.createdAt).format('MMM YYYY') : 'Recently',
+    };
   };
 
-  const handleChat = () => {
-    navigate('Chat', {
-      userId: applicant._id,
-      userName: applicant.name,
-      taskId: taskId
-    });
-  };
+  const stats = calculateRatings();
 
-  const handleAssign = () => {
-    Alert.alert(
-      "Assign Task",
-      `Assign this task to ${applicant.name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Assign", 
-          onPress: () => {
-            // Navigate back to applicants screen with assignment intent
-            navigate('TaskApplicants', { 
-              taskId,
-              assignApplicantId: applicant._id 
-            });
-          }
-        }
-      ]
+  // Function to render stars with proper decimal handling
+  const renderStars = (rating, size = 16) => {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+
+    return (
+      <View style={styles.ratingStars}>
+        {/* Full stars */}
+        {[...Array(fullStars)].map((_, index) => (
+          <Ionicons
+            key={`full-${index}`}
+            name="star"
+            size={size}
+            color="#F59E0B"
+          />
+        ))}
+        
+        {/* Half star */}
+        {hasHalfStar && (
+          <Ionicons
+            key="half"
+            name="star-half"
+            size={size}
+            color="#F59E0B"
+          />
+        )}
+        
+        {/* Empty stars */}
+        {[...Array(emptyStars)].map((_, index) => (
+          <Ionicons
+            key={`empty-${index}`}
+            name="star-outline"
+            size={size}
+            color="#F59E0B"
+          />
+        ))}
+      </View>
     );
   };
 
-  const handleAcceptBid = () => {
-    Alert.alert(
-      "Accept Bid",
-      `Accept ${applicant.name}'s bid of ₵${applicant.amount}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Accept Bid", 
-          onPress: () => {
-            // Navigate back to applicants screen with bid acceptance intent
-            navigate('TaskApplicants', { 
-              taskId,
-              acceptBidId: applicant._id 
-            });
-          }
-        }
-      ]
-    );
-  };
 
   const StatCard = ({ icon, value, label, color = '#6366F1' }) => (
     <View style={styles.statCard}>
@@ -176,7 +172,7 @@ export default function ApplicantProfileScreen({ route }) {
         <InfoSection title="Location" icon="location-outline">
           <View style={styles.locationInfo}>
             <Text style={styles.locationText}>
-              {[applicant.location.region, applicant.location.city, applicant.location.suburb]
+              {[applicant.location.region, applicant.location.city, applicant.location.town]
                 .filter(Boolean)
                 .join(', ')}
             </Text>
@@ -210,102 +206,72 @@ export default function ApplicantProfileScreen({ route }) {
           </View>
         </InfoSection>
       )}
+    </View>
+  );
 
-      {/* Education 
-      {applicant?.education && applicant.education.length > 0 && (
-        <InfoSection title="Education" icon="school-outline">
-          <View style={styles.educationList}>
-            {applicant.education.map((edu, index) => (
-              <View key={index} style={styles.educationItem}>
-                <View style={styles.educationHeader}>
-                  <Text style={styles.educationDegree}>{edu.degree}</Text>
-                  <Text style={styles.educationPeriod}>
-                    {moment(edu.startDate).format('YYYY')} -{' '}
-                    {edu.endDate ? moment(edu.endDate).format('YYYY') : 'Present'}
-                  </Text>
+  const renderPortfolio = () => (
+    <View>
+      {applicant?.workPortfolio && applicant.workPortfolio.length > 0 ? (
+        <InfoSection title="Portfolio" icon="images-outline">
+          <View style={styles.portfolioGrid}>
+            {applicant.workPortfolio.map((item, index) => (
+              <View key={index} style={styles.portfolioCard}>
+                <Text style={styles.portfolioTitle} numberOfLines={1}>
+                  {item.title || 'Project'}
+                </Text>
+                <View style={styles.filesContainer}>
+                  {item.files && item.files.length > 0 ? (
+                    item.files.map((file, i) =>
+                      file.publicUrl.endsWith('.jpg') ||
+                      file.publicUrl.endsWith('.png') ||
+                      file.publicUrl.endsWith('.jpeg') ? (
+                        <Image
+                          key={i}
+                          source={{ uri: file.publicUrl }}
+                          style={styles.portfolioImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <TouchableOpacity key={i} style={styles.fileItem}>
+                          <Ionicons name="document-text-outline" size={20} color="#4B5563" />
+                          <Text style={styles.fileName} numberOfLines={1}>
+                            {file.name || 'File'}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    )
+                  ) : (
+                    <View style={styles.portfolioPlaceholder}>
+                      <Ionicons name="folder-outline" size={24} color="#6B7280" />
+                      <Text style={styles.portfolioText}>No files</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.educationSchool}>{edu.school}</Text>
-                {edu.fieldOfStudy && (
-                  <Text style={styles.educationField}>{edu.fieldOfStudy}</Text>
+                {item.description && (
+                  <Text style={styles.portfolioDescription} numberOfLines={3}>
+                    {item.description}
+                  </Text>
+                )}
+                {item.link && (
+                  <TouchableOpacity onPress={() => Linking.openURL(item.link)}>
+                    <Text style={styles.portfolioLink}>View Project ↗</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             ))}
           </View>
         </InfoSection>
-      )} */}
+      ) : (
+        <View style={styles.emptyPortfolio}>
+          <Ionicons name="images-outline" size={48} color="#9CA3AF" />
+          <Text style={styles.emptyPortfolioText}>No portfolio items yet</Text>
+          <Text style={styles.emptyPortfolioSubtext}>
+            {applicant.name} hasn't added any work to their portfolio
+          </Text>
+        </View>
+      )}
     </View>
   );
-
- const renderPortfolio = () => (
-  <View>
-    {applicant?.workPortfolio && applicant.workPortfolio.length > 0 ? (
-      <InfoSection title="Portfolio" icon="images-outline">
-        <View style={styles.portfolioGrid}>
-          {applicant.workPortfolio.map((item, index) => (
-            <View key={index} style={styles.portfolioCard}>
-              {/* Title */}
-              <Text style={styles.portfolioTitle} numberOfLines={1}>
-                {item.title || 'Project'}
-              </Text>
-
-              {/* Files Preview */}
-              <View style={styles.filesContainer}>
-                {item.files && item.files.length > 0 ? (
-                  item.files.map((file, i) =>
-                    file.publicUrl.endsWith('.jpg') ||
-                    file.publicUrl.endsWith('.png') ||
-                    file.publicUrl.endsWith('.jpeg') ? (
-                      <Image
-                        key={i}
-                        source={{ uri: file.publicUrl }}
-                        style={styles.portfolioImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <TouchableOpacity key={i} style={styles.fileItem}>
-                        <Ionicons name="document-text-outline" size={20} color="#4B5563" />
-                        <Text style={styles.fileName} numberOfLines={1}>
-                          {file.name || 'File'}
-                        </Text>
-                      </TouchableOpacity>
-                    )
-                  )
-                ) : (
-                  <View style={styles.portfolioPlaceholder}>
-                    <Ionicons name="folder-outline" size={24} color="#6B7280" />
-                    <Text style={styles.portfolioText}>No files</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Description */}
-              {item.description && (
-                <Text style={styles.portfolioDescription} numberOfLines={3}>
-                  {item.description}
-                </Text>
-              )}
-
-              {/* External Link */}
-              {item.link && (
-                <TouchableOpacity onPress={() => Linking.openURL(item.link)}>
-                  <Text style={styles.portfolioLink}>View Project ↗</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-        </View>
-      </InfoSection>
-    ) : (
-      <View style={styles.emptyPortfolio}>
-        <Ionicons name="images-outline" size={48} color="#9CA3AF" />
-        <Text style={styles.emptyPortfolioText}>No portfolio items yet</Text>
-        <Text style={styles.emptyPortfolioSubtext}>
-          {applicant.name} hasn’t added any work to their portfolio
-        </Text>
-      </View>
-    )}
-  </View>
-);
 
   const renderReviews = () => (
     <View>
@@ -313,19 +279,10 @@ export default function ApplicantProfileScreen({ route }) {
       <InfoSection title="Ratings & Reviews" icon="star-outline">
         <View style={styles.ratingsSummary}>
           <View style={styles.ratingOverview}>
-            <Text style={styles.ratingNumber}>{stats.avgRating}</Text>
-            <View style={styles.ratingStars}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons
-                  key={star}
-                  name={star <= Math.floor(stats.avgRating) ? "star" : "star-outline"}
-                  size={16}
-                  color="#F59E0B"
-                />
-              ))}
-            </View>
+            <Text style={styles.ratingNumber}>{stats.rating}</Text>
+            {renderStars(stats.rating, 20)}
             <Text style={styles.ratingCount}>
-              {applicant?.numberOfRatings || 0} reviews
+              {stats.numberOfRatings} review{stats.numberOfRatings !== 1 ? 's' : ''}
             </Text>
           </View>
         </View>
@@ -339,25 +296,16 @@ export default function ApplicantProfileScreen({ route }) {
               <View style={styles.reviewHeader}>
                 <View style={styles.reviewerInfo}>
                   <Text style={styles.reviewerName}>
-                    {review.reviewerName || 'Anonymous'}
+                    {review.ratedBy?.name || 'Anonymous'}
                   </Text>
-                  <View style={styles.reviewStars}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons
-                        key={star}
-                        name={star <= review.rating ? "star" : "star-outline"}
-                        size={12}
-                        color="#F59E0B"
-                      />
-                    ))}
-                  </View>
+                  {renderStars(review.rating, 14)}
                 </View>
                 <Text style={styles.reviewDate}>
                   {moment(review.createdAt).fromNow()}
                 </Text>
               </View>
-              {review.comment && (
-                <Text style={styles.reviewComment}>{review.comment}</Text>
+              {review.feedback && (
+                <Text style={styles.reviewComment}>{review.feedback}</Text>
               )}
             </View>
           ))}
@@ -421,9 +369,6 @@ export default function ApplicantProfileScreen({ route }) {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{applicant?.name || 'User'}</Text>
               <Text style={styles.profileEmail}>{applicant?.email}</Text>
-              {/*{applicant?.phone && (
-                <Text style={styles.profilePhone}>{applicant.phone}</Text>
-              )}*/}              
               <Text style={styles.memberSince}>
                 Member since {stats.memberSince}
               </Text>
@@ -431,32 +376,7 @@ export default function ApplicantProfileScreen({ route }) {
           </View>
 
           {/* Stats Grid */}
-          <View style={styles.statsGrid}>
-            <StatCard
-              icon="star"
-              value={stats.rating}
-              label="Rating"
-              color="#F59E0B"
-            />
-            <StatCard
-              icon="checkmark-done"
-              value={stats.completedTasks}
-              label="Completed"
-              color="#10B981"
-            />
-            <StatCard
-              icon="trending-up"
-              value={`${stats.completionRate}%`}
-              label="Success Rate"
-              color="#6366F1"
-            />
-            <StatCard
-              icon="flash"
-              value={`${stats.responseRate}%`}
-              label="Response Rate"
-              color="#8B5CF6"
-            />
-          </View>
+         
         </LinearGradient>
 
         {/* Bid Information (if from open-bid) */}
@@ -484,39 +404,9 @@ export default function ApplicantProfileScreen({ route }) {
           </View>
         )}
 
-        {/* Action Buttons 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.contactButton]}
-            onPress={handleContact}
-          >
-            <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.contactButtonText}>Contact</Text>
-          </TouchableOpacity>
-
-          {isBidder ? (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.assignButton]}
-              onPress={handleAcceptBid}
-            >
-              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.assignButtonText}>Accept Bid</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.assignButton]}
-              onPress={handleAssign}
-            >
-              <Ionicons name="person-add-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.assignButtonText}>Assign Task</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        */}
-
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          {['overview', 'experience', 'portfolio', 'reviews'].map((tab) => (
+          {['overview', 'experience',  'reviews'].map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tabButton, activeTab === tab && styles.tabButtonActive]}
@@ -533,7 +423,7 @@ export default function ApplicantProfileScreen({ route }) {
         <View style={styles.tabContent}>
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'experience' && renderExperience()}
-          {activeTab === 'portfolio' && renderPortfolio()}
+          {/*{activeTab === 'portfolio' && renderPortfolio()}*/}
           {activeTab === 'reviews' && renderReviews()}
         </View>
       </ScrollView>
@@ -545,6 +435,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+   ratingStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,

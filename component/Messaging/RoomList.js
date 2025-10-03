@@ -185,12 +185,15 @@ const RoomList = ({
     <View style={styles.container}>
       {/* Header */}
       <Header title="Chats" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerSubtitle}>
-          {filteredRooms.length} conversations
-        </Text>
-      </View>
+      <View style={styles.compactHeader}>
+       <View style={styles.headerTextContainer}>
+       <Text style={styles.compactHeaderTitle}>Messages</Text>
+        <Text style={styles.compactHeaderSubtitle}>
+        {filteredRooms.length} {filteredRooms.length === 1 ? 'conversation' : 'conversations'}
+       </Text>
+        </View>
+       </View>
+
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -220,7 +223,7 @@ const RoomList = ({
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No conversations</Text>
+            <Text style={styles.emptyStateTitle}>No conversations. You can chat with Taskers here once you Assign task to them.</Text>
             <Text style={styles.emptyStateText}>
               {searchQuery ? 'No conversations match your search' : 'Start a conversation to see it here'}
             </Text>
@@ -236,23 +239,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header: {
-    padding: 20,
-    paddingBottom: 16,
+   compactHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    alignItems:'center',
+    backgroundColor: '#FFFFFF',
   },
-  headerTitle: {
-    fontSize: 24,
+  headerTextContainer: {
+    alignItems: 'flex-start',
+  },
+  compactHeaderTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  headerSubtitle: {
-    fontSize: 14,
+  compactHeaderSubtitle: {
+    fontSize: 13,
     color: '#6B7280',
+    fontWeight: '500',
   },
+ 
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
