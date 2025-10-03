@@ -25,6 +25,7 @@ import {getMiniTaskInfo,acceptMiniTaskAssignment,rejectMiniTaskAssignment,markTa
 import { navigate } from '../../services/navigationService';
 import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
+import RatingModal from '../../component/common/RatingModal';
 
 
 const { width } = Dimensions.get('window');
@@ -37,6 +38,8 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const { user } = useContext(AuthContext);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showWorkModal, setShowWorkModal] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  
 
 
 const [fabExpanded, setFabExpanded] = useState(false);
@@ -152,6 +155,9 @@ const handleMarkAsDone = async () => {
             const res = await markTaskAsDoneTasker(taskId)
             if (res.status ===200){
             Alert.alert("Success", "Task marked as completed! ");
+             setTimeout(() => {
+                setRatingModalVisible(true);
+              }, 750);
             loadTaskDetails();
             }
            
@@ -581,24 +587,26 @@ const handleReportPress = () => {
 
               {/* Employer Stats */}
               <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{task.employer.rating || 0}</Text>
-                  <Text style={styles.statLabel}>Rating</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{task.employer.numberOfRatings || 0}</Text>
-                  <Text style={styles.statLabel}>Reviews</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{task.employer.tasksPosted || 'N/A'}</Text>
-                  <Text style={styles.statLabel}>Tasks Posted</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {task.employer.completionRate ? `${task.employer.completionRate}%` : 'N/A'}
-                  </Text>
-                  <Text style={styles.statLabel}>Completion Rate</Text>
-                </View>
+                <View style={styles.ratingStatsCard}>
+                  <View style={styles.ratingMain}>
+                     <View style={styles.ratingStars}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                       <Ionicons
+                        key={star}
+                        name={star <= Math.floor(task.employer.rating || 0) ? "star" : "star-outline"}
+                        size={12}
+                        color="#F59E0B"
+                           />
+                  ))}
+                 </View>
+                <Text style={styles.ratingValue}>
+                 {task.employer.rating?.toFixed(1) || '0.0'}
+              </Text>
+                  </View>
+                <Text style={styles.reviewsCount}>
+               {task.employer.numberOfRatings || 0} reviews
+              </Text>
+            </View>
               </View>
             </View>
           )}
@@ -862,7 +870,19 @@ const handleReportPress = () => {
       loadTaskDetails();
      
       }}
+      
      />
+
+      <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        userId={task.employer?._id}
+        userName={task.employer?.name}
+        userRole='client' 
+            
+        />
+
+     
     </SafeAreaView>
   );
 };

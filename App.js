@@ -6,6 +6,7 @@ import {TaskerOnboardingProvider} from "./context/TaskerOnboardingContext"
 import { NotificationProvider } from "./context/NotificationContext";
 import RootNavigator from "./navigation/RootNavigator";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import NotificationPopup from "./component/common/NotificationPopUp";
 
 
 
@@ -18,6 +19,7 @@ export default function App() {
       <TaskerProvider>
         <PosterProvider>
           <NotificationProvider>
+            <NotificationPopup/>
           <RootNavigator />
           </NotificationProvider>
         </PosterProvider>

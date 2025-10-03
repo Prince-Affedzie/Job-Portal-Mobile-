@@ -220,12 +220,6 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           resizeMode="contain"
         />
       </View>
-          <TouchableOpacity
-            style={[styles.backButton, { top: insets.top + 16 }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
         </View>
 
         {/* Main Content */}
@@ -342,7 +336,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
                   <Text style={styles.clientName}>{task.employer?.name || 'Client'}</Text>
                   <View style={styles.rating}>
                     <Ionicons name="star" size={14} color="#F59E0B" />
-                    <Text style={styles.ratingText}>{task.employer?.rating || '4.5'}</Text>
+                    <Text style={styles.ratingText}>{task.employer.rating}</Text>
                     {task.employer?.isVerified && (
                       <Ionicons name="checkmark-circle" size={14} color="#10B981" style={styles.verifiedIcon} />
                     )}
