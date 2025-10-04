@@ -7,6 +7,7 @@ import { NotificationProvider } from "./context/NotificationContext";
 import RootNavigator from "./navigation/RootNavigator";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import NotificationPopup from "./component/common/NotificationPopUp";
+import { PaystackProvider } from "react-native-paystack-webview";
 
 
 
@@ -14,13 +15,19 @@ import NotificationPopup from "./component/common/NotificationPopUp";
 export default function App() {
   return (
      <SafeAreaProvider>
-    <AuthProvider>
+      <AuthProvider>
       <TaskerOnboardingProvider>
       <TaskerProvider>
         <PosterProvider>
           <NotificationProvider>
-            <NotificationPopup/>
+          <NotificationPopup/>
+          <PaystackProvider debug 
+           publicKey="pk_test_31e53267e9515cb94801b1fbf13c80c5d1ff89a1"
+           currency="GHS"
+           defaultChannels={['card','mobile_money']}
+           >
           <RootNavigator />
+          </PaystackProvider>
           </NotificationProvider>
         </PosterProvider>
       </TaskerProvider>

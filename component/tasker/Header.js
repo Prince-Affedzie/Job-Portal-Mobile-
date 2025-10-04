@@ -121,7 +121,7 @@ const Header = ({
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <View style={styles.notificationContainer}>
-                      <Ionicons name="notifications-outline" size={22} color="#E2E8F0" />
+                      <Ionicons name="notifications-outline" size={30} color="#E2E8F0" />
                       {notificationCount > 0 && (
                         <View style={[
                           styles.notificationBadge,
@@ -245,16 +245,16 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: 4,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    
   },
   notificationContainer: {
     position: 'relative',
-    padding: 2,
+    padding: 8,
   },
   notificationBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: 4,
+    right: -1,
     backgroundColor: '#EF4444',
     borderRadius: 10,
     minWidth: 18,

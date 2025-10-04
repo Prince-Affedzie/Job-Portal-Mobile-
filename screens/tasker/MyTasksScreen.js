@@ -172,6 +172,7 @@ const MyApplicationsScreen = () => {
   };
 
   const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedCategory !== 'all' || sortBy !== 'newest';
+    
 
   const renderApplicationItem = ({ item }) => (
     <TouchableOpacity
@@ -638,6 +639,7 @@ const MyApplicationsScreen = () => {
       
       {/* Filter Modal */}
       <FilterModal />
+     
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
@@ -714,6 +716,16 @@ const MyApplicationsScreen = () => {
           )}
         </TouchableOpacity>
       </View>
+      <View style={styles.infoBanner}>
+      <View style={styles.infoHeader}>
+    
+        <Text style={styles.infoTitle}>Task Visibility</Text>
+      </View>
+      <Text style={styles.infoText}>
+       
+        Tasks assigned to other taskers won't appear here even if you applied to...
+      </Text>
+    </View>
 
       {/* Active Filters Info */}
       {hasActiveFilters && (
@@ -785,6 +797,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  infoBanner: {
+    backgroundColor: '#F8FAFF',
+    marginHorizontal: 20,
+    marginTop: 4,
+    padding: 4,
+    borderRadius: 12,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#4F46E5',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  
   filterButton: {
     width: 40,
     height: 40,

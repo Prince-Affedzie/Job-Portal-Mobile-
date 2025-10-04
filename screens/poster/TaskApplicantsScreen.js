@@ -22,12 +22,16 @@ import { AuthContext } from '../../context/AuthContext';
 import { assignApplicantToTask,  } from '../../api/miniTaskApi';
 import { getMicroTaskApplicants,acceptBidForTask, getMicroTaskBids } from '../../api/bidApi';
 import { navigate } from '../../services/navigationService';
+import { triggerPayment } from '../../services/PaymentServices';
+import { usePaystack } from "react-native-paystack-webview";
+
 
 const { width } = Dimensions.get('window');
 
 export default function ApplicantsScreen({ route }) {
   const { taskId, task } = route.params;
   const { user } = useContext(AuthContext);
+  const { popup } = usePaystack();
   
   const [data, setData] = useState([]); // Will hold either applicants or bids
   const [loading, setLoading] = useState(true);
@@ -41,7 +45,8 @@ export default function ApplicantsScreen({ route }) {
   const isTaskAssigned = task?.assignedTo && task?.status !== 'Open' && task?.status !== 'Pending';
   const isTaskInProgress = task?.status === 'In-progress' || task?.status === 'Review';
   const isTaskCompleted = task?.status === 'Completed' || task?.status === 'Closed';
-  const canAssign = !isTaskAssigned && !isTaskInProgress && !isTaskCompleted;
+  const canAssign =  !isTaskInProgress && !isTaskCompleted;
+  const isAlreadyFunded = task?.funded  // Assuming 'Pending' means funded but not yet accepted
 
   useEffect(() => {
     loadData();
@@ -96,61 +101,128 @@ export default function ApplicantsScreen({ route }) {
   };
 
   const handleAssign = async (applicantId, applicantName) => {
-    Alert.alert(
-      "Assign Task",
-      `Are you sure you want to assign this task to ${applicantName}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Assign", 
-          style: "default",
-          onPress: async () => {
-            try {
-              setProcessingAction(applicantId);
-              const response = await assignApplicantToTask(taskId, applicantId);
-              if (response.status === 200) {
-                Alert.alert("Success", `Task assigned to ${applicantName}!`);
-                // Update the data to show assigned status
-                setData(prev => prev.map(item => ({
-                  ...item,
-                  isAssigned: item._id === applicantId
-                })));
-              } else {
-                throw new Error(response.data?.message || 'Assignment failed');
-              }
-            } catch (error) {
-              const errorMessage = error.response?.data?.message ||
-                error.response?.data?.error || 'Error assigning task';
-              Alert.alert("Error", errorMessage);
-            } finally {
-              setProcessingAction(null);
-            }
-          }
-        }
-      ]
-    );
-  };
+  const alertTitle = isAlreadyFunded ? "Reassign Task" : "Assign Task & Make Payment";
+  const alertMessage = isAlreadyFunded 
+    ? `You can reassign this task to ${applicantName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
+    : `Assigning ${applicantName} will initiate a secure payment of ${task.budget} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
 
-  const handleAcceptBid = async (bidId, bidderName) => {
+  Alert.alert(
+    alertTitle,
+    alertMessage,
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: isAlreadyFunded ? "Reassign" : "Continue",
+        style: "default",
+        onPress: async () => {
+          try {
+            setProcessingAction(applicantId);
+
+            let paymentSuccess = true; // Default to true if already funded
+            if (!isAlreadyFunded) {
+              paymentSuccess = await triggerPayment({
+                popup,
+                email: user.email,
+                amount: task.budget,
+                taskId: task._id,
+                beneficiary: applicantId,
+              });
+              
+              if (!paymentSuccess) {
+                Alert.alert(
+                  "Payment Not Completed",
+                  "Task assignment has been cancelled since payment was not successful."
+                );
+                return; 
+              }
+            }
+
+            // Proceed with assignment (reassignment if already funded)
+            const response = await assignApplicantToTask(taskId, applicantId);
+            if (response.status === 200) {
+              const successMessage = isAlreadyFunded 
+                ? `Task reassigned to ${applicantName}!` 
+                : `Task assigned to ${applicantName}!`;
+              Alert.alert("Success", successMessage);
+
+              setData((prev) =>
+                prev.map((item) => ({
+                  ...item,
+                  isAssigned: item._id === applicantId,
+                }))
+              );
+               onRefresh()
+            } else {
+              throw new Error(response.data?.message || "Assignment failed");
+            }
+          } catch (error) {
+            const errorMessage =
+              error.response?.data?.message ||
+              error.response?.data?.error ||
+              "Error assigning task";
+            Alert.alert("Error", errorMessage);
+            console.error(error);
+          } finally {
+            setProcessingAction(null);
+          }
+        },
+      },
+    ]
+  );
+};
+
+
+  const handleAcceptBid = async (bidder, amount,bidId, bidderName) => {
+    const alertTitle = isAlreadyFunded ? "Reassign Task" : "Accept Bid";
+    const alertMessage = isAlreadyFunded 
+      ? `You can reassign this task to ${bidderName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
+      : `Assigning ${bidderName} will initiate a secure payment of ₵${amount} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
+
     Alert.alert(
-      "Accept Bid",
-      `Are you sure you want to accept ${bidderName}'s bid?`,
+      alertTitle,
+      alertMessage,
       [
         { text: "Cancel", style: "cancel" },
         { 
-          text: "Accept Bid", 
+          text: isAlreadyFunded ? "Reassign" : "Accept Bid", 
           style: "default",
           onPress: async () => {
             try {
               setProcessingAction(bidId);
+
+              let paymentSuccess = true; // Default to true if already funded
+              if (!isAlreadyFunded) {
+                paymentSuccess = await triggerPayment({
+                popup,
+                email: user.email,
+                amount: amount,
+                taskId: task._id,
+                beneficiary: bidder._id,
+              });
+              
+              if (!paymentSuccess) {
+                Alert.alert(
+                  "Payment Not Completed",
+                  "Task assignment has been cancelled since payment was not successful."
+                );
+                return; 
+              }
+              }
+
+              // Proceed with bid acceptance (reassignment if already funded)
               const response = await acceptBidForTask(taskId, bidId);
               if (response.status === 200) {
-                Alert.alert("Success", `Bid accepted from ${bidderName}!`);
-                // Update the data to show accepted status
+                const successMessage = isAlreadyFunded 
+                  ? `Task reassigned to ${bidderName}!` 
+                  : `Bid accepted from ${bidderName}!`;
+                Alert.alert("Success", successMessage);
+                
                 setData(prev => prev.map(item => ({
                   ...item,
                   isAccepted: item._id === bidId
                 })));
+
+                 onRefresh()
               } else {
                 throw new Error(response.data?.message || 'Bid acceptance failed');
               }
@@ -158,6 +230,7 @@ export default function ApplicantsScreen({ route }) {
               const errorMessage = error.response?.data?.message ||
                 error.response?.data?.error || 'Error accepting bid';
               Alert.alert("Error", errorMessage);
+              console.error(error);
             } finally {
               setProcessingAction(null);
             }
@@ -213,7 +286,7 @@ export default function ApplicantsScreen({ route }) {
               </Text>
             </View>
           )}
-          {(applicant.isAssigned || applicant.isAccepted) && (
+          {(isTaskAssigned && (task.assignedTo._id === applicant._id)) && (
             <View style={styles.assignedBadge}>
               <Ionicons name="checkmark" size={12} color="#FFFFFF" />
             </View>
@@ -229,7 +302,7 @@ export default function ApplicantsScreen({ route }) {
         <View style={styles.scoreContainer}>
           <Text style={styles.scoreLabel}>Score</Text>
           <Text style={styles.scoreValue}>
-            {applicant.totalScore ? applicant.totalScore.toFixed(1) : 'N/A'}
+            {applicant.totalScore ? parseFloat(applicant.totalScore.toFixed(1)) : 'N/A'}
           </Text>
         </View>
       </View>
@@ -238,7 +311,7 @@ export default function ApplicantsScreen({ route }) {
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.statValue}>{applicant.rating || 'N/A'}</Text>
+          <Text style={styles.statValue}>{applicant.rating ? parseFloat(applicant.rating.toFixed(1)) : 'N/A'}</Text>
           <Text style={styles.statLabel}>Rating</Text>
         </View>
         
@@ -316,7 +389,7 @@ export default function ApplicantsScreen({ route }) {
           <Text style={styles.chatButtonText}>Chat</Text>
         </TouchableOpacity>*/}
 
-        {!applicant.isAssigned ? (
+        {task.assignedTo?._id !== applicant._id ? (
           <TouchableOpacity 
             style={[styles.actionButton, styles.assignButton, !canAssign && styles.disabledButton]}
             onPress={() => handleAssign(applicant._id, applicant.name)}
@@ -394,7 +467,7 @@ export default function ApplicantsScreen({ route }) {
           {bid?.timeline && (
             <View style={styles.bidInfoItem}>
               <Ionicons name="time-outline" size={16} color="#6366F1" />
-              <Text style={styles.bidInfoText}>{bid.timeline} days</Text>
+              <Text style={styles.bidInfoText}>{bid.timeline} </Text>
             </View>
           )}
         </View>
@@ -406,11 +479,11 @@ export default function ApplicantsScreen({ route }) {
         )}
       </View>
 
-      {/* Bidder Stats - FIXED: Add proper optional chaining */}
+     
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.statValue}>{bidder?.rating || 'N/A'}</Text>
+          <Text style={styles.statValue}>{bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'}</Text>
           <Text style={styles.statLabel}>Rating</Text>
         </View>
         
@@ -447,10 +520,10 @@ export default function ApplicantsScreen({ route }) {
           <Text style={styles.chatButtonText}>Chat</Text>
         </TouchableOpacity>*/}
 
-        {!bid?.isAccepted ? (
+        {task.assignedTo?._id !==  bidder?._id  ? (
           <TouchableOpacity 
             style={[styles.actionButton, styles.assignButton, !canAssign && styles.disabledButton]}
-            onPress={() => handleAcceptBid(bid?._id, bidder?.name || 'Bidder')}
+            onPress={() => handleAcceptBid( bidder,bid?.amount, bid?._id, bidder?.name || 'Bidder')}
             disabled={processingAction === bid?._id || !canAssign}
           >
             {processingAction === bid?._id ? (
@@ -525,7 +598,7 @@ export default function ApplicantsScreen({ route }) {
     <View style={styles.assignedTaskerCard}>
       <View style={styles.assignedHeader}>
         <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-        <Text style={styles.assignedTitle}>Task Assigned</Text>
+        <Text style={styles.assignedTitle}>Task Assigned to:</Text>
       </View>
       
       <View style={styles.assignedContent}>
@@ -655,14 +728,14 @@ export default function ApplicantsScreen({ route }) {
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
+           {/* <TouchableOpacity
               style={[styles.filterButton, activeFilter === 'assigned' && styles.filterButtonActive]}
               onPress={() => setActiveFilter('assigned')}
             >
               <Text style={[styles.filterText, activeFilter === 'assigned' && styles.filterTextActive]}>
                 {biddingType === 'fixed' ? 'Assigned' : 'Accepted'} ({data.filter(a => a.isAssigned || a.isAccepted).length})
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity>*/}
           </View>
         </ScrollView>
 
@@ -770,6 +843,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 8,
     borderRadius: 12,
+    marginBottom:8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
