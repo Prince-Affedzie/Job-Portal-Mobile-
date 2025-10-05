@@ -19,8 +19,8 @@ export default function App() {
       <TaskerOnboardingProvider>
       <TaskerProvider>
         <PosterProvider>
-          <NotificationProvider>
-          <NotificationPopup/>
+          
+         
           <PaystackProvider debug 
            publicKey="pk_test_31e53267e9515cb94801b1fbf13c80c5d1ff89a1"
            currency="GHS"
@@ -28,7 +28,7 @@ export default function App() {
            >
           <RootNavigator />
           </PaystackProvider>
-          </NotificationProvider>
+          
         </PosterProvider>
       </TaskerProvider>
       </TaskerOnboardingProvider>

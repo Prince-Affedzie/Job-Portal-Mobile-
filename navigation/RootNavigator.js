@@ -2,6 +2,8 @@ import React, { useContext } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { NotificationProvider } from "../context/NotificationContext";
+import NotificationPopup from "../component/common/NotificationPopUp";
 
 
 import AuthStack from "./AuthStack";
@@ -30,6 +32,7 @@ export default function RootNavigator() {
 
  return (
    <SafeAreaProvider>
+     <NotificationProvider>
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
@@ -37,10 +40,15 @@ export default function RootNavigator() {
           <Stack.Screen name="AuthStack" component={AuthStack} />
         ) : user.role === "job_seeker" ? (
           //  Tasker flow
+         
+           
           <Stack.Screen name="TaskerStack" component={TaskerStack} />
+         
         ) : (
           //  Poster flow
+          
           <Stack.Screen name="PosterStack" component={PosterStack} />
+          
         )}
 
         {/* Shared/global routes */}
@@ -48,6 +56,7 @@ export default function RootNavigator() {
         <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
       </Stack.Navigator>
     </NavigationContainer>
+    </NotificationProvider>
     </SafeAreaProvider>
   );
 }

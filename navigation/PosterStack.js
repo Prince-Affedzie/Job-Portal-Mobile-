@@ -1,6 +1,7 @@
 import React, { useContext } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
+import { CommonActions } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DashboardScreen from "../screens/poster/DashboardScreen";
 import PostedTasksScreen from "../screens/poster/PostedTasksScreen";
@@ -93,6 +94,7 @@ function ProfileStack() {
 export default function PosterStack() {
   const { notifications } = useContext(NotificationContext);
   const unreadNotifications = notifications.filter(n => !n.read);
+  
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
       <Tab.Navigator
@@ -113,6 +115,37 @@ export default function PosterStack() {
             fontWeight: '500',
           },
         }}
+        screenListeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            // Get the current state
+            const state = navigation.getState();
+            const currentRoute = state.routes[state.index];
+            
+            // If we're pressing the currently active tab
+            if (currentRoute.name === route.name) {
+              // Prevent default to handle the reset ourselves
+              e.preventDefault();
+              
+              // For stack navigators, we need to reset to the first screen
+              if (route.name === 'PostedTasks' || route.name === 'Profile') {
+                // Use navigate to go to the initial screen of the stack
+                if (route.name === 'PostedTasks') {
+                  navigation.navigate('PostedTasks', {
+                    screen: 'PostedTasksList'
+                  });
+                } else if (route.name === 'Profile') {
+                  navigation.navigate('Profile', {
+                    screen: 'ClientProfile'
+                  });
+                }
+              } else {
+                // For regular screens, just navigate normally
+                navigation.navigate(route.name);
+              }
+            }
+            // If switching to a different tab, let the default handler work
+          },
+        })}
       >
         <Tab.Screen
           name="Dashboard"
