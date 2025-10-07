@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Image,
   ActivityIndicator,
   Dimensions,
@@ -13,6 +12,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -1366,6 +1366,7 @@ markDoneButtonText: {
   
   // Main FAB button
   mainFAB: {
+    bottom:40,
     width: 56,
     height: 56,
     borderRadius: 28,

@@ -24,6 +24,7 @@ export default {
   web: { favicon: "./assets/favicon.png" },
   extra: {
     EXPO_PUBLIC_BACKEND_URL: process.env.EXPO_PUBLIC_BACKEND_URL,
+    EXPO_PayStack_publicKey:process.env.EXPO_PayStack_publicKey,
   },
   
  

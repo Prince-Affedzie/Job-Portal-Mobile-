@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import {getMiniTasksPosted, postMiniTask, assignApplicantToTask,updateMiniTask,deleteMiniTask} from "../api/miniTaskApi";
 import {getMicroTaskApplicants,getMicroTaskBids} from "../api/bidApi"
+import { getClientPayments } from '../api/paymentApi'; 
+
 import { AuthContext } from "./AuthContext";
 
 export const PosterContext = createContext();
@@ -8,6 +10,7 @@ export const PosterContext = createContext();
 export const PosterProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
   const [postedTasks, setPostedTasks] = useState([]);
+  const [payments,setPayments] = useState([])
   const [loading, setLoading] = useState(false);
 
   // Load tasks posted by this poster
@@ -88,10 +91,22 @@ export const PosterProvider = ({ children }) => {
     }
   };
 
+   const fetchPayments = async () => {
+      try {
+        const response = await getClientPayments(); 
+        setPayments(response.data || []);
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+        Alert.alert('Error', 'Failed to load payment data');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
+
   useEffect(() => {
-    if (user?.role === "poster") {
       loadPostedTasks();
-    }
+      fetchPayments();
   }, [user]);
 
   return (
@@ -100,12 +115,14 @@ export const PosterProvider = ({ children }) => {
         postedTasks,
         loading,
         loadPostedTasks,
+        fetchPayments,
         addTask,
         editMiniTask,
         getApplicants,
         approveApplicant,
         getTaskBids,
         deleteTask,
+        payments,
       }}
     >
       {children}

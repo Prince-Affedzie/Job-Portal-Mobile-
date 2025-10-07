@@ -9,12 +9,17 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system'; // Use new API
+import * as FileSystem from 'expo-file-system';
 import { AuthContext } from '../../context/AuthContext';
 import { raiseDispute, addReportingEvidence, sendFileToS3 } from '../../api/commonApi';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 const ReportForm = ({ 
   isVisible, 
@@ -74,13 +79,10 @@ const ReportForm = ({
         copyToCacheDirectory: true
       });
 
-      
-
       if (result.assets && result.assets.length > 0) {
-        const file = result.assets[0]; // Report form only allows single file
+        const file = result.assets[0];
        
         try {
-          // Use new FileSystem API to get file info
           const fileInfo = await FileSystem.getInfo(file.uri);
           const fileSizeMB = fileInfo.size / (1024 * 1024);
           
@@ -100,7 +102,6 @@ const ReportForm = ({
           }));
         } catch (fileError) {
           console.error('Error getting file info:', fileError);
-          // Fallback
           setFormData(prev => ({ 
             ...prev, 
             evidence: {
@@ -140,11 +141,9 @@ const ReportForm = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Use sendFileToS3 with proper file preparation
   const uploadWithSendFileToS3 = async (uploadUrl, file) => {
     return new Promise((resolve, reject) => {
       try {
-        // Prepare file object for sendFileToS3
         const fileToUpload = {
           name: file.name,
           type: file.type,
@@ -155,7 +154,6 @@ const ReportForm = ({
 
         console.log('Uploading file to S3:', fileToUpload);
 
-        // Use your sendFileToS3 API
         sendFileToS3(uploadUrl, fileToUpload, {
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
@@ -182,14 +180,11 @@ const ReportForm = ({
     });
   };
 
-  // Alternative upload method if sendFileToS3 doesn't work
   const uploadWithAlternativeMethod = async (uploadUrl, file) => {
     try {
-      // Convert file to blob for upload
       const response = await fetch(file.uri);
       const blob = await response.blob();
       
-      // Upload using fetch
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         body: blob,
@@ -219,7 +214,6 @@ const ReportForm = ({
       setIsLoading(true);
       let evidenceData = null;
 
-      // Handle file upload if evidence exists
       if (formData.evidence) {
         try {
           const fileInfo = {
@@ -229,20 +223,16 @@ const ReportForm = ({
 
           console.log('Getting pre-signed URL for:', fileInfo);
 
-          // Step 1: Get pre-signed URL from backend
           const evidenceResponse = await addReportingEvidence(fileInfo);
-          
           const { publicUrl, uploadURL } = evidenceResponse.data;
 
           console.log('Pre-signed URL received:', uploadURL);
           setUploadProgress(30);
 
           try {
-            // Try using your sendFileToS3 API first
             await uploadWithSendFileToS3(uploadURL, formData.evidence);
           } catch (s3Error) {
             console.log('sendFileToS3 failed, trying alternative method:', s3Error);
-            // Fallback to alternative method
             await uploadWithAlternativeMethod(uploadURL, formData.evidence);
           }
 
@@ -266,7 +256,6 @@ const ReportForm = ({
         }
       }
 
-      // Submit the report
       await submitReport(evidenceData);
       
     } catch (error) {
@@ -345,156 +334,172 @@ const ReportForm = ({
       transparent={true}
       onRequestClose={handleClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.headerContent}>
-              <Ionicons name="flag" size={24} color="#EF4444" />
-              <Text style={styles.modalTitle}>Report Issue</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.headerContent}>
+                <Ionicons name="flag" size={24} color="#EF4444" />
+                <Text style={styles.modalTitle}>Report Issue</Text>
+              </View>
+              <TouchableOpacity 
+                onPress={handleClose}
+                disabled={isLoading}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              onPress={handleClose}
-              disabled={isLoading}
-              style={styles.closeButton}
+
+            {formData.tasktitle && (
+              <Text style={styles.taskInfo}>
+                Reporting issue with: <Text style={styles.taskTitle}>{formData.tasktitle}</Text>
+              </Text>
+            )}
+
+            <ScrollView 
+              style={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContentContainer}
             >
-              <Ionicons name="close" size={24} color="#64748B" />
-            </TouchableOpacity>
-          </View>
+              {/* Form fields */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Reason <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.textInput, errors.reason && styles.inputError]}
+                  placeholder="Brief reason for reporting"
+                  value={formData.reason}
+                  onChangeText={(text) => handleChange('reason', text)}
+                  editable={!isLoading}
+                  returnKeyType="next"
+                />
+                {errors.reason && <Text style={styles.errorText}>{errors.reason}</Text>}
+              </View>
 
-          {formData.tasktitle && (
-            <Text style={styles.taskInfo}>
-              Reporting issue with: <Text style={styles.taskTitle}>{formData.tasktitle}</Text>
-            </Text>
-          )}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Details <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.textArea, errors.details && styles.inputError]}
+                  placeholder="Please provide detailed explanation"
+                  value={formData.details}
+                  onChangeText={(text) => handleChange('details', text)}
+                  multiline={true}
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  editable={!isLoading}
+                  scrollEnabled={true}
+                  returnKeyType="default"
+                  blurOnSubmit={false}
+                />
+                {errors.details && <Text style={styles.errorText}>{errors.details}</Text>}
+              </View>
 
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Form fields */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Reason <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.textInput, errors.reason && styles.inputError]}
-                placeholder="Brief reason for reporting"
-                value={formData.reason}
-                onChangeText={(text) => handleChange('reason', text)}
-                editable={!isLoading}
-              />
-              {errors.reason && <Text style={styles.errorText}>{errors.reason}</Text>}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Details <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.textArea, errors.details && styles.inputError]}
-                placeholder="Please provide detailed explanation"
-                value={formData.details}
-                onChangeText={(text) => handleChange('details', text)}
-                multiline={true}
-                numberOfLines={4}
-                textAlignVertical="top"
-                editable={!isLoading}
-              />
-              {errors.details && <Text style={styles.errorText}>{errors.details}</Text>}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Supporting Evidence (Optional)</Text>
-              
-              {!formData.evidence ? (
-                <TouchableOpacity 
-                  style={[styles.uploadButton, isLoading && styles.uploadButtonDisabled]}
-                  onPress={pickDocument}
-                  disabled={isLoading}
-                >
-                  <Ionicons name="cloud-upload" size={20} color="#6366F1" />
-                  <Text style={styles.uploadButtonText}>Tap to upload file</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.fileContainer}>
-                  <View style={styles.fileInfo}>
-                    <Ionicons name="document" size={20} color="#6366F1" />
-                    <View style={styles.fileDetails}>
-                      <Text style={styles.fileName} numberOfLines={1}>
-                        {formData.evidence.name}
-                      </Text>
-                      <Text style={styles.fileSize}>
-                        {Math.round(formData.evidence.size / 1024)} KB
-                      </Text>
-                    </View>
-                  </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Supporting Evidence (Optional)</Text>
+                
+                {!formData.evidence ? (
                   <TouchableOpacity 
-                    onPress={removeDocument}
+                    style={[styles.uploadButton, isLoading && styles.uploadButtonDisabled]}
+                    onPress={pickDocument}
                     disabled={isLoading}
                   >
-                    <Ionicons name="close-circle" size={20} color="#EF4444" />
+                    <Ionicons name="cloud-upload" size={20} color="#6366F1" />
+                    <Text style={styles.uploadButtonText}>Tap to upload file</Text>
                   </TouchableOpacity>
-                </View>
-              )}
-
-              {uploadProgress > 0 && uploadProgress < 100 && (
-                <View style={styles.progressContainer}>
-                  <View style={styles.progressBar}>
-                    <View 
-                      style={[styles.progressFill, { width: `${uploadProgress}%` }]} 
-                    />
+                ) : (
+                  <View style={styles.fileContainer}>
+                    <View style={styles.fileInfo}>
+                      <Ionicons name="document" size={20} color="#6366F1" />
+                      <View style={styles.fileDetails}>
+                        <Text style={styles.fileName} numberOfLines={1}>
+                          {formData.evidence.name}
+                        </Text>
+                        <Text style={styles.fileSize}>
+                          {Math.round(formData.evidence.size / 1024)} KB
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      onPress={removeDocument}
+                      disabled={isLoading}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#EF4444" />
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.progressText}>
-                    Uploading: {uploadProgress}%
-                  </Text>
-                </View>
-              )}
+                )}
 
-              {uploadProgress === 100 && (
-                <View style={styles.successContainer}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={styles.successText}>File uploaded successfully</Text>
-                </View>
-              )}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View 
+                        style={[styles.progressFill, { width: `${uploadProgress}%` }]} 
+                      />
+                    </View>
+                    <Text style={styles.progressText}>
+                      Uploading: {uploadProgress}%
+                    </Text>
+                  </View>
+                )}
 
-              <Text style={styles.fileHint}>
-                JPG, PNG, PDF, or DOC (Max 5MB)
-              </Text>
+                {uploadProgress === 100 && (
+                  <View style={styles.successContainer}>
+                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Text style={styles.successText}>File uploaded successfully</Text>
+                  </View>
+                )}
+
+                <Text style={styles.fileHint}>
+                  JPG, PNG, PDF, or DOC (Max 5MB)
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton, isLoading && styles.buttonDisabled]}
+                onPress={handleClose}
+                disabled={isLoading}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.submitButton, isLoading && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.submitButtonText}>
+                      {uploadProgress > 0 ? 'Uploading...' : 'Submitting...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit Report</Text>
+                )}
+              </TouchableOpacity>
             </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, isLoading && styles.buttonDisabled]}
-              onPress={handleClose}
-              disabled={isLoading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.button, styles.submitButton, isLoading && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.submitButtonText}>
-                    {uploadProgress > 0 ? 'Uploading...' : 'Submitting...'}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.submitButtonText}>Submit Report</Text>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-// Styles remain exactly the same as before
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -506,7 +511,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     width: '100%',
-    maxHeight: '80%',
+    maxHeight: screenHeight * 0.8, // Use percentage of screen height
+    minHeight: 400, // Minimum height
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -542,14 +548,18 @@ const styles = StyleSheet.create({
     color: '#64748B',
     paddingHorizontal: 16,
     paddingBottom: 16,
+    paddingTop: 8,
   },
   taskTitle: {
     fontWeight: '600',
     color: '#1E293B',
   },
   scrollContent: {
-    maxHeight: 400,
+    flex: 1,
+  },
+  scrollContentContainer: {
     paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   inputContainer: {
     marginBottom: 16,
@@ -578,8 +588,9 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#FFFFFF',
-    minHeight: 100,
+    minHeight: 120, // Fixed height for better scrolling
     textAlignVertical: 'top',
+    maxHeight: 200, // Maximum height before scrolling
   },
   inputError: {
     borderColor: '#EF4444',
@@ -625,10 +636,19 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 8,
   },
+  fileDetails: {
+    flex: 1,
+    marginLeft: 8,
+  },
   fileName: {
     flex: 1,
     color: '#374151',
     fontSize: 14,
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
   progressContainer: {
     marginTop: 8,
@@ -649,6 +669,17 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'right',
     marginTop: 4,
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  successText: {
+    fontSize: 12,
+    color: '#10B981',
+    fontWeight: '500',
   },
   fileHint: {
     fontSize: 12,
@@ -695,26 +726,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  fileDetails: {
-    flex: 1,
-    marginLeft: 8,
-  },
-  fileSize: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  successContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 4,
-  },
-  successText: {
-    fontSize: 12,
-    color: '#10B981',
-    fontWeight: '500',
   },
   buttonDisabled: {
     opacity: 0.5,

@@ -112,6 +112,7 @@ const Login = ({ navigation }) => {
         error.message ||
         "An unexpected error occurred. Please try again.";
       setStatusMessage(errorMessage);
+      Alert.alert(errorMessage)
       
       // Error shake animation
       Animated.sequence([

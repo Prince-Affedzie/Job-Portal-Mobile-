@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Image,
   ActivityIndicator,
   Dimensions,
@@ -14,6 +13,7 @@ import {
   RefreshControl,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -151,7 +151,7 @@ export default function ApplicantsScreen({ route }) {
                   isAssigned: item._id === applicantId,
                 }))
               );
-               onRefresh()
+               loadData()
             } else {
               throw new Error(response.data?.message || "Assignment failed");
             }
@@ -222,7 +222,7 @@ export default function ApplicantsScreen({ route }) {
                   isAccepted: item._id === bidId
                 })));
 
-                 onRefresh()
+                loadData()
               } else {
                 throw new Error(response.data?.message || 'Bid acceptance failed');
               }

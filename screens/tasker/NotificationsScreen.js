@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Animated,
@@ -22,6 +21,7 @@ import { NotificationContext } from '../../context/NotificationContext';
 import NotificationDetailModal from '../../component/common/NotificationDetailModal';
 import Header from "../../component/tasker/Header";
 import LoadingIndicator from '../../component/common/LoadingIndicator';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -54,6 +54,10 @@ const NotificationsScreen = ({ navigation }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
+  
+  // Modal animation values
+  const [modalScale] = useState(new Animated.Value(0.8));
+  const [modalOpacity] = useState(new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -64,6 +68,47 @@ const NotificationsScreen = ({ navigation }) => {
     
     loadNotifications();
   }, []);
+
+  const openModal = (notification) => {
+    setSelectedNotification(notification);
+    setModalVisible(true);
+    
+    // Reset animation values
+    modalScale.setValue(0.8);
+    modalOpacity.setValue(0);
+    
+    // Animate modal in
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      })
+    ]).start();
+  };
+
+  const closeModal = () => {
+    Animated.parallel([
+      Animated.timing(modalScale, {
+        toValue: 0.8,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(modalOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      setModalVisible(false);
+      setSelectedNotification(null);
+    });
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -152,12 +197,11 @@ const NotificationsScreen = ({ navigation }) => {
       toggleSelection(notification._id);
       return;
     }
-    setSelectedNotification(notification);
-    setModalVisible(true);
+    openModal(notification);
   };
 
   const handleNotificationAction = (notification) => {
-    setModalVisible(false);
+    closeModal();
     
     switch (notification.action) {
       case 'view_task':
@@ -187,59 +231,102 @@ const NotificationsScreen = ({ navigation }) => {
   });
 
   const unreadCount = safeNotifications.filter(n => !n.read).length;
+  
   const NotificationItem = ({ notification }) => {
     const { icon, color } = getNotificationIcon(notification.type);
     const isSelected = selectedNotifications.includes(notification._id);
-    
+    const [pressAnim] = useState(new Animated.Value(1));
+
+    const handlePressIn = () => {
+      if (selectMode) return;
+      Animated.spring(pressAnim, {
+        toValue: 0.95,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      if (selectMode) return;
+      Animated.spring(pressAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    };
+
     return (
-      <TouchableOpacity
+      <Animated.View
         style={[
-          styles.notificationItem, 
-          !notification.read && styles.unreadNotification,
-          isSelected && styles.selectedNotification,
-          selectMode && styles.selectModeItem
+          {
+            transform: [{ scale: pressAnim }],
+          },
         ]}
-        onPress={() => handleNotificationPress(notification)}
-        onLongPress={() => {
-          setSelectMode(true);
-          toggleSelection(notification._id);
-        }}
-        activeOpacity={0.7}
-        delayLongPress={500}
       >
-        {selectMode && (
-          <View style={styles.selectionCheckbox}>
-            <Ionicons 
-              name={isSelected ? "checkbox" : "square-outline"} 
-              size={24} 
-              color={isSelected ? '#6366F1' : '#94A3B8'} 
-            />
-          </View>
-        )}
-        
-        <View style={styles.notificationContent}>
-          <View style={[styles.notificationIcon, { backgroundColor: color + '20' }]}>
-            <Ionicons name={icon} size={20} color={color} />
-          </View>
-          <View style={styles.notificationText}>
-            <Text style={styles.notificationTitle} numberOfLines={1}>
-              {notification.type}
-            </Text>
-            <Text style={styles.notificationMessage} numberOfLines={2}>
-              {notification.message}
-            </Text>
-            <Text style={styles.notificationTime}>
-              {new Date(notification.createdAt).toLocaleDateString()}
-            </Text>
-          </View>
-          {!notification.read && !selectMode && (
-            <View style={styles.unreadBadge} />
+        <TouchableOpacity
+          style={[
+            styles.notificationItem, 
+            !notification.read && styles.unreadNotification,
+            isSelected && styles.selectedNotification,
+            selectMode && styles.selectModeItem,
+            styles.clickableNotification // Added for better clickable appearance
+          ]}
+          onPress={() => handleNotificationPress(notification)}
+          onLongPress={() => {
+            setSelectMode(true);
+            toggleSelection(notification._id);
+          }}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={0.8}
+          delayLongPress={500}
+        >
+          {selectMode && (
+            <View style={styles.selectionCheckbox}>
+              <Ionicons 
+                name={isSelected ? "checkbox" : "square-outline"} 
+                size={24} 
+                color={isSelected ? '#6366F1' : '#94A3B8'} 
+              />
+            </View>
           )}
-          {notification.important && !selectMode && (
-            <Ionicons name="alert-circle" size={16} color="#EF4444" style={styles.importantIcon} />
-          )}
-        </View>
-      </TouchableOpacity>
+          
+          <View style={styles.notificationContent}>
+            <View style={[styles.notificationIcon, { backgroundColor: color + '20' }]}>
+              <Ionicons name={icon} size={20} color={color} />
+            </View>
+            <View style={styles.notificationText}>
+              <Text style={styles.notificationTitle} numberOfLines={1}>
+                {notification.title}
+              </Text>
+              <Text style={styles.notificationMessage} numberOfLines={2}>
+                {notification.message}
+              </Text>
+              <Text style={styles.notificationTime}>
+                {new Date(notification.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+            
+            <View style={styles.notificationRightSection}>
+              {!notification.read && !selectMode && (
+                <View style={styles.unreadBadge} />
+              )}
+              {notification.important && !selectMode && (
+                <Ionicons name="alert-circle" size={16} color="#EF4444" style={styles.importantIcon} />
+              )}
+              {/* Chevron icon to indicate clickability */}
+              {!selectMode && (
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={16} 
+                  color="#CBD5E1" 
+                  style={styles.chevronIcon}
+                />
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -305,7 +392,6 @@ const NotificationsScreen = ({ navigation }) => {
               onPress={handleMarkAllAsRead}
               disabled={isProcessing || unreadCount === 0}
             >
-             
               <Text style={styles.actionText}>Mark All Read</Text>
             </TouchableOpacity>
             
@@ -341,7 +427,7 @@ const NotificationsScreen = ({ navigation }) => {
 
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
-        contentContainerStyle={[styles.scrollContent, { paddingTop: 0 }]} // Remove insets.top since Header handles it
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 0 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -550,12 +636,37 @@ const NotificationsScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      <NotificationDetailModal
+      {/* Animated Notification Detail Modal */}
+      <Modal
         visible={modalVisible}
-        notification={selectedNotification}
-        onClose={() => setModalVisible(false)}
-        onAction={handleNotificationAction}
-      />
+        transparent={true}
+        animationType="none" // We handle animation manually
+        onRequestClose={closeModal}
+      >
+        <Animated.View 
+          style={[
+            styles.modalOverlay,
+            { opacity: modalOpacity }
+          ]}
+        >
+          <Animated.View 
+            style={[
+              styles.detailModalContent,
+              {
+                transform: [{ scale: modalScale }],
+                opacity: modalOpacity
+              }
+            ]}
+          >
+            <NotificationDetailModal
+              visible={modalVisible}
+              notification={selectedNotification}
+              onClose={closeModal}
+              onAction={handleNotificationAction}
+            />
+          </Animated.View>
+        </Animated.View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -583,7 +694,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   headerActions: {
-    
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -731,9 +841,22 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  clickableNotification: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
   },
   unreadNotification: {
     backgroundColor: '#F0F9FF',
+    borderLeftColor: '#6366F1',
   },
   selectedNotification: {
     backgroundColor: '#EEF2FF',
@@ -779,15 +902,21 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 2,
   },
+  notificationRightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   unreadBadge: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: '#6366F1',
-    marginLeft: 4,
   },
   importantIcon: {
-    marginLeft: 4,
+    marginTop: 4,
+  },
+  chevronIcon: {
     marginTop: 4,
   },
   emptyState: {
@@ -852,18 +981,15 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 20,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     width: '100%',
+    maxWidth: 400,
+  },
+  detailModalContent: {
+    width: '90%',
     maxWidth: 400,
   },
   modalHeader: {

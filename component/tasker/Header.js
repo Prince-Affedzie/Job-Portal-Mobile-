@@ -48,7 +48,7 @@ const Header = ({
   };
 
   const handleNotificationPress = () => {
-   user?.role==="job_seeker"? navigate('DashboardTab',{screen:'Notifications'}):navigate('Notifications'); // Replace with your actual notification screen name
+   user?.role==="job_seeker"? navigate('NotificationsScreen'):navigate('Notifications'); // Replace with your actual notification screen name
   };
 
   const HeaderBackground = gradient ? LinearGradient : View;

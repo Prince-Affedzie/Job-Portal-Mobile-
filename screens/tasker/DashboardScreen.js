@@ -22,10 +22,12 @@ import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 
+
 const { width } = Dimensions.get('window');
 
 const TaskerDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
+   const { getAllEarnings,earnings } = useContext(TaskerContext);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
@@ -38,6 +40,7 @@ const TaskerDashboard = () => {
 
   useEffect(() => {
     loadData();
+    getAllEarnings()
   }, []);
 
   const loadData = async () => {
@@ -113,9 +116,9 @@ const TaskerDashboard = () => {
       : 0;
 
     // Calculate earnings from completed tasks
-    const totalEarnings = applications
-      .filter(task => task.status === "Completed")
-      .reduce((sum, task) => sum + (task.budget || 0), 0);
+    const totalEarnings = earnings
+      .filter(earning=> earning.status === "released")
+      .reduce((sum, earning) => sum + (earning.amount || 0), 0);
 
     // Calculate bids statistics
     const submittedBids = bids.length;
@@ -364,29 +367,14 @@ const TaskerDashboard = () => {
         <View style={styles.performanceSection}>
           <Text style={styles.sectionTitle}>Performance Overview</Text>
           <View style={styles.performanceGrid}>
-            <PerformanceCard
-              title="Response Rate"
-              value={stats?.performance.responseRate || '0%'}
-              subtitle="Last 30 days"
-              icon="flash"
-              color="#6366F1"
-              onPress={() => navigate('Performance')}
-            />
+           
             <PerformanceCard
               title="Job Success"
               value={stats?.tasks.successRate || '0%'}
               subtitle="Completed tasks"
               icon="trending-up"
               color="#10B981"
-              onPress={() => navigate('MyTasksTab')}
-            />
-            <PerformanceCard
-              title="Recommendation"
-              value={`${stats?.performance.recommendationScore || 0}%`}
-              subtitle="Profile score"
-              icon="thumbs-up"
-              color="#F59E0B"
-              onPress={() => navigate('ProfileTab')}
+              onPress={() => navigate('MyTasks')}
             />
             <PerformanceCard
               title="Earnings"
@@ -394,7 +382,7 @@ const TaskerDashboard = () => {
               subtitle="Total earned"
               icon="cash"
               color="#10B981"
-              onPress={() => navigate('Earnings')}
+              onPress={() => navigate('EarningScreen')}
             />
           </View>
         </View>
@@ -415,29 +403,30 @@ const TaskerDashboard = () => {
               description="Browse and apply for new opportunities"
               icon="search"
               color="#6366F1"
-              onPress={() => navigate('AvailableTab')}
+              onPress={() => navigate('AvailableTasks')}
+            />
+             <QuickAction
+              title="View Earnings"
+              description="Check your payments and history"
+              icon="wallet"
+              color="#10B981"
+              onPress={() => navigate('EarningScreen')}
             />
             <QuickAction
               title="Manage Applications"
               description="Track your submitted applications"
               icon="document-text"
               color="#10B981"
-              onPress={() => navigate('MyTasksTab')}
+              onPress={() => navigate('MyTasks')}
             />
             <QuickAction
               title="Boost Profile"
               description="Improve your visibility to clients"
               icon="rocket"
               color="#F59E0B"
-              onPress={() => navigate('ProfileTab')}
+              onPress={() => navigate('Profile')}
             />
-            <QuickAction
-              title="View Earnings"
-              description="Check your payments and history"
-              icon="wallet"
-              color="#10B981"
-              onPress={() => navigate('Earnings')}
-            />
+           
           </View>
         </View>
 
@@ -445,7 +434,7 @@ const TaskerDashboard = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Active Work</Text>
-            <TouchableOpacity onPress={() => navigate('MyTasksTab')}>
+            <TouchableOpacity onPress={() => navigate('MyTasks')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -469,9 +458,9 @@ const TaskerDashboard = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity>
+            {/*<TouchableOpacity>
               <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
+            </TouchableOpacity>*/}
           </View>
           <View style={styles.activitiesList}>
             {recentActivities.map((item) => (
@@ -494,8 +483,8 @@ const TaskerDashboard = () => {
           </Text>
           <TouchableOpacity style={styles.tipsButton} onPress={() => 
             stats?.performance.profileCompletion >= 80 
-              ? navigate('AvailableTab') 
-              : navigate('ProfileTab')
+              ? navigate('AvailableTasks') 
+              : navigate('Profile')
           }>
             <Text style={styles.tipsButtonText}>
               {stats?.performance.profileCompletion >= 80 ? "Find Tasks" : "Complete Profile"}

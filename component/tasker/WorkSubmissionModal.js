@@ -20,8 +20,7 @@ import * as FileSystem from "expo-file-system";
 import { getSignedUrl, sendFileToS3 } from '../../api/commonApi';
 import { submitWorkForReview } from '../../api/miniTaskApi';
 
-const { width } = Dimensions.get('window');
-
+const { width, height: screenHeight } = Dimensions.get('window');
 
 const WorkSubmissionModal = ({ 
   isVisible, 
@@ -38,10 +37,7 @@ const WorkSubmissionModal = ({
   const [errors, setErrors] = useState({});
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-
-
-
-   useEffect(() => {
+  useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
       () => setKeyboardVisible(true)
@@ -373,8 +369,6 @@ const WorkSubmissionModal = ({
         throw new Error('All file uploads failed');
       }
 
-     
-
       // Submit work with successful uploads
       await submitWorkForReview(taskId, {
         message: message.trim(),
@@ -456,182 +450,192 @@ const WorkSubmissionModal = ({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
-    ><KeyboardAvoidingView 
-        style={styles.modalOverlay}
+    >
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-      <View style={[
-        styles.modalContainer,
-        keyboardVisible && styles.modalContainerKeyboardOpen
-      ]}>
-       
-          {/* Header and rest of the JSX remains exactly the same */}
-          <View style={styles.modalHeader}>
-            <View style={styles.headerGradient}>
-              <View style={styles.headerContent}>
-                <View style={styles.titleContainer}>
-                  <Ionicons name="cloud-upload" size={24} color="#FFFFFF" />
-                  <Text style={styles.modalTitle}>Submit Your Work</Text>
+        <View style={styles.modalOverlay}>
+          <View style={[
+            styles.modalContainer,
+            keyboardVisible && styles.modalContainerKeyboardOpen
+          ]}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.headerGradient}>
+                <View style={styles.headerContent}>
+                  <View style={styles.titleContainer}>
+                    <Ionicons name="cloud-upload" size={24} color="#FFFFFF" />
+                    <Text style={styles.modalTitle}>Submit Your Work</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={onClose}
+                    disabled={submitting}
+                    style={styles.closeButton}
+                  >
+                    <Ionicons name="close" size={24} color="#FFFFFF" />
+                  </TouchableOpacity>
                 </View>
+                <Text style={styles.headerSubtitle}>
+                  Upload your completed files and provide details
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView 
+              style={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContentContainer}
+            >
+              {/* Message Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Description <Text style={styles.required}>*</Text>
+                </Text>
+                <TextInput
+                  style={[
+                    styles.textArea,
+                    errors.message && styles.inputError
+                  ]}
+                  placeholder="Describe what you're submitting..."
+                  value={message}
+                  onChangeText={(text) => {
+                    setMessage(text);
+                    if (errors.message) {
+                      setErrors(prev => ({ ...prev, message: undefined }));
+                    }
+                  }}
+                  multiline={true}
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  editable={!submitting}
+                  maxLength={1000}
+                  scrollEnabled={true}
+                  blurOnSubmit={false}
+                />
+                <View style={styles.charCounter}>
+                  {errors.message ? (
+                    <Text style={styles.errorText}>{errors.message}</Text>
+                  ) : (
+                    <Text style={styles.hintText}>Minimum 10 characters</Text>
+                  )}
+                  <Text style={styles.charCount}>{message.length}/1000</Text>
+                </View>
+              </View>
+
+              {/* File Upload Area */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>
+                  Files <Text style={styles.required}>*</Text> 
+                  <Text style={styles.fileCount}>({files.length}/{MAX_FILES})</Text>
+                </Text>
+                
                 <TouchableOpacity 
-                  onPress={onClose}
+                  style={[
+                    styles.uploadArea,
+                    errors.files && styles.uploadAreaError,
+                    dragActive && styles.uploadAreaActive
+                  ]}
+                  onPress={pickFiles}
                   disabled={submitting}
-                  style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                  <View style={styles.uploadIcon}>
+                    <Ionicons name="cloud-upload" size={32} color="#6366F1" />
+                  </View>
+                  <View style={styles.uploadText}>
+                    <Text style={styles.uploadTitle}>Tap to upload</Text>
+                    <Text style={styles.uploadSubtitle}>
+                      Max {formatFileSize(MAX_FILE_SIZE)} per file • 50MB total
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-              </View>
-              <Text style={styles.headerSubtitle}>
-                Upload your completed files and provide details
-              </Text>
-            </View>
-          </View>
 
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Message Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Description <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[
-                  styles.textArea,
-                  errors.message && styles.inputError
-                ]}
-                placeholder="Describe what you're submitting..."
-                value={message}
-                onChangeText={(text) => {
-                  setMessage(text);
-                  if (errors.message) {
-                    setErrors(prev => ({ ...prev, message: undefined }));
-                  }
-                }}
-                multiline={true}
-                numberOfLines={4}
-                textAlignVertical="top"
-                editable={!submitting}
-                maxLength={1000}
-              />
-              <View style={styles.charCounter}>
-                {errors.message ? (
-                  <Text style={styles.errorText}>{errors.message}</Text>
-                ) : (
-                  <Text style={styles.hintText}>Minimum 10 characters</Text>
+                {errors.files && (
+                  <Text style={styles.errorText}>{errors.files}</Text>
                 )}
-                <Text style={styles.charCount}>{message.length}/1000</Text>
               </View>
-            </View>
 
-            {/* File Upload Area */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>
-                Files <Text style={styles.required}>*</Text> 
-                <Text style={styles.fileCount}>({files.length}/{MAX_FILES})</Text>
-              </Text>
-              
-              <TouchableOpacity 
-                style={[
-                  styles.uploadArea,
-                  errors.files && styles.uploadAreaError,
-                  dragActive && styles.uploadAreaActive
-                ]}
-                onPress={pickFiles}
+              {/* File List */}
+              {files.length > 0 && (
+                <View style={styles.fileListContainer}>
+                  <Text style={styles.fileListTitle}>Selected Files</Text>
+                  <View style={styles.fileList}>
+                    {files.map((file, index) => (
+                      <FileItem 
+                        key={index}
+                        file={file}
+                        index={index}
+                        progress={uploadProgress[index]}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Error Messages */}
+              {Object.keys(errors).filter(key => !['message', 'files'].includes(key)).length > 0 && (
+                <View style={styles.errorContainer}>
+                  <View style={styles.errorHeader}>
+                    <Ionicons name="warning" size={20} color="#EF4444" />
+                    <Text style={styles.errorTitle}>Some files couldn't be added</Text>
+                  </View>
+                  <View style={styles.errorList}>
+                    {Object.entries(errors)
+                      .filter(([key]) => !['message', 'files'].includes(key))
+                      .map(([fileName, error]) => (
+                        <Text key={fileName} style={styles.errorItem}>
+                          <Text style={styles.errorFileName}>{fileName}:</Text> {error}
+                        </Text>
+                      ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={onClose}
                 disabled={submitting}
               >
-                <View style={styles.uploadIcon}>
-                  <Ionicons name="cloud-upload" size={32} color="#6366F1" />
-                </View>
-                <View style={styles.uploadText}>
-                  <Text style={styles.uploadTitle}>Tap to upload</Text>
-                  <Text style={styles.uploadSubtitle}>
-                    Max {formatFileSize(MAX_FILE_SIZE)} per file • 50MB total
-                  </Text>
-                </View>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-
-              {errors.files && (
-                <Text style={styles.errorText}>{errors.files}</Text>
-              )}
+              <TouchableOpacity
+                style={[
+                  styles.button, 
+                  styles.submitButton,
+                  (submitting || files.length === 0) && styles.submitButtonDisabled
+                ]}
+                onPress={handleSubmit}
+                disabled={submitting || files.length === 0}
+              >
+                {submitting ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.submitButtonText}>Uploading...</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="cloud-upload" size={16} color="#FFFFFF" />
+                    <Text style={styles.submitButtonText}>Submit Work</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-
-            {/* File List */}
-            {files.length > 0 && (
-              <View style={styles.fileListContainer}>
-                <Text style={styles.fileListTitle}>Selected Files</Text>
-                <View style={styles.fileList}>
-                  {files.map((file, index) => (
-                    <FileItem 
-                      key={index}
-                      file={file}
-                      index={index}
-                      progress={uploadProgress[index]}
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Error Messages */}
-            {Object.keys(errors).filter(key => !['message', 'files'].includes(key)).length > 0 && (
-              <View style={styles.errorContainer}>
-                <View style={styles.errorHeader}>
-                  <Ionicons name="warning" size={20} color="#EF4444" />
-                  <Text style={styles.errorTitle}>Some files couldn't be added</Text>
-                </View>
-                <View style={styles.errorList}>
-                  {Object.entries(errors)
-                    .filter(([key]) => !['message', 'files'].includes(key))
-                    .map(([fileName, error]) => (
-                      <Text key={fileName} style={styles.errorItem}>
-                        <Text style={styles.errorFileName}>{fileName}:</Text> {error}
-                      </Text>
-                    ))}
-                </View>
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Action Buttons */}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onClose}
-              disabled={submitting}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.button, 
-                styles.submitButton,
-                (submitting || files.length === 0) && styles.submitButtonDisabled
-              ]}
-              onPress={handleSubmit}
-              disabled={submitting || files.length === 0}
-            >
-              {submitting ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.submitButtonText}>Uploading...</Text>
-                </View>
-              ) : (
-                <>
-                  <Ionicons name="cloud-upload" size={16} color="#FFFFFF" />
-                  <Text style={styles.submitButtonText}>Submit Work</Text>
-                </>
-              )}
-            </TouchableOpacity>
           </View>
-       
-      </View>
-       </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-
 const styles = StyleSheet.create({
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -643,7 +647,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     width: '100%',
-    maxHeight: '90%',
+    maxHeight: screenHeight * 0.85, // Use percentage of screen height
+    minHeight: 400,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -654,21 +659,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalContainerKeyboardOpen: {
-    maxHeight: '95%', // Allow more height when keyboard is open
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    width: '100%',
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    maxHeight: screenHeight * 0.9, // Allow more height when keyboard is open
   },
   modalHeader: {
     borderTopLeftRadius: 16,
@@ -703,8 +694,10 @@ const styles = StyleSheet.create({
     color: '#E0E7FF',
   },
   scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
     padding: 20,
-    maxHeight: 500,
   },
   inputContainer: {
     marginBottom: 20,
@@ -729,7 +722,8 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#FFFFFF',
-    minHeight: 100,
+    minHeight: 120,
+    maxHeight: 200, // Maximum height before scrolling
     textAlignVertical: 'top',
   },
   inputError: {

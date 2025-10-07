@@ -35,7 +35,7 @@ const ClientProfileScreen = ({ navigation }) => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
-  const { postedTasks } = useContext(PosterContext);
+  const { postedTasks,payments } = useContext(PosterContext);
   const [profileData, setProfileData] = useState({});
   const [notifications, setNotifications] = useState({
     taskUpdates: true,
@@ -54,7 +54,9 @@ const ClientProfileScreen = ({ navigation }) => {
   const completedTasks = postedTasks?.filter(task => 
     ['Completed', 'Closed'].includes(task.status)
   ).length || 0;
-  const totalSpent = postedTasks?.reduce((sum, task) => sum + (task.budget || 0), 0) || 0;
+  const totalSpent = payments
+            .filter(payment => payment.status === 'in_escrow')
+            .reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
   // Initialize profile data with user data and fallbacks
  useEffect(() => {

@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from "react";
 import {  getMiniTasks, getYourAppliedMiniTasks } from "../api/miniTaskApi";
 import {applyToMiniTask,bidOnMiniTask} from "../api/miniTaskApi";
 import { AuthContext } from "./AuthContext";
+import {viewAllEarnings} from "../api/paymentApi"
 
 export const TaskerContext = createContext();
 
@@ -10,6 +11,7 @@ export const TaskerProvider = ({ children }) => {
   const [availableTasks, setAvailableTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [earnings,setEarnings] = useState([])
 
   // Load available tasks for tasker
   const loadAvailableTasks = async (params) => {
@@ -63,10 +65,22 @@ export const TaskerProvider = ({ children }) => {
     }
   };
 
+  const getAllEarnings = async()=>{
+    try{
+      const res = await viewAllEarnings()
+      setEarnings(res.data)
+      return res
+
+    }catch(err){
+      console.log(err)
+    }
+  }
+
   useEffect(() => {
     if (user?.role === "tasker") {
       loadAvailableTasks();
       loadMyTasks();
+      getAllEarnings();
     }
   }, [user]);
 
@@ -79,7 +93,9 @@ export const TaskerProvider = ({ children }) => {
         loadAvailableTasks,
         loadMyTasks,
         applyTask,
-        bidOnTask
+        bidOnTask,
+        getAllEarnings,
+        earnings
       }}
     >
       {children}

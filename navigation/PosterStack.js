@@ -1,7 +1,6 @@
 import React, { useContext } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
-import { CommonActions } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DashboardScreen from "../screens/poster/DashboardScreen";
 import PostedTasksScreen from "../screens/poster/PostedTasksScreen";
@@ -22,79 +21,35 @@ import { Ionicons } from "@expo/vector-icons";
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Create a Stack Navigator for Posted Tasks
-function PostedTasksStack() {
+// Main Poster Stack Navigator (for non-tab screens)
+function PosterStackNavigator() {
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen
-        name="PostedTasksList"
-        component={PostedTasksScreen}
-        options={{ title: "My Posted Tasks" }}
-      />
-      <Stack.Screen
-        name="ClientTaskDetail"
-        component={ClientTaskDetailScreen}
-        options={{ title: "Task Details" }}
-      />
-      <Stack.Screen
-        name="EditTask"
-        component={EditTaskScreen}
-        options={{ title: "Edit Task" }}
-      />
-      <Stack.Screen
-        name="CreateTask"
-        component={CreateTaskScreen}
-        options={{ title: "Post Task" }}
-      />
-      <Stack.Screen
-        name="TaskApplicants"
-        component={ApplicantsScreen}
-        options={{ title: "Task Applicants" }}
-      />
-      <Stack.Screen
-        name="ApplicantProfile"
-        component={ApplicantProfileScreen}
-        options={{ title: "Applicant Profile" }}
-      />
-      <Stack.Screen
-        name="TaskSubmissions"
-        component={ClientViewSubmissionsScreen}
-        options={{ title: "Task Submissions" }}
-      />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {/* Tab Navigator as the main screen */}
+      <Stack.Screen name="MainTabs" component={PosterTabs} />
+      
+      {/* Stack Screens (not in tabs) */}
+      <Stack.Screen name="ClientTaskDetail" component={ClientTaskDetailScreen} />
+      <Stack.Screen name="EditTask" component={EditTaskScreen} />
+      <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
+      <Stack.Screen name="TaskApplicants" component={ApplicantsScreen} />
+      <Stack.Screen name="ApplicantProfile" component={ApplicantProfileScreen} />
+      <Stack.Screen name="TaskSubmissions" component={ClientViewSubmissionsScreen} />
+      <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Payments" component={PaymentsScreen} />
+      
+      {/* Chat should be in stack since it's already in tabs */}
+      {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
     </Stack.Navigator>
   );
 }
 
-// Create a Stack Navigator for Profile
-function ProfileStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Stack.Screen
-        name="ClientProfile"
-        component={ClientProfileScreen}
-        options={{ title: "Profile" }}
-      />
-      <Stack.Screen
-        name="AllReviews"
-        component={AllReviewsScreen}
-        options={{ title: "All Reviews" }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-export default function PosterStack() {
+// Tab Navigator with direct screen links
+function PosterTabs() {
   const { notifications } = useContext(NotificationContext);
   const unreadNotifications = notifications.filter(n => !n.read);
-  
+
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
       <Tab.Navigator
@@ -115,72 +70,56 @@ export default function PosterStack() {
             fontWeight: '500',
           },
         }}
-        screenListeners={({ navigation, route }) => ({
-          tabPress: (e) => {
-            // Get the current state
-            const state = navigation.getState();
-            const currentRoute = state.routes[state.index];
-            
-            // If we're pressing the currently active tab
-            if (currentRoute.name === route.name) {
-              // Prevent default to handle the reset ourselves
-              e.preventDefault();
-              
-              // For stack navigators, we need to reset to the first screen
-              if (route.name === 'PostedTasks' || route.name === 'Profile') {
-                // Use navigate to go to the initial screen of the stack
-                if (route.name === 'PostedTasks') {
-                  navigation.navigate('PostedTasks', {
-                    screen: 'PostedTasksList'
-                  });
-                } else if (route.name === 'Profile') {
-                  navigation.navigate('Profile', {
-                    screen: 'ClientProfile'
-                  });
-                }
-              } else {
-                // For regular screens, just navigate normally
-                navigation.navigate(route.name);
-              }
-            }
-            // If switching to a different tab, let the default handler work
-          },
-        })}
       >
+        {/* Direct Tab Screens */}
         <Tab.Screen
           name="Dashboard"
           component={DashboardScreen}
           options={{
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" color={color} size={size} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="PostedTasks"
-          component={PostedTasksStack}
-          options={{
-            tabBarLabel: "Posted Tasks",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="list-outline" color={color} size={size} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Notifications"
-          component={NotificationsScreen}
-          options={{
-            tabBarLabel: 'Notifications',
+            tabBarLabel: 'Dashboard',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
-                name={focused ? "notifications" : "notifications-outline"}
+                name={focused ? "home" : "home-outline"}
                 color={color}
                 size={size}
               />
             ),
-            tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined,
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of dashboard when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            },
+          })}
         />
+
+        <Tab.Screen
+          name="PostedTasks"
+          component={PostedTasksScreen}
+          options={{
+            tabBarLabel: 'My Tasks',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? "list" : "list-outline"}
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of posted tasks when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'PostedTasks' }],
+              });
+            },
+          })}
+        />
+
         <Tab.Screen
           name="Chat"
           component={ChatScreen}
@@ -195,9 +134,35 @@ export default function PosterStack() {
             ),
           }}
         />
+
+        <Tab.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{
+            tabBarLabel: 'Notifications',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? "notifications" : "notifications-outline"}
+                color={color}
+                size={size}
+              />
+            ),
+            tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined,
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of notifications when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Notifications' }],
+              });
+            },
+          })}
+        />
+
         <Tab.Screen
           name="Profile"
-          component={ProfileStack}
+          component={ClientProfileScreen}
           options={{
             tabBarLabel: 'Profile',
             tabBarIcon: ({ color, size, focused }) => (
@@ -208,8 +173,19 @@ export default function PosterStack() {
               />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of profile when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Profile' }],
+              });
+            },
+          })}
         />
       </Tab.Navigator>
     </SafeAreaView>
   );
 }
+
+export default PosterStackNavigator;

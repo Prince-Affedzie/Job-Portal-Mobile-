@@ -23,16 +23,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMiniTaskInfo, applyToMiniTask, bidOnMiniTask } from '../../api/miniTaskApi';
-import moment from 'moment'
+import moment from 'moment';
 import { BidModal } from '../../component/tasker/BidModal';
 import { ScamAlertModal } from '../../component/tasker/ScamAlertModal';
 const HANDYMAN_AVATAR = require('../../assets/HandyManAvatar.png');
-import Header from "../../component/tasker/Header";
+import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
-
-
 
 const TaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
@@ -47,9 +45,9 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
 
   const [bidData, setBidData] = useState({
-    amount: "",
-    message: "",
-    timeline: ""
+    amount: '',
+    message: '',
+    timeline: '',
   });
 
   useEffect(() => {
@@ -57,7 +55,6 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       try {
         setLoading(true);
         const response = await getMiniTaskInfo(taskId);
-        
         if (response.status === 200) {
           setTask(response.data);
           Animated.timing(fadeAnim, {
@@ -80,11 +77,10 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   }, [taskId]);
 
   const handleApplyOrBid = async () => {
-    if (task?.biddingType === "open-bid") {
+    if (task?.biddingType === 'open-bid') {
       setShowBidModal(true);
       return;
     }
-    
     await handleFixedApplication();
   };
 
@@ -99,9 +95,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         Alert.alert('Error', 'An error occurred. Please try again later.');
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error ||
-        "An unexpected error occurred. Please try again.";
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
       Alert.alert('Error', errorMessage);
     } finally {
       setApplying(false);
@@ -125,24 +119,16 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         Alert.alert('Error', 'An error occurred. Please try again later.');
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error ||
-        "An unexpected error occurred. Please try again.";
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
       Alert.alert('Error', errorMessage);
     } finally {
       setApplying(false);
     }
   };
 
-
   const getRequirements = () => {
     if (!task || !task.requirements || task.requirements.length === 0) {
-      return [
-        'Good communication skills',
-        'Reliable and punctual',
-        'Attention to detail',
-        'Quality work delivery'
-      ];
+      return ['Good communication skills', 'Reliable and punctual', 'Attention to detail', 'Quality work delivery'];
     }
     return task.requirements;
   };
@@ -153,7 +139,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         'Creative Tasks': ['Creativity', 'Design Sense', 'Attention to Detail'],
         'Delivery & Errands': ['Punctuality', 'Reliability', 'Communication'],
         'Digital Services': ['Technical Skills', 'Problem Solving', 'Efficiency'],
-        'Home Services': ['Handyman Skills', 'Reliability', 'Quality Work']
+        'Home Services': ['Handyman Skills', 'Reliability', 'Quality Work'],
       };
       return categorySkills[task?.category] || ['Reliable', 'Professional', 'Skilled'];
     }
@@ -175,16 +161,14 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   };
 
   const getButtonText = () => {
-    if (applying) return "Processing...";
-    if (applyClicked) return task?.biddingType === "open-bid" ? "Bid Sent!" : "Interest Sent!";
-    if (task?.biddingType === "open-bid") return "Place a Bid";
-    return "Show Interest";
+    if (applying) return 'Processing...';
+    if (applyClicked) return task?.biddingType === 'open-bid' ? 'Bid Sent!' : 'Interest Sent!';
+    if (task?.biddingType === 'open-bid') return 'Place a Bid';
+    return 'Show Interest';
   };
 
   if (loading) {
-    return (
-      <LoadingIndicator text='Loading task details...'/>
-    );
+    return <LoadingIndicator text="Loading task details..." />;
   }
 
   if (!task) {
@@ -199,27 +183,22 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     );
   }
 
- 
   const requirements = getRequirements();
   const skills = getSkills();
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView 
+      <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-         <Header title="Task Details" showBackButton={true} />
+        <Header title="Task Details" showBackButton={true} />
         {/* Header Images */}
         <View style={styles.imageContainer}>
-      <View style={styles.avatarWrapper}>
-        <Image
-          source={HANDYMAN_AVATAR}
-          style={styles.taskAvatar}
-          resizeMode="contain"
-        />
-      </View>
+          <View style={styles.avatarWrapper}>
+            <Image source={HANDYMAN_AVATAR} style={styles.taskAvatar} resizeMode="contain" />
+          </View>
         </View>
 
         {/* Main Content */}
@@ -228,20 +207,24 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           <View style={styles.header}>
             <Text style={styles.title}>{task.title}</Text>
             {task.biddingType && (
-              <View style={[
-                styles.biddingTypeBadge,
-                task.biddingType === "open-bid" ? styles.openBidBadge : styles.fixedBidBadge
-              ]}>
-                <Ionicons 
-                  name={task.biddingType === "open-bid" ? "pricetags" : "lock-closed"} 
-                  size={14} 
-                  color={task.biddingType === "open-bid" ? "#1D4ED8" : "#059669"} 
+              <View
+                style={[
+                  styles.biddingTypeBadge,
+                  task.biddingType === 'open-bid' ? styles.openBidBadge : styles.fixedBidBadge,
+                ]}
+              >
+                <Ionicons
+                  name={task.biddingType === 'open-bid' ? 'pricetags' : 'lock-closed'}
+                  size={14}
+                  color={task.biddingType === 'open-bid' ? '#1D4ED8' : '#059669'}
                 />
-                <Text style={[
-                  styles.biddingTypeText,
-                  task.biddingType === "open-bid" ? styles.openBidText : styles.fixedBidText
-                ]}>
-                  {task.biddingType === "open-bid" ? "Open for Bids" : "Fixed Budget"}
+                <Text
+                  style={[
+                    styles.biddingTypeText,
+                    task.biddingType === 'open-bid' ? styles.openBidText : styles.fixedBidText,
+                  ]}
+                >
+                  {task.biddingType === 'open-bid' ? 'Open for Bids' : 'Fixed Budget'}
                 </Text>
               </View>
             )}
@@ -249,30 +232,21 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
           {/* Price and Status */}
           <View style={styles.priceStatusContainer}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.priceBadge}
-            >
+            <LinearGradient colors={['#10B981', '#059669']} style={styles.priceBadge}>
               <Text style={styles.price}>₵{task.budget}</Text>
             </LinearGradient>
-            <View style={[
-              styles.statusBadge,
-              task.status?.toLowerCase() === 'active' ? styles.activeStatus : styles.inactiveStatus
-            ]}>
+            <View
+              style={[
+                styles.statusBadge,
+                task.status?.toLowerCase() === 'active' ? styles.activeStatus : styles.inactiveStatus,
+              ]}
+            >
               <Text style={styles.statusText}>{task.status || 'Active'}</Text>
             </View>
           </View>
 
           {/* Stats */}
           <View style={styles.stats}>
-           {/* <View style={styles.stat}>
-              <Ionicons name="eye" size={16} color="#64748B" />
-              <Text style={styles.statText}>{task.views || 0} views</Text>
-            </View>
-            <View style={styles.stat}>
-              <Ionicons name="people" size={16} color="#64748B" />
-              <Text style={styles.statText}>{task.applications || 0} applications</Text>
-            </View>*/}
             <View style={styles.stat}>
               <Ionicons name="time" size={16} color="#64748B" />
               <Text style={styles.statText}>{calculateTimeLeft()}</Text>
@@ -316,7 +290,9 @@ const TaskDetailsScreen = ({ route, navigation }) => {
               <View style={styles.locationInfo}>
                 <Text style={styles.locationText}>{task.locationType || 'Flexible Location'}</Text>
                 <Text style={styles.addressText}>
-                  {task.address ? `${task.address.region}, ${task.address.city}, ${task.address.suburb}` : 'Location details available after application'}
+                  {task.address
+                    ? `${task.address.region}, ${task.address.city}, ${task.address.suburb}`
+                    : 'Location details available after application'}
                 </Text>
               </View>
             </View>
@@ -328,17 +304,18 @@ const TaskDetailsScreen = ({ route, navigation }) => {
             <View style={styles.clientCard}>
               <View style={styles.clientHeader}>
                 <View style={styles.clientAvatar}>
-                  <Text style={styles.avatarText}>
-                    {task.employer?.name?.charAt(0) || 'C'}
-                  </Text>
+                  <Text style={styles.avatarText}>{task.employer?.name?.charAt(0) || 'C'}</Text>
                 </View>
                 <View style={styles.clientInfo}>
                   <Text style={styles.clientName}>{task.employer?.name || 'Client'}</Text>
                   <View style={styles.rating}>
                     <Ionicons name="star" size={14} color="#F59E0B" />
-                    <Text style={styles.ratingText}>{task.employer.rating}</Text>
+                    <Text style={styles.ratingText}>Rating: {task.employer.rating}</Text>
                     {task.employer?.isVerified && (
-                      <Ionicons name="checkmark-circle" size={14} color="#10B981" style={styles.verifiedIcon} />
+                      <View style={styles.verifiedContainer}>
+                       <Text style={styles.verifiedText}>Verified</Text>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" style={styles.verifiedIcon} />
+                      </View>
                     )}
                   </View>
                 </View>
@@ -366,42 +343,31 @@ const TaskDetailsScreen = ({ route, navigation }) => {
               </View>
             </View>
           </View>
+
+          {/* Footer Inside ScrollView */}
+          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+            <View style={styles.footerContent}>
+              <TouchableOpacity
+                style={[styles.applyButton, (applying || applyClicked) && styles.applyButtonDisabled]}
+                onPress={handleApplyOrBid}
+                disabled={applying || applyClicked}
+              >
+                {applying ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name={applyClicked ? 'checkmark-circle' : 'hand-right'} size={20} color="#FFFFFF" />
+                    <Text style={styles.applyText}>{getButtonText()}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Animated.ScrollView>
 
-      {/* Fixed Apply Button */}
-      <LinearGradient
-        colors={['rgba(248, 250, 252, 0.95)', 'rgba(248, 250, 252, 1)']}
-        style={[styles.footer, { paddingBottom: insets.bottom - 16 }]}
-      >
-        <View style={styles.footerContent}>
-          <TouchableOpacity
-            style={[styles.applyButton, (applying || applyClicked) && styles.applyButtonDisabled]}
-            onPress={handleApplyOrBid}
-            disabled={applying || applyClicked}
-          >
-            {applying ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons 
-                  name={applyClicked ? "checkmark-circle" : "hand-right"} 
-                  size={20} 
-                  color="#FFFFFF" 
-                />
-                <Text style={styles.applyText}>{getButtonText()}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
       {/* Modals */}
-      <ScamAlertModal 
-        visible={showScamAlert} 
-        onClose={() => setShowScamAlert(false)} 
-      />
-      
+      <ScamAlertModal visible={showScamAlert} onClose={() => setShowScamAlert(false)} />
       <BidModal
         visible={showBidModal}
         onClose={() => setShowBidModal(false)}
@@ -414,10 +380,8 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   );
 };
 
-
 export const styles = StyleSheet.create({
-
- container: {
+  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
@@ -458,31 +422,30 @@ export const styles = StyleSheet.create({
     fontSize: 16,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 16, // Reduced from 100 to minimal padding
   },
- imageContainer: {
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#1A1F3B', 
-  borderRadius: 16,
-  padding: 5,
-  marginHorizontal:2,
-  marginVertical: 2,
-  marginTop:10,
-},
-avatarWrapper: {
-  width: 250, 
-  height: 250,
-  borderRadius: 0,
-  justifyContent: 'center',
-  alignItems: 'center',
- 
-},
-taskAvatar: {
-  width: 200,
-  height: 200,
-  borderRadius: 10,
-},
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1F3B',
+    borderRadius: 16,
+    padding: 5,
+    marginHorizontal: 2,
+    marginVertical: 2,
+    marginTop: 10,
+  },
+  avatarWrapper: {
+    width: 250,
+    height: 250,
+    borderRadius: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  taskAvatar: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+  },
   backButton: {
     position: 'absolute',
     left: 16,
@@ -714,19 +677,17 @@ taskAvatar: {
     color: '#64748B',
   },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
   },
   footerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    justifyContent: 'space-between',
   },
   contactButton: {
     flex: 1,
@@ -734,7 +695,7 @@ taskAvatar: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -751,7 +712,7 @@ taskAvatar: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     gap: 8,
     shadowColor: '#6366F1',
@@ -765,7 +726,6 @@ taskAvatar: {
     fontWeight: '600',
     fontSize: 16,
   },
-  // New styles for bidding and modals
   biddingTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -822,8 +782,6 @@ taskAvatar: {
   modalContainer: {
     width: '90%',
     maxHeight: '80%',
-    
-   
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
@@ -849,13 +807,11 @@ taskAvatar: {
   modalBody: {
     maxHeight: 400,
     padding: 20,
-    paddingBottom:10,
   },
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 10,
-    paddingTop:3,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
@@ -998,6 +954,24 @@ taskAvatar: {
   },
   applyButtonDisabled: {
     opacity: 0.7,
+  },
+  verifiedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5', // Light green background for verified status
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8, // Space from the rating text
+  },
+  verifiedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669', // Matches the active status color
+    marginRight: 4, // Space between text and icon
+  },
+  verifiedIcon: {
+    marginLeft: 0, // Reset any existing margin to align properly
   },
 });
 

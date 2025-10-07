@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  ScrollView,
   Image,
   ActivityIndicator,
   RefreshControl,
@@ -17,14 +17,93 @@ import {
   Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { navigate } from '../../services/navigationService';
 import { TaskerContext } from '../../context/TaskerContext';
-import { getYourAppliedMiniTasks } from '../../api/miniTaskApi'
+import { getYourAppliedMiniTasks } from '../../api/miniTaskApi';
 import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
+
+// Separate Search Component for the screen
+const SearchBar = ({
+  activeTab,
+  initialQuery = '',
+  onSearch,
+  onOpenFilter,
+  hasActiveFilters,
+  onClearFilters
+}) => {
+  const [localQuery, setLocalQuery] = React.useState(initialQuery);
+  const searchInputRef = React.useRef(null);
+
+  // Sync localQuery with initialQuery when it changes from parent
+  React.useEffect(() => {
+    setLocalQuery(initialQuery);
+  }, [initialQuery]);
+
+  const handleSearch = () => {
+    onSearch?.(localQuery.trim());
+    searchInputRef.current?.blur();
+  };
+
+  const handleClearSearch = () => {
+    setLocalQuery('');
+    onSearch?.('');
+    searchInputRef.current?.focus();
+  };
+
+  return (
+    <View style={styles.searchBarContainer}>
+      <View style={styles.searchInputWrapper}>
+        <Ionicons name="search-outline" size={20} color="#6B7280" style={styles.searchIcon} />
+        <TextInput
+          ref={searchInputRef}
+          style={styles.searchInput}
+          placeholder={`Search ${activeTab}...`}
+          value={localQuery}
+          onChangeText={setLocalQuery}
+          returnKeyType="search"
+          blurOnSubmit={false}
+          onSubmitEditing={handleSearch}
+        />
+        {localQuery ? (
+          <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchButton}>
+            <Ionicons name="close-circle" size={20} color="#6B7280" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      <View style={styles.filterButtonsContainer}>
+        <TouchableOpacity 
+          style={[
+            styles.searchButton,
+            localQuery.trim() && styles.searchButtonActive
+          ]} 
+          onPress={handleSearch}
+          disabled={!localQuery.trim()}
+        >
+          <Ionicons 
+            name="search" 
+            size={18} 
+            color={localQuery.trim() ? "#FFFFFF" : "#6B7280"} 
+          />
+        </TouchableOpacity>
+
+        {hasActiveFilters && (
+          <TouchableOpacity style={styles.activeFiltersBadge} onPress={onClearFilters}>
+            <Ionicons name="funnel" size={16} color="#FFFFFF" />
+            <Text style={styles.activeFiltersText}>Filtered</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.filterButton} onPress={onOpenFilter}>
+          <Ionicons name="options-outline" size={20} color="#6B7280" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 const MyApplicationsScreen = () => {
   const [activeTab, setActiveTab] = useState('applications');
@@ -33,7 +112,6 @@ const MyApplicationsScreen = () => {
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -51,7 +129,7 @@ const MyApplicationsScreen = () => {
     { value: 'review', label: 'Under Review' }
   ];
 
-  // Category options (you can populate this from your data)
+  // Category options
   const categoryOptions = [
     { value: 'all', label: 'All Categories' },
     { value: 'Home Services', label: 'Home Services' },
@@ -97,6 +175,54 @@ const MyApplicationsScreen = () => {
     loadData();
   };
 
+  // Handle search submission
+  const handleSearch = useCallback((query) => {
+    setSearchQuery(query);
+  }, []);
+
+  // Calculate statistics
+  const calculateStats = () => {
+    const totalApplications = applications.length;
+    const totalBids = bids.length;
+    
+    const acceptedApplications = applications.filter(app => 
+      app.status?.toLowerCase() === 'accepted' || app.status?.toLowerCase() === 'completed'
+    ).length;
+    
+    const acceptedBids = bids.filter(bid => 
+      bid.bid.status?.toLowerCase() === 'accepted'
+    ).length;
+
+    const pendingApplications = applications.filter(app => 
+      app.status?.toLowerCase() === 'pending' || app.status?.toLowerCase() === 'review'
+    ).length;
+
+    const pendingBids = bids.filter(bid => 
+      bid.bid.status?.toLowerCase() === 'pending'
+    ).length;
+
+    const successRateApplications = totalApplications > 0 
+      ? Math.round((acceptedApplications / totalApplications) * 100) 
+      : 0;
+
+    const successRateBids = totalBids > 0 
+      ? Math.round((acceptedBids / totalBids) * 100) 
+      : 0;
+
+    return {
+      totalApplications,
+      totalBids,
+      acceptedApplications,
+      acceptedBids,
+      pendingApplications,
+      pendingBids,
+      successRateApplications,
+      successRateBids
+    };
+  };
+
+  const stats = calculateStats();
+
   // Filter and search logic
   const getFilteredData = () => {
     let data = activeTab === 'applications' ? applications : bids;
@@ -114,21 +240,18 @@ const MyApplicationsScreen = () => {
 
     // Apply status filter
     if (selectedStatus !== 'all') {
-    data = data.filter(item => {
-    const status = activeTab === 'applications' ? item.status : item.bid.status;
-    
-    // Normalize both the data status and selected status for comparison
-    const normalizedDataStatus = status?.toLowerCase().replace(/-/g, '');
-    const normalizedSelectedStatus = selectedStatus.toLowerCase().replace(/-/g, '');
-    return normalizedDataStatus === normalizedSelectedStatus;
-  });
-}
+      data = data.filter(item => {
+        const status = activeTab === 'applications' ? item.status : item.bid.status;
+        const normalizedDataStatus = status?.toLowerCase().replace(/-/g, '');
+        const normalizedSelectedStatus = selectedStatus.toLowerCase().replace(/-/g, '');
+        return normalizedDataStatus === normalizedSelectedStatus;
+      });
+    }
 
     // Apply category filter
     if (selectedCategory !== 'all') {
       data = data.filter(item => {
         const category = activeTab === 'applications' ? item.category : item.task.category;
-        console.log(category)
         return category === selectedCategory;
       });
     }
@@ -164,15 +287,14 @@ const MyApplicationsScreen = () => {
     return data;
   };
 
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     setSearchQuery('');
     setSelectedStatus('all');
     setSelectedCategory('all');
     setSortBy('newest');
-  };
+  }, []);
 
   const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedCategory !== 'all' || sortBy !== 'newest';
-    
 
   const renderApplicationItem = ({ item }) => (
     <TouchableOpacity
@@ -180,7 +302,6 @@ const MyApplicationsScreen = () => {
       onPress={() => navigate('AppliedTaskDetails', { taskId: item._id })}
       activeOpacity={0.7}
     >
-      {/* Card Header */}
       <View style={styles.cardHeader}>
         <View style={styles.taskInfo}>
           <Text style={styles.taskTitle} numberOfLines={2}>
@@ -216,14 +337,12 @@ const MyApplicationsScreen = () => {
         </View>
       </View>
 
-      {/* Card Content */}
       <View style={styles.cardContent}>
         <Text style={styles.description} numberOfLines={3}>
           {item.description || 'No description provided'}
         </Text>
       </View>
 
-      {/* Card Footer */}
       <View style={styles.cardFooter}>
         <View style={styles.metaInfo}>
           <View style={styles.metaItem}>
@@ -253,7 +372,6 @@ const MyApplicationsScreen = () => {
       onPress={() => navigate('AppliedTaskDetails', { taskId: item.task._id })}
       activeOpacity={0.7}
     >
-      {/* Card Header */}
       <View style={styles.cardHeader}>
         <View style={styles.taskInfo}>
           <Text style={styles.taskTitle} numberOfLines={2}>
@@ -289,14 +407,12 @@ const MyApplicationsScreen = () => {
         </View>
       </View>
 
-      {/* Bid Message */}
       <View style={styles.bidMessage}>
         <Text style={styles.bidMessageText} numberOfLines={3}>
           {item.bid.message || 'No message provided'}
         </Text>
       </View>
 
-      {/* Card Footer */}
       <View style={styles.cardFooter}>
         <View style={styles.metaInfo}>
           <View style={styles.metaItem}>
@@ -453,7 +569,7 @@ const MyApplicationsScreen = () => {
         </Text>
         <TouchableOpacity 
           style={styles.exploreButton}
-          onPress={() => navigate('Available')}
+          onPress={() => navigate('AvailableTasks')}
         >
           <Ionicons name="search-outline" size={16} color="#FFFFFF" />
           <Text style={styles.exploreButtonText}>Explore Tasks</Text>
@@ -481,8 +597,10 @@ const MyApplicationsScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody}>
-            {/* Status Filter */}
+          <ScrollView 
+            style={styles.modalBody}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Status</Text>
               <View style={styles.filterOptions}>
@@ -506,7 +624,6 @@ const MyApplicationsScreen = () => {
               </View>
             </View>
 
-            {/* Category Filter */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Category</Text>
               <View style={styles.filterOptions}>
@@ -530,7 +647,6 @@ const MyApplicationsScreen = () => {
               </View>
             </View>
 
-            {/* Sort Options */}
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Sort By</Text>
               <View style={styles.filterOptions}>
@@ -573,192 +689,144 @@ const MyApplicationsScreen = () => {
       </View>
     </Modal>
   );
-  const headerActions = () => (  
-    <View style={styles.headerActions}>
-      {/* Search Bar */}
-      {searchOpen ? (
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Search ${activeTab}...`}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus={true}
-          />
-          <TouchableOpacity 
-            style={styles.searchCloseButton}
-            onPress={() => {
-              setSearchOpen(false);
-              setSearchQuery('');
-            }}
+
+  const renderHeader = () => (
+    <View>
+      <Header title="My Tasks" />
+      
+      <SearchBar
+        activeTab={activeTab}
+        initialQuery={searchQuery}
+        onSearch={handleSearch}
+        onOpenFilter={() => setFilterOpen(true)}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearAllFilters}
+      />
+
+      <View style={styles.tabSection}>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'applications' && styles.activeTab
+            ]}
+            onPress={() => setActiveTab('applications')}
           >
-            <Ionicons name="close" size={20} color="#6B7280" />
+            <View style={styles.tabInner}>
+              <View style={[
+                styles.tabIconContainer,
+                activeTab === 'applications' && styles.activeTabIconContainer
+              ]}>
+                <Ionicons 
+                  name={activeTab === 'applications' ? "document-text" : "document-text-outline"} 
+                  size={20} 
+                  color={activeTab === 'applications' ? '#FFFFFF' : '#6B7280'} 
+                />
+              </View>
+              <Text style={[
+                styles.tabText,
+                activeTab === 'applications' && styles.activeTabText
+              ]}>
+                Applications
+              </Text>
+              {applications.length > 0 && (
+                <View style={[
+                  styles.tabBadge,
+                  activeTab === 'applications' && styles.activeTabBadge
+                ]}>
+                  <Text style={styles.tabBadgeText}>{applications.length}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              activeTab === 'bids' && styles.activeTab
+            ]}
+            onPress={() => setActiveTab('bids')}
+          >
+            <View style={styles.tabInner}>
+              <View style={[
+                styles.tabIconContainer,
+                activeTab === 'bids' && styles.activeTabIconContainer
+              ]}>
+                <Ionicons 
+                  name={activeTab === 'bids' ? "pricetags" : "pricetags-outline"} 
+                  size={20} 
+                  color={activeTab === 'bids' ? '#FFFFFF' : '#6B7280'} 
+                />
+              </View>
+              <Text style={[
+                styles.tabText,
+                activeTab === 'bids' && styles.activeTabText
+              ]}>
+                Bids
+              </Text>
+              {bids.length > 0 && (
+                <View style={[
+                  styles.tabBadge,
+                  activeTab === 'bids' && styles.activeTabBadge
+                ]}>
+                  <Text style={styles.tabBadgeText}>{bids.length}</Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
-      ) : (
-        <>
-          {hasActiveFilters && (
-            <TouchableOpacity 
-              style={styles.activeFiltersBadge}
-              onPress={clearAllFilters}
-            >
-              <Ionicons name="funnel" size={16} color="#FFFFFF" />
-              <Text style={styles.activeFiltersText}>Filtered</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity 
-            style={styles.filterButton}
-            onPress={() => setFilterOpen(true)}
-          >
-            <Ionicons name="options-outline" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.searchButton}
-            onPress={() => setSearchOpen(true)}
-          >
-            <Ionicons name="search-outline" size={20} color="#6B7280" />
-          </TouchableOpacity>
-        </>
+      </View>
+
+      <View style={styles.infoBanner}>
+        <View style={styles.infoHeader}>
+          <Ionicons name="information-circle" size={18} color="#6366F1" />
+          <Text style={styles.infoTitle}>Task Visibility</Text>
+        </View>
+        <Text style={styles.infoText}>
+          Tasks assigned to other taskers won't appear here even if you applied to them.
+        </Text>
+      </View>
+
+      {hasActiveFilters && (
+        <View style={styles.activeFiltersInfo}>
+          <Text style={styles.activeFiltersInfoText}>
+            Showing {getFilteredData().length} of {activeTab === 'applications' ? applications.length : bids.length} {activeTab}
+            {searchQuery && ` for "${searchQuery}"`}
+          </Text>
+        </View>
       )}
     </View>
   );
 
   if (loading) {
-    return (
-      <LoadingIndicator text='Loading Tasks'/>
-    );
+    return <LoadingIndicator text="Loading Tasks" />;
   }
 
   const filteredData = getFilteredData();
   const isEmpty = filteredData.length === 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <Header title="My Tasks" rightComponent={headerActions()} />
-      
-      {/* Filter Modal */}
+    <View style={styles.container}>
+      <FlatList
+        data={isEmpty ? [] : filteredData}
+        keyExtractor={(item) => item._id || (item.task?._id + item.bid?._id)}
+        renderItem={activeTab === 'applications' ? renderApplicationItem : renderBidItem}
+        ListHeaderComponent={renderHeader}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#4F46E5']}
+            tintColor="#4F46E5"
+          />
+        }
+        ListEmptyComponent={isEmpty ? renderEmptyState() : null}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
       <FilterModal />
-     
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            styles.tabDivider,
-            activeTab === 'applications' && styles.activeTab,
-            activeTab === 'applications' && styles.activeTabShadow
-          ]}
-          onPress={() => setActiveTab('applications')}
-        >
-          <View style={styles.tabContent}>
-            <View style={[
-              styles.tabIconContainer,
-              activeTab === 'applications' && styles.activeTabIconContainer
-            ]}>
-              <Ionicons 
-                name={activeTab === 'applications' ? "document-text" : "document-text-outline"} 
-                size={22} 
-                color={activeTab === 'applications' ? '#FFFFFF' : '#6B7280'} 
-              />
-            </View>
-            <Text style={[
-              styles.tabText,
-              activeTab === 'applications' && styles.activeTabText
-            ]}>
-              Applications
-            </Text>
-          </View>
-          {applications.length > 0 && (
-            <View style={[
-              styles.tabBadge,
-              activeTab === 'applications' && styles.activeTabBadge
-            ]}>
-              <Text style={styles.tabBadgeText}>{applications.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'bids' && styles.activeTab,
-            activeTab === 'bids' && styles.activeTabShadow
-          ]}
-          onPress={() => setActiveTab('bids')}
-        >
-          <View style={styles.tabContent}>
-            <View style={[
-              styles.tabIconContainer,
-              activeTab === 'bids' && styles.activeTabIconContainer
-            ]}>
-              <Ionicons 
-                name={activeTab === 'bids' ? "pricetags" : "pricetags-outline"} 
-                size={22} 
-                color={activeTab === 'bids' ? '#FFFFFF' : '#6B7280'} 
-              />
-            </View>
-            <Text style={[
-              styles.tabText,
-              activeTab === 'bids' && styles.activeTabText
-            ]}>
-              Bids
-            </Text>
-          </View>
-          {bids.length > 0 && (
-            <View style={[
-              styles.tabBadge,
-              activeTab === 'bids' && styles.activeTabBadge
-            ]}>
-              <Text style={styles.tabBadgeText}>{bids.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-      <View style={styles.infoBanner}>
-      <View style={styles.infoHeader}>
-    
-        <Text style={styles.infoTitle}>Task Visibility</Text>
-      </View>
-      <Text style={styles.infoText}>
-       
-        Tasks assigned to other taskers won't appear here even if you applied to...
-      </Text>
     </View>
-
-      {/* Active Filters Info */}
-      {hasActiveFilters && (
-        <View style={styles.activeFiltersInfo}>
-          <Text style={styles.activeFiltersInfoText}>
-            Showing {filteredData.length} of {activeTab === 'applications' ? applications.length : bids.length} {activeTab}
-            {searchQuery && ` for "${searchQuery}"`}
-          </Text>
-        </View>
-      )}
-
-      {/* Content */}
-      {isEmpty ? (
-        renderEmptyState()
-      ) : (
-        <FlatList
-          data={filteredData}
-          keyExtractor={(item) => item._id || (item.task?._id + item.bid?._id)}
-          renderItem={activeTab === 'applications' ? renderApplicationItem : renderBidItem}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={['#4F46E5']}
-              tintColor="#4F46E5"
-            />
-          }
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </SafeAreaView>
   );
 };
 
@@ -768,41 +836,190 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAFAFA',
   },
-  header: {
-    backgroundColor: '#1A1F3B',
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 0 : 35,
-    paddingBottom: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
-    marginTop:10,
+    gap: 12,
   },
-  headerContent: {
+  searchInputWrapper: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFF',
-    letterSpacing: -0.5,
+  searchIcon: {
+    marginRight: 8,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#FFFF',
-    marginTop: 2,
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    paddingVertical: 4,
   },
-  headerActions: {
+  clearSearchButton: {
+    padding: 2,
+  },
+   searchButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#F9FAFB',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+    },
+    searchButtonActive: {
+      backgroundColor: '#6366F1',
+      borderColor: '#6366F1',
+    },
+  filterButtonsContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  infoBanner: {
-    backgroundColor: '#F8FAFF',
+  tabSection: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  tabContainer: {
+    flexDirection: 'row',
     marginHorizontal: 20,
-    marginTop: 4,
-    padding: 4,
+    marginTop: 16,
+    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    position: 'relative',
+  },
+  activeTab: {
+    backgroundColor: '#6366F1',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tabInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tabIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activeTabIconContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -2,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  activeTabBadge: {
+    backgroundColor: '#DC2626',
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  statTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  statSubtitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statSuccessText: {
+    fontSize: 11,
+    color: '#10B981',
+    fontWeight: '500',
+  },
+  statPendingText: {
+    fontSize: 11,
+    color: '#F59E0B',
+    fontWeight: '500',
+  },
+  infoBanner: {
+    backgroundColor: '#F0F9FF',
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0EA5E9',
   },
   infoHeader: {
     flexDirection: 'row',
@@ -811,35 +1028,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#0C4A6E',
   },
   infoText: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 16,
+    fontSize: 13,
+    color: '#0369A1',
+    lineHeight: 18,
   },
-  statsGrid: {
+  headerActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4F46E5',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  
   filterButton: {
     width: 40,
     height: 40,
@@ -860,91 +1061,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
- tabContainer: {
-  flexDirection: 'row',
-  backgroundColor: 'transparent',
-  marginHorizontal: 20,
-  marginTop: 16,
-  marginBottom: 8,
-  borderRadius: 0,
-  padding: 0,
-  justifyContent: 'flex-start',
-  gap: 10,
-},
-tab: {
-  flex: 1,
-  paddingVertical: 12,
-  paddingHorizontal: 8,
-  position: 'relative',
-  backgroundColor: 'transparent',
-  borderWidth: 1,
-  borderColor: '#E2E8F0',
-  borderRadius: 20,
-},
-activeTab: {
-  backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
-},
-tabBackground: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  position: 'relative',
-},
-tabContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-},
-tabText: {
-  fontSize: 15,
-  fontWeight: '500',
-  color: '#6B7280',
-  letterSpacing: -0.2,
-},
-activeTabText: {
-  color: '#FFFF',
-  fontWeight: '600',
-},
-tabBadge: {
-  position: 'absolute',
-  top: -8,
-  right: -8,
-  backgroundColor: '#EF4444',
-  borderRadius: 10,
-  minWidth: 18,
-  height: 18,
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 4,
-  borderWidth: 1.5,
-  borderColor: '#FFFFFF',
-},
-activeTabBadge: {
-  backgroundColor: '#DC2626',
-},
-tabBadgeText: {
-  color: '#FFFFFF',
-  fontSize: 10,
-  fontWeight: '700',
-},
-tabUnderline: {
-  position: 'absolute',
-  bottom: 0,
-  left: '20%',
-  right: '20%',
-  height: 3,
-  backgroundColor: 'transparent',
-  borderRadius: 3,
-  transform: [{ scaleX: 0 }],
-  transition: 'all 0.3s ease',
-},
-activeTabUnderline: {
-  backgroundColor: '#4F46E5',
-  transform: [{ scaleX: 1 }],
-},
   listContainer: {
-    padding: 20,
   },
   separator: {
     height: 12,
@@ -1155,29 +1272,18 @@ activeTabUnderline: {
     fontSize: 14,
     fontWeight: '600',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 16,
-  },
   searchContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#FFFFFF',
-  borderRadius: 12,
-  paddingHorizontal: 8,
-  paddingVertical: 6,
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-  width: 230, // Fixed width instead of flex: 1
-  maxWidth: 230, // Ensure it doesn't grow beyond this
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    width: 230,
+    maxWidth: 230,
+  },
   searchInput: {
     flex: 1,
     fontSize: 16,
@@ -1207,6 +1313,7 @@ activeTabUnderline: {
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#C7D2FE',
+    marginVertical:12,
   },
   activeFiltersInfoText: {
     color: '#3730A3',

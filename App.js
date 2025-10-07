@@ -1,4 +1,5 @@
 import React from "react";
+import Constants from "expo-constants";
 import { AuthProvider } from "./context/AuthContext";
 import { TaskerProvider } from "./context/TaskerContext";
 import { PosterProvider } from "./context/PosterContext";
@@ -8,6 +9,7 @@ import RootNavigator from "./navigation/RootNavigator";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import NotificationPopup from "./component/common/NotificationPopUp";
 import { PaystackProvider } from "react-native-paystack-webview";
+const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
 
 
 
@@ -22,7 +24,7 @@ export default function App() {
           
          
           <PaystackProvider debug 
-           publicKey="pk_test_31e53267e9515cb94801b1fbf13c80c5d1ff89a1"
+           publicKey={PayStack_Public_Key}
            currency="GHS"
            defaultChannels={['card','mobile_money']}
            >

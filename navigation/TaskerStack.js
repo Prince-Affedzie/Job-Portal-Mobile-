@@ -13,65 +13,35 @@ import SubmissionsScreen from "../screens/tasker/TaskSubmissionsScreen";
 import ChatScreen from "../screens/tasker/ChatScreen";
 import { NotificationContext } from "../context/NotificationContext";
 import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
+import EarningScreen from "../screens/tasker/EarningsScreen";
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Available Tasks Stack
-function AvailableStack() {
+// Main Tasker Stack Navigator (for non-tab screens)
+function TaskerStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="AvailableTasks" component={AvailableTasksScreen} />
+      {/* Tab Navigator as the main screen */}
+      <Stack.Screen name="MainTabs" component={TaskerTabs} />
+      
+      {/* Stack Screens (not in tabs) */}
       <Stack.Screen name="TaskDetails" component={TaskDetailsScreen} />
-    </Stack.Navigator>
-  );
-}
-
-// My Tasks Stack
-function MyTasksStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="MyApplications" component={MyApplicationsScreen} />
       <Stack.Screen name="AppliedTaskDetails" component={AppliedTaskDetailsScreen} />
       <Stack.Screen name="Submissions" component={SubmissionsScreen} />
-    </Stack.Navigator>
-  );
-}
-
-// Notifications Stack
-function NotificationsStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      {/* Add any notification-related stack screens here */}
-    </Stack.Navigator>
-  );
-}
-
-// Dashboard Stack
-function DashboardStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Dashboard" component={TaskerDashboard} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      {/* Add any dashboard-related stack screens here */}
-    </Stack.Navigator>
-  );
-}
-
-// Profile Stack
-function ProfileStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Profile" component={TaskerProfileScreen} />
       <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
-      {/* Add any profile-related stack screens here */}
+      <Stack.Screen name="EarningScreen" component={EarningScreen} />
+      <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+      
+      {/* Chat should be in stack since it's already in tabs */}
+      {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
     </Stack.Navigator>
   );
 }
 
-export default function TaskerStack() {
+// Tab Navigator with direct screen links
+function TaskerTabs() {
   const { notifications } = useContext(NotificationContext);
   const unreadNotifications = notifications.filter(n => !n.read);
 
@@ -95,49 +65,11 @@ export default function TaskerStack() {
             fontWeight: '500',
           },
         }}
-        screenListeners={({ navigation, route }) => ({
-          tabPress: (e) => {
-            // Get the current state
-            const state = navigation.getState();
-            const currentRoute = state.routes[state.index];
-            
-            // If we're pressing the currently active tab
-            if (currentRoute.name === route.name) {
-              // Prevent default to handle the reset ourselves
-              e.preventDefault();
-              
-              // For stack navigators, we need to reset to the first screen
-              if (route.name === 'AvailableTab' || route.name === 'MyTasksTab' || route.name === 'DashboardTab' || route.name === 'ProfileTab') {
-                // Use navigate to go to the initial screen of the stack
-                if (route.name === 'AvailableTab') {
-                  navigation.navigate('AvailableTab', {
-                    screen: 'AvailableTasks'
-                  });
-                } else if (route.name === 'MyTasksTab') {
-                  navigation.navigate('MyTasksTab', {
-                    screen: 'MyApplications'
-                  });
-                } else if (route.name === 'DashboardTab') {
-                  navigation.navigate('DashboardTab', {
-                    screen: 'Dashboard'
-                  });
-                } else if (route.name === 'ProfileTab') {
-                  navigation.navigate('ProfileTab', {
-                    screen: 'Profile'
-                  });
-                }
-              } else {
-                // For regular screens, just navigate normally
-                navigation.navigate(route.name);
-              }
-            }
-            // If switching to a different tab, let the default handler work
-          },
-        })}
       >
+        {/* Direct Tab Screens */}
         <Tab.Screen
-          name="AvailableTab"
-          component={AvailableStack}
+          name="AvailableTasks"
+          component={AvailableTasksScreen}
           options={{
             tabBarLabel: 'Available',
             tabBarIcon: ({ color, size, focused }) => (
@@ -148,10 +80,20 @@ export default function TaskerStack() {
               />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of available tasks when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'AvailableTasks' }],
+              });
+            },
+          })}
         />
+
         <Tab.Screen
-          name="MyTasksTab"
-          component={MyTasksStack}
+          name="MyTasks"
+          component={MyApplicationsScreen}
           options={{
             tabBarLabel: 'My Tasks',
             tabBarIcon: ({ color, size, focused }) => (
@@ -162,22 +104,17 @@ export default function TaskerStack() {
               />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of my tasks when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MyTasks' }],
+              });
+            },
+          })}
         />
-        {/* <Tab.Screen
-          name="NotificationsTab"
-          component={NotificationsStack}
-          options={{
-            tabBarLabel: 'Notifications',
-            tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons
-                name={focused ? "notifications" : "notifications-outline"}
-                color={color}
-                size={size}
-              />
-            ),
-            tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined,
-          }}
-        /> */}
+
         <Tab.Screen
           name="Chat"
           component={ChatScreen}
@@ -192,23 +129,34 @@ export default function TaskerStack() {
             ),
           }}
         />
+
         <Tab.Screen
-          name="DashboardTab"
-          component={DashboardStack}
+          name="Dashboard"
+          component={TaskerDashboard}
           options={{
             tabBarLabel: 'Dashboard',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
-                name={focused ? "cash" : "cash-outline"}
+                name={focused ? "analytics" : "analytics-outline"}
                 color={color}
                 size={size}
               />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of dashboard when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            },
+          })}
         />
+
         <Tab.Screen
-          name="ProfileTab"
-          component={ProfileStack}
+          name="Profile"
+          component={TaskerProfileScreen}
           options={{
             tabBarLabel: 'Profile',
             tabBarIcon: ({ color, size, focused }) => (
@@ -219,8 +167,19 @@ export default function TaskerStack() {
               />
             ),
           }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of profile when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Profile' }],
+              });
+            },
+          })}
         />
       </Tab.Navigator>
     </SafeAreaView>
   );
 }
+
+export default TaskerStackNavigator;

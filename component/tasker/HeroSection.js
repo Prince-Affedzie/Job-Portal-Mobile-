@@ -75,7 +75,7 @@ const HeroSection = ({
   const completionRate = taskCount > 0 ? Math.round((completedTasks / taskCount) * 100) : 0;
 
   return (
-    <View style={[styles.wrapper, { paddingTop: insets.top + 0 }]}>
+    <View style={[styles.wrapper, { paddingTop: insets.top -12 }]}>
       <LinearGradient
         colors={['#1A1F3B', '#2D325D', '#4A4F8C']}
         start={{ x: 0, y: 0 }}

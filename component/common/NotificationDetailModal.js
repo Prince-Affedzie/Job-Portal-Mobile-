@@ -76,6 +76,11 @@ const NotificationDetailModal = ({ visible, notification, onClose, onAction }) =
               </View>
 
               <ScrollView style={styles.modalBody}>
+                
+                <View style={styles.section}>
+                  <Text style={styles.sectionLabel}>Title</Text>
+                  <Text style={styles.messageText}>{notification.title}</Text>
+                </View>
                 {/* Notification Message */}
                 <View style={styles.section}>
                   <Text style={styles.sectionLabel}>Message</Text>

@@ -13,7 +13,7 @@ const { width } = Dimensions.get('window')
 
 export default function DashboardScreen() {
     const { user } = useContext(AuthContext)
-    const { postedTasks, loading, loadPostedTasks } = useContext(PosterContext)
+    const { postedTasks, loading, loadPostedTasks,payments, fetchPayments } = useContext(PosterContext)
     const [refreshing, setRefreshing] = useState(false)
 
     // Refresh function
@@ -25,6 +25,12 @@ export default function DashboardScreen() {
 
     useEffect(() => {
         loadPostedTasks()
+         fetchPayments()
+    }, [])
+
+
+     useEffect(() => {
+        console.log(payments)
     }, [])
 
     // Enhanced statistics calculation
@@ -61,18 +67,18 @@ export default function DashboardScreen() {
             return daysUntilDeadline <= 2 && !['Completed', 'Closed'].includes(task.status)
         }).length
 
-        const totalSpent = postedTasks
-            .filter(task => task.status === 'Completed')
-            .reduce((sum, task) => sum + (task.budget || 0), 0)
+        const totalSpent = payments
+            .filter(payment => payment.status === 'in_escrow')
+            .reduce((sum, payment) => sum + (payment.amount || 0), 0)
 
-        const monthlySpending = postedTasks
-            .filter(task => {
-                if (task.status !== 'Completed') return false
-                const completionDate = new Date(task.updatedAt || task.createdAt)
+        const monthlySpending = payments
+            .filter(payment => {
+                if (payment.status !== 'in_escrow') return false
+                const completionDate = new Date(payment.updatedAt || payment.createdAt)
                 const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
                 return completionDate > thirtyDaysAgo
             })
-            .reduce((sum, task) => sum + (task.budget || 0), 0)
+            .reduce((sum, payment) => sum + (payment.amount || 0), 0)
 
         const successRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
         const avgTaskValue = completedTasks > 0 ? Math.round(totalSpent / completedTasks) : 0
@@ -120,7 +126,6 @@ export default function DashboardScreen() {
             color: ['#1A1F3B', '#2D325D'],
             description: 'Create a new task',
             navigation: {
-                navigator: 'PostedTasks', // Tab navigator name
                 screen: 'CreateTask' // Screen inside the PostedTasksStack
             }
         },
@@ -152,8 +157,17 @@ export default function DashboardScreen() {
             color: ['#DC2626', '#EF4444'],
             description: 'View all tasks',
             navigation: {
-                navigator: 'PostedTasks', // Tab navigator name
-                screen: 'PostedTasksList' // Initial screen of PostedTasksStack
+                screen: 'PostedTasks' // Initial screen of PostedTasksStack
+            }
+        },
+        {
+            id: 5,
+            title: 'Payments',
+            icon: 'wallet',
+            color: ['#F59E0B', '#EF4444'],
+            description: 'View all payments',
+            navigation: {
+                screen: 'Payments' // Initial screen of PostedTasksStack
             }
         }
     ]
@@ -194,10 +208,7 @@ export default function DashboardScreen() {
 
     // Navigation handler for task details with nested navigation
     const handleTaskDetailPress = (taskId) => {
-        navigate('PostedTasks', {
-            screen: 'ClientTaskDetail',
-            params: { taskId }
-        });
+       navigate('ClientTaskDetail', { taskId: taskId })
     }
 
     if (loading && !refreshing) {

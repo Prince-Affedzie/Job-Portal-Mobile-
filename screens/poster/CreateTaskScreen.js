@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
+ 
   TextInput,
   Alert,
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -46,7 +47,6 @@ const subcategories = {
   "Others": ["General Tasks", "Miscellaneous"]
 };
 
-
 const InputField = ({ label, value, onChange, placeholder, error, multiline = false, numberOfLines = 1, required = false }) => (
     <View style={styles.inputContainer}>
       <Text style={styles.inputLabel}>
@@ -68,7 +68,6 @@ const InputField = ({ label, value, onChange, placeholder, error, multiline = fa
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
-
 
 const CreateTaskScreen = ({ navigation }) => {
   const { addTask, loading } = useContext(PosterContext);
@@ -108,8 +107,12 @@ const CreateTaskScreen = ({ navigation }) => {
     
     if (!task.category) newErrors.category = 'Category is required';
     
-    if (task.biddingType === 'fixed' && (!task.budget || isNaN(task.budget) || parseFloat(task.budget) <= 0)) {
-      newErrors.budget = 'Valid budget is required for fixed price tasks';
+    // Budget validation for both bidding types
+    if (!task.budget || isNaN(task.budget) || parseFloat(task.budget) <= 0) {
+      newErrors.budget = 'Valid budget is required';
+    }
+    if (parseFloat(task.budget) < 5) {
+      newErrors.budget = 'Minimum budget is ₵5';
     }
     
     if (!task.deadline) newErrors.deadline = 'Deadline is required';
@@ -133,7 +136,7 @@ const CreateTaskScreen = ({ navigation }) => {
     try {
       const taskData = {
         ...task,
-        budget: task.biddingType === 'fixed' ? parseFloat(task.budget) : 0,
+        budget: parseFloat(task.budget),
         deadline: task.deadline.toISOString(),
         employer: user?.id,
         status: 'Open'
@@ -147,12 +150,18 @@ const CreateTaskScreen = ({ navigation }) => {
       const result = await addTask(taskData);
       
       if (result.status ===200) {
-        Alert.alert('Success', 'Task posted successfully!', [
-          { 
-            text: 'OK', 
-            onPress: () =>  navigate('PostedTasksList')
-          }
-        ]);
+        Alert.alert(
+       '🎉 Task Posted Successfully!',
+       'Your task is now under review and will be live shortly. We\'ll notify you once it\'s approved and open for applications.',
+    [
+      { 
+        text: 'Got It', 
+        onPress: () => navigate('MainTabs', { 
+          screen: 'PostedTasks' 
+        })
+      }
+    ]
+   );
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to create task. Please try again.');
@@ -186,7 +195,6 @@ const CreateTaskScreen = ({ navigation }) => {
     }
   };
 
-  
   const SectionHeader = ({ title, icon, description }) => (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitleContainer}>
@@ -284,7 +292,7 @@ const CreateTaskScreen = ({ navigation }) => {
           <SectionHeader 
             title="Budget & Pricing" 
             icon="cash-outline"
-            description="Choose how you want to pay for this task"
+            description="Set your budget for this task"
           />
           
           <View style={styles.inputContainer}>
@@ -332,17 +340,44 @@ const CreateTaskScreen = ({ navigation }) => {
             </View>
           </View>
 
-          
-            <InputField
-              label="Budget (GHS)"
-              value={task.budget}
-              onChange={(text) => setTask(prev => ({ ...prev, budget: text }))}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              error={errors.budget}
-              required={true}
-            />
-          
+          {/* Single Budget Input for both types */}
+          <InputField
+            label={
+              task.biddingType === 'fixed' 
+                ? "Task Budget (GHS)" 
+                : "Expected Budget (GHS)"
+            }
+            value={task.budget}
+            onChange={(text) => setTask(prev => ({ ...prev, budget: text }))}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+            error={errors.budget}
+            required={true}
+          />
+
+          {/* Budget Explanation */}
+          <View style={styles.budgetExplanation}>
+            <Text style={styles.budgetExplanationTitle}>
+              {task.biddingType === 'fixed' ? '💰 Fixed Price' : '💰 Open Bidding'}
+            </Text>
+            <Text style={styles.budgetExplanationText}>
+              {task.biddingType === 'fixed' 
+                ? 'This is the exact amount you will pay for the task. Taskers will apply knowing the fixed price.'
+                : 'This is your expected budget range. Taskers will submit bids within or around this amount.'
+              }
+            </Text>
+          </View>
+
+          {/* Budget Tips */}
+          <View style={styles.budgetTips}>
+            <Text style={styles.budgetTipsTitle}>💡 Budget Tips:</Text>
+            <Text style={styles.budgetTipsText}>
+              • Research similar tasks to set a competitive price{'\n'}
+              • Consider task complexity and time required{'\n'}
+              • Higher budgets attract more experienced taskers{'\n'}
+              • Minimum budget is ₵5 for all tasks
+            </Text>
+          </View>
         </View>
 
         {/* Timeline Section */}
@@ -753,24 +788,43 @@ const styles = StyleSheet.create({
   removeSkillButton: {
     padding: 2,
   },
-  switchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
+  budgetExplanation: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0EA5E9',
   },
-  switchLabelContainer: {
-    flex: 1,
-  },
-  switchLabel: {
+  budgetExplanationTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 2,
+    color: '#0369A1',
+    marginBottom: 4,
   },
-  switchDescription: {
+  budgetExplanationText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#0369A1',
+    lineHeight: 16,
+  },
+  budgetTips: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  budgetTipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  budgetTipsText: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
   },
   submitButton: {
     borderRadius: 12,
