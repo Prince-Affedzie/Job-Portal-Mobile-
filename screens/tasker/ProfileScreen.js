@@ -907,7 +907,7 @@ const formatDisplayDate = (dateString) => {
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton}>
+            <TouchableOpacity onPress={()=>navigate('SupportScreen')} style={styles.accountButton}>
               <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
               <Text style={styles.accountButtonText}>Help & Support</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />

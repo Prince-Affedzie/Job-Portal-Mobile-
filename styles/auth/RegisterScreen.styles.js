@@ -179,11 +179,11 @@ export const styles = StyleSheet.create({
     alignItems: "center",
   },
   loginText: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#666666",
   },
   loginLink: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#007AFF",
     fontWeight: "600",
     marginLeft: 4,

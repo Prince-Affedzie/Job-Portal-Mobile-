@@ -5,6 +5,9 @@ export const signUp = (data) => API.post("/api/user/signup", data);
 export const loginUser = (data) => API.post("/api/user/login", data);
 export const logoutUser = () => API.post("/api/user/logout");
 
+export const sendOtp = (data)=>API.post("/api/send-otp",data)
+export const verifyOtp = (data)=>API.post("/api/verify-reset-otp",data)
+
 export const requestPasswordReset = (email) =>
   API.post("/api/user/request-password-reset", { email });
 
@@ -14,7 +17,7 @@ export const resetPassword = (password) =>
 export const fetchUser = () => API.get("/api/user/view_profile");
 
 export const completeProfile = (data) =>
-  API.put("/api/user/edit_profile", data, {
+  API.put("/api/user/onboarding", data, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 

@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
-  screenHeight,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +18,7 @@ import { useTaskerOnboarding } from '../../context/TaskerOnboardingContext';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -38,7 +38,6 @@ const ProfileImageScreen = () => {
   const [imageToCrop, setImageToCrop] = useState(null);
   const [showCropInterface, setShowCropInterface] = useState(false);
 
-  // Enhanced permission handling
   const requestPermissions = async (isCamera = false) => {
     if (isCamera) {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -70,7 +69,6 @@ const ProfileImageScreen = () => {
     return true;
   };
 
-  // Enhanced image picker with better UX
   const pickImageFromGallery = async () => {
     try {
       const hasPermission = await requestPermissions(false);
@@ -88,7 +86,6 @@ const ProfileImageScreen = () => {
       });
 
       if (!result.canceled) {
-        // Use Expo's built-in cropping
         handleImageSelection(result.assets[0]);
       }
     } catch (error) {
@@ -121,7 +118,7 @@ const ProfileImageScreen = () => {
       setIsUploading(false);
     }
   };
-  // Custom cropping function using expo-image-manipulator
+
   const cropImage = async (uri, cropRegion) => {
     try {
       const manipResult = await manipulateAsync(
@@ -146,10 +143,8 @@ const ProfileImageScreen = () => {
     }
   };
 
-  // Simple auto-crop to square
   const autoCropToSquare = async (uri) => {
     try {
-      // Get image dimensions first
       return new Promise((resolve, reject) => {
         Image.getSize(uri, (width, height) => {
           const size = Math.min(width, height);
@@ -215,7 +210,6 @@ const ProfileImageScreen = () => {
     }
   };
 
-  // Simple Crop Interface Modal
   const CropInterfaceModal = () => (
     <Modal
       visible={showCropInterface}
@@ -252,6 +246,8 @@ const ProfileImageScreen = () => {
               setShowCropInterface(false);
               setImageToCrop(null);
             }}
+            accessibilityLabel="Cancel cropping"
+            accessibilityHint="Discard the current photo and return to the profile image screen"
           >
             <Text style={styles.cropCancelText}>Cancel</Text>
           </TouchableOpacity>
@@ -260,6 +256,8 @@ const ProfileImageScreen = () => {
             style={styles.cropConfirmButton}
             onPress={handleCustomCropComplete}
             disabled={isUploading}
+            accessibilityLabel="Use this photo"
+            accessibilityHint="Confirm and save the cropped photo as your profile image"
           >
             {isUploading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -339,6 +337,8 @@ const ProfileImageScreen = () => {
           <TouchableOpacity 
             style={styles.modalOption}
             onPress={takePhotoWithCamera}
+            accessibilityLabel="Take photo"
+            accessibilityHint="Open the camera to take a new profile photo"
           >
             <Ionicons name="camera" size={24} color="#007AFF" />
             <View style={styles.optionTextContainer}>
@@ -350,6 +350,8 @@ const ProfileImageScreen = () => {
           <TouchableOpacity 
             style={styles.modalOption}
             onPress={pickImageFromGallery}
+            accessibilityLabel="Choose from library"
+            accessibilityHint="Select an existing photo from your photo library"
           >
             <Ionicons name="images" size={24} color="#007AFF" />
             <View style={styles.optionTextContainer}>
@@ -361,6 +363,8 @@ const ProfileImageScreen = () => {
           <TouchableOpacity 
             style={styles.modalCancel}
             onPress={() => setShowOptions(false)}
+            accessibilityLabel="Cancel photo selection"
+            accessibilityHint="Close the photo selection options"
           >
             <Text style={styles.modalCancelText}>Cancel</Text>
           </TouchableOpacity>
@@ -370,7 +374,7 @@ const ProfileImageScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="auto" /> 
       <ScrollView 
         style={styles.scrollView}
@@ -402,6 +406,8 @@ const ProfileImageScreen = () => {
                     style={styles.editButton}
                     onPress={() => setShowOptions(true)}
                     activeOpacity={0.8}
+                    accessibilityLabel="Edit profile photo"
+                    accessibilityHint="Open options to change or take a new profile photo"
                   >
                     <Ionicons name="camera" size={16} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -440,6 +446,8 @@ const ProfileImageScreen = () => {
                 onPress={() => setShowOptions(true)}
                 activeOpacity={0.8}
                 disabled={isUploading}
+                accessibilityLabel="Add profile photo"
+                accessibilityHint="Open options to take or select a profile photo"
               >
                 <Ionicons name="camera" size={20} color="#FFFFFF" />
                 <Text style={styles.primaryActionText}>Add Photo</Text>
@@ -453,6 +461,8 @@ const ProfileImageScreen = () => {
                 style={styles.changePhotoButton}
                 onPress={() => setShowOptions(true)}
                 activeOpacity={0.7}
+                accessibilityLabel="Change profile photo"
+                accessibilityHint="Open options to select a different photo"
               >
                 <Ionicons name="camera-outline" size={18} color="#1877F2" />
                 <Text style={styles.changePhotoText}>Change Photo</Text>
@@ -462,69 +472,14 @@ const ProfileImageScreen = () => {
                 style={styles.removePhotoButton}
                 onPress={removeImage}
                 activeOpacity={0.7}
+                accessibilityLabel="Remove profile photo"
+                accessibilityHint="Remove the current profile photo"
               >
                 <Ionicons name="trash-outline" size={18} color="#E41E3F" />
                 <Text style={styles.removePhotoText}>Remove</Text>
               </TouchableOpacity>
             </View>
           )}
-        </View>
-
-        <View style={styles.benefitsSection}>
-          <Text style={styles.benefitsTitle}>Why add a photo?</Text>
-          <View style={styles.benefitsList}>
-            <View style={styles.benefitItem}>
-              <View style={styles.benefitIcon}>
-                <Ionicons name="eye" size={20} color="#1877F2" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Get 3x more views</Text>
-                <Text style={styles.benefitDescription}>Profiles with photos are viewed significantly more</Text>
-              </View>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <View style={styles.benefitIcon}>
-                <Ionicons name="shield-checkmark" size={20} color="#1877F2" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>Build trust faster</Text>
-                <Text style={styles.benefitDescription}>Clients prefer to hire people they can see</Text>
-              </View>
-            </View>
-            
-            <View style={styles.benefitItem}>
-              <View style={styles.benefitIcon}>
-                <Ionicons name="chatbubble-ellipses" size={20} color="#1877F2" />
-              </View>
-              <View style={styles.benefitContent}>
-                <Text style={styles.benefitTitle}>More client messages</Text>
-                <Text style={styles.benefitDescription}>Professional photos lead to more inquiries</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.guidelinesSection}>
-          <Text style={styles.guidelinesTitle}>Photo guidelines</Text>
-          <View style={styles.guidelinesList}>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={16} color="#42B883" />
-              <Text style={styles.guidelineText}>Clear, well-lit headshot</Text>
-            </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={16} color="#42B883" />
-              <Text style={styles.guidelineText}>Face the camera and smile naturally</Text>
-            </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="checkmark-circle" size={16} color="#42B883" />
-              <Text style={styles.guidelineText}>Professional attire preferred</Text>
-            </View>
-            <View style={styles.guidelineItem}>
-              <Ionicons name="close-circle" size={16} color="#E41E3F" />
-              <Text style={styles.guidelineText}>Avoid group photos, filters, or sunglasses</Text>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
@@ -533,6 +488,8 @@ const ProfileImageScreen = () => {
           style={styles.backButton}
           onPress={handleBack}
           activeOpacity={0.8}
+          accessibilityLabel="Go back"
+          accessibilityHint="Return to the previous step in the onboarding process"
         >
           <Ionicons name="chevron-back" size={20} color="#65676B" />
           <Text style={styles.backButtonText}>Back</Text>
@@ -543,6 +500,8 @@ const ProfileImageScreen = () => {
             style={styles.continueButton}
             onPress={handleContinue}
             activeOpacity={0.8}
+            accessibilityLabel="Continue to review"
+            accessibilityHint="Proceed to the review step with the selected profile photo"
           >
             <Text style={styles.continueButtonText}>Continue</Text>
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
@@ -552,6 +511,8 @@ const ProfileImageScreen = () => {
             style={styles.skipButton}
             onPress={handleSkip}
             activeOpacity={0.8}
+            accessibilityLabel="Skip adding photo"
+            accessibilityHint="Skip adding a profile photo and proceed to the next step"
           >
             <Text style={styles.skipButtonText}>Skip for now</Text>
             <Ionicons name="chevron-forward" size={20} color="#65676B" />
@@ -574,36 +535,36 @@ const styles = {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: hp('20%'), // Increased padding to ensure content is not cut off
   },
   header: {
-    padding: 20,
-    paddingTop: 10,
+    padding: wp('5%'),
+    paddingTop: hp('2%'),
   },
   title: {
-    fontSize: 28,
+    fontSize: wp('7%'),
     fontWeight: 'bold',
     color: '#1C1E21',
-    marginBottom: 8,
+    marginBottom: hp('1%'),
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     color: '#65676B',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: wp('5.5%'),
   },
   previewSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 30,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('4%'),
   },
   imageWrapper: {
     alignItems: 'center',
   },
   imageContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: wp('50%'),
+    height: wp('50%'),
+    borderRadius: wp('25%'),
     backgroundColor: '#F0F2F5',
     justifyContent: 'center',
     alignItems: 'center',
@@ -617,16 +578,16 @@ const styles = {
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 96,
+    borderRadius: wp('24%'),
   },
   editButton: {
     position: 'absolute',
-    bottom: 10,
-    right: 10,
+    bottom: wp('2.5%'),
+    right: wp('2.5%'),
     backgroundColor: '#1877F2',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: wp('10%'),
+    height: wp('10%'),
+    borderRadius: wp('5%'),
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -636,10 +597,10 @@ const styles = {
     alignItems: 'center',
   },
   placeholderIcon: {
-    marginBottom: 10,
+    marginBottom: hp('1%'),
   },
   placeholderText: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     color: '#8A8D91',
     fontWeight: '500',
   },
@@ -650,7 +611,7 @@ const styles = {
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 96,
+    borderRadius: wp('24%'),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -658,171 +619,109 @@ const styles = {
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 14,
+    marginTop: hp('1%'),
+    fontSize: wp('3.5%'),
     color: '#FFFFFF',
     fontWeight: '500',
   },
   successIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    marginTop: hp('2%'),
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
     backgroundColor: '#E8F5E8',
-    borderRadius: 25,
+    borderRadius: wp('6%'),
   },
   successText: {
-    marginLeft: 8,
-    fontSize: 14,
+    marginLeft: wp('2%'),
+    fontSize: wp('3.5%'),
     color: '#42B883',
     fontWeight: '500',
   },
   actionButtons: {
-    marginTop: 30,
+    marginTop: hp('4%'),
     alignItems: 'center',
   },
   primaryActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1877F2',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 25,
-    minWidth: 150,
+    paddingHorizontal: wp('7.5%'),
+    paddingVertical: hp('2%'),
+    borderRadius: wp('6%'),
+    minWidth: wp('40%'),
     justifyContent: 'center',
   },
   primaryActionText: {
-    marginLeft: 8,
-    fontSize: 16,
+    marginLeft: wp('2%'),
+    fontSize: wp('4%'),
     color: '#FFFFFF',
     fontWeight: '600',
   },
   photoActions: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 20,
-    gap: 20,
+    marginTop: hp('3%'),
+    gap: wp('5%'),
   },
   changePhotoButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('5%'),
     backgroundColor: '#E7F3FF',
   },
   changePhotoText: {
-    marginLeft: 6,
-    fontSize: 14,
+    marginLeft: wp('1.5%'),
+    fontSize: wp('3.5%'),
     color: '#1877F2',
     fontWeight: '500',
   },
   removePhotoButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('5%'),
     backgroundColor: '#FFEBEE',
   },
   removePhotoText: {
-    marginLeft: 6,
-    fontSize: 14,
+    marginLeft: wp('1.5%'),
+    fontSize: wp('3.5%'),
     color: '#E41E3F',
     fontWeight: '500',
   },
-  benefitsSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  benefitsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1C1E21',
-    marginBottom: 15,
-  },
-  benefitsList: {
-    gap: 15,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  benefitIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E7F3FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  benefitContent: {
-    flex: 1,
-    paddingTop: 2,
-  },
-  benefitTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1E21',
-    marginBottom: 4,
-  },
-  benefitDescription: {
-    fontSize: 14,
-    color: '#65676B',
-    lineHeight: 18,
-  },
-  guidelinesSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: '#F8F9FA',
-    marginHorizontal: 20,
-    borderRadius: 12,
-  },
-  guidelinesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1E21',
-    marginBottom: 15,
-  },
-  guidelinesList: {
-    gap: 10,
-  },
-  guidelineItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  guidelineText: {
-    marginLeft: 10,
-    fontSize: 14,
-    color: '#65676B',
-    flex: 1,
-  },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
+    paddingBottom: Platform.OS === 'ios' ? hp('6%') : hp('8%'), // Extra padding for system UI
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E4E6EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('5%'),
+    minWidth: wp('25%'),
+    justifyContent: 'center',
+    backgroundColor: '#F0F2F5',
   },
   backButtonText: {
-    marginLeft: 5,
-    fontSize: 16,
+    marginLeft: wp('1%'),
+    fontSize: wp('4%'),
     color: '#65676B',
     fontWeight: '500',
   },
@@ -830,26 +729,31 @@ const styles = {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1877F2',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('5%'),
+    minWidth: wp('30%'),
+    justifyContent: 'center',
   },
   continueButtonText: {
-    marginRight: 5,
-    fontSize: 16,
+    marginRight: wp('1%'),
+    fontSize: wp('4%'),
     color: '#FFFFFF',
     fontWeight: '600',
   },
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 20,
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('5%'),
+    minWidth: wp('30%'),
+    justifyContent: 'center',
+    backgroundColor: '#F0F2F5',
   },
   skipButtonText: {
-    marginRight: 5,
-    fontSize: 16,
+    marginRight: wp('1%'),
+    fontSize: wp('4%'),
     color: '#65676B',
     fontWeight: '500',
   },
@@ -860,54 +764,53 @@ const styles = {
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 20,
+    borderTopLeftRadius: wp('5%'),
+    borderTopRightRadius: wp('5%'),
+    paddingBottom: hp('2%'),
   },
   modalHeader: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: hp('2.5%'),
     borderBottomWidth: 1,
     borderBottomColor: '#E4E6EA',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: wp('4.5%'),
     fontWeight: '600',
     color: '#1C1E21',
   },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F2F5',
   },
   optionTextContainer: {
-    marginLeft: 15,
+    marginLeft: wp('4%'),
     flex: 1,
   },
   optionTitle: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     fontWeight: '500',
     color: '#1C1E21',
-    marginBottom: 2,
+    marginBottom: hp('0.5%'),
   },
   optionDescription: {
-    fontSize: 14,
+    fontSize: wp('3.5%'),
     color: '#65676B',
   },
   modalCancel: {
     alignItems: 'center',
-    paddingVertical: 15,
-    marginTop: 10,
+    paddingVertical: hp('2%'),
+    marginTop: hp('1%'),
   },
   modalCancelText: {
-    fontSize: 16,
+    fontSize: wp('4%'),
     color: '#1877F2',
     fontWeight: '500',
   },
-  // IMPROVED CROP INTERFACE STYLES
   cropContainer: {
     flex: 1,
     backgroundColor: '#000000',
@@ -916,46 +819,33 @@ const styles = {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
     backgroundColor: 'rgba(0,0,0,0.9)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  cropHeaderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    minWidth: 80,
-    justifyContent: 'center',
-  },
-  cropHeaderButtonText: {
-    marginLeft: 5,
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  cropSaveButton: {
-    backgroundColor: '#1877F2',
-  },
   cropTitle: {
-    fontSize: 18,
+    fontSize: wp('4.5%'),
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  cropImageContainer: {
+  cropSubtitle: {
+    fontSize: wp('3.5%'),
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginTop: hp('1%'),
+  },
+  cropPreviewContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
-  cropImage: {
+  cropPreviewImage: {
     width: screenWidth,
-    height: screenHeight * 0.6,
+    height: hp('60%'),
   },
   cropOverlay: {
     position: 'absolute',
@@ -966,106 +856,60 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cropSquare: {
-    width: screenWidth * 0.8,
-    height: screenWidth * 0.8,
+  cropCircle: {
+    width: wp('60%'),
+    height: wp('60%'),
+    borderRadius: wp('30%'),
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    borderRadius: 8,
-    position: 'relative',
     backgroundColor: 'transparent',
   },
-  cropCorner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderColor: '#1877F2',
-    top: -2,
-    left: -2,
-  },
-  cropCornerTopRight: {
-    top: -2,
-    right: -2,
-    left: 'auto',
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderLeftWidth: 0,
-  },
-  cropCornerBottomLeft: {
-    bottom: -2,
-    left: -2,
-    top: 'auto',
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderTopWidth: 0,
-  },
-  cropCornerBottomRight: {
-    bottom: -2,
-    right: -2,
-    top: 'auto',
-    left: 'auto',
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-  },
-  cropInstructions: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-  },
-  cropInstructionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  cropInstructionText: {
-    fontSize: 14,
+  cropGuideText: {
+    marginTop: hp('2%'),
+    fontSize: wp('3.5%'),
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    lineHeight: 20,
   },
-  cropBottomActions: {
+  cropControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
     backgroundColor: 'rgba(0,0,0,0.9)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
   },
   cropCancelButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('2%'),
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  cropCancelButtonText: {
-    fontSize: 16,
+  cropCancelText: {
+    fontSize: wp('4%'),
     color: '#FFFFFF',
     fontWeight: '500',
     textAlign: 'center',
   },
   cropConfirmButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('1.5%'),
+    borderRadius: wp('2%'),
     backgroundColor: '#1877F2',
-    minWidth: 120,
+    minWidth: wp('30%'),
+    justifyContent: 'center',
   },
-  cropConfirmButtonText: {
-    fontSize: 16,
+  cropConfirmText: {
+    marginLeft: wp('2%'),
+    fontSize: wp('4%'),
     color: '#FFFFFF',
     fontWeight: '600',
     textAlign: 'center',
   },
 };
-
 
 export default ProfileImageScreen;

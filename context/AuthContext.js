@@ -75,10 +75,11 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await logoutUser();
       if(res.status===200){
+         navigate('Login');
          setUser(null);
          setToken(null);
          await AsyncStorage.removeItem("authToken");
-        navigate('AuthStack', { screen: 'Login' });
+        
       }
     } catch {}
     setUser(null);

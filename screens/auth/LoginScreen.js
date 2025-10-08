@@ -147,10 +147,10 @@ const Login = ({ navigation }) => {
             {/* Enhanced Header */}
             <View style={styles.header}>
               <LinearGradient
-                colors={['#667eea', '#764ba2']}
+                colors={['#1A1F3B', '#2D325D']}
                 style={styles.logoContainer}
               >
-                <Ionicons name="briefcase" size={32} color="#FFFFFF" />
+                <Ionicons name="briefcase" size={22} color="#FFFFFF" />
               </LinearGradient>
               
               <Text style={styles.title}>Welcome Back</Text>
@@ -309,28 +309,6 @@ const Login = ({ navigation }) => {
               )}
             </View>
 
-            {/* Divider
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View> */}
-
-            {/* Social Login Options 
-            <View style={styles.socialContainer}>
-              <Text style={styles.socialTitle}>Continue with</Text>
-              <View style={styles.socialButtons}>
-                <TouchableOpacity style={styles.socialButton} disabled={status === "loading"}>
-                  <Ionicons name="logo-google" size={20} color="#DB4437" />
-                  <Text style={styles.socialButtonText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton} disabled={status === "loading"}>
-                  <Ionicons name="logo-apple" size={20} color="#000000" />
-                  <Text style={styles.socialButtonText}>Apple</Text>
-                </TouchableOpacity>
-              </View>
-            </View>*/}
-
             {/* Sign Up Section */}
             <View style={styles.signUpContainer}>
               <Text style={styles.signUpText}>Don't have an account?</Text>
@@ -363,16 +341,15 @@ const styles = {
   },
   header: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   logoContainer: {
-    width: 80,
-    height: 80,
+    width: 60,
+    height: 60,
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
-    shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -415,9 +392,7 @@ const styles = {
     paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    
   },
   inputWrapperFocused: {
     borderColor: "#667eea",

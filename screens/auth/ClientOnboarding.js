@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 import { navigate } from '../../services/navigationService';
 import { completeProfile, fetchUser } from '../../api/authApi';
@@ -153,6 +154,29 @@ const TaskPosterOnboarding = () => {
     }
   };
 
+  const autoCropToSquare = async (uri) => {
+    try {
+      const { width: imgWidth, height: imgHeight } = await new Promise((resolve, reject) => {
+        Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject);
+      });
+      const size = Math.min(imgWidth, imgHeight);
+      const offsetX = (imgWidth - size) / 2;
+      const offsetY = (imgHeight - size) / 2;
+
+      const croppedImage = await manipulateAsync(
+        uri,
+        [{ crop: { originX: offsetX, originY: offsetY, width: size, height: size } }],
+        { compress: 0.7, format: SaveFormat.JPEG }
+      );
+
+      return croppedImage;
+    } catch (error) {
+      console.error('Cropping error:', error);
+      Alert.alert('Error', 'Failed to process image. Please try another one.');
+      return null;
+    }
+  };
+
   const handleImageUpload = async (useCamera = false) => {
     try {
       let result;
@@ -164,7 +188,7 @@ const TaskPosterOnboarding = () => {
           return;
         }
         result = await ImagePicker.launchCameraAsync({
-          allowsEditing: true,
+          allowsEditing: false,  // Disabled native editor
           aspect: [1, 1],
           quality: 0.7,
         });
@@ -176,7 +200,7 @@ const TaskPosterOnboarding = () => {
         }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
+          allowsEditing: false,  // Disabled native editor
           aspect: [1, 1],
           quality: 0.7,
         });
@@ -190,18 +214,21 @@ const TaskPosterOnboarding = () => {
           return;
         }
 
-        setProfile(prev => ({
-          ...prev,
-          profileImage: {
-            uri: asset.uri,
-            type: 'image/jpeg',
-            name: `profile-${Date.now()}.jpg`
-          },
-          profileImageUri: asset.uri,
-        }));
-        
-        if (errors.profileImage) {
-          setErrors(prev => ({ ...prev, profileImage: null }));
+        const cropped = await autoCropToSquare(asset.uri);
+        if (cropped) {
+          setProfile(prev => ({
+            ...prev,
+            profileImage: {
+              uri: cropped.uri,
+              type: 'image/jpeg',
+              name: `profile-${Date.now()}.jpg`
+            },
+            profileImageUri: cropped.uri,
+          }));
+          
+          if (errors.profileImage) {
+            setErrors(prev => ({ ...prev, profileImage: null }));
+          }
         }
       }
     } catch (error) {
@@ -262,6 +289,7 @@ const TaskPosterOnboarding = () => {
         error.response?.data?.error ||
         "Unable to complete profile. Please check your connection and try again.";
       
+      Alert.alert(errorMessage)
       setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
@@ -287,12 +315,12 @@ const TaskPosterOnboarding = () => {
               onPress={() => setShowRegionModal(false)}
               style={styles.closeButton}
             >
-              <Ionicons name="close" size={22} color="#6B7280" />
+              <Ionicons name="close" size={22} color="#65676B" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.searchContainer}>
-            <Ionicons name="search" size={18} color="#6B7280" style={styles.searchIcon} />
+            <Ionicons name="search" size={18} color="#65676B" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search regions..."
@@ -324,7 +352,7 @@ const TaskPosterOnboarding = () => {
                   {item.label}
                 </Text>
                 {profile.location.region === item.value && (
-                  <Ionicons name="checkmark" size={18} color="#6366F1" />
+                  <Ionicons name="checkmark" size={18} color="#007AFF" />
                 )}
               </TouchableOpacity>
             )}
@@ -342,6 +370,7 @@ const TaskPosterOnboarding = () => {
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView 
           style={styles.scrollView}
@@ -361,7 +390,7 @@ const TaskPosterOnboarding = () => {
             {/* Error Banner */}
             {errors.submit && (
               <View style={styles.errorBanner}>
-                <Ionicons name="warning" size={18} color="#DC2626" />
+                <Ionicons name="warning" size={18} color="#FF3B30" />
                 <Text style={styles.errorBannerText}>{errors.submit}</Text>
               </View>
             )}
@@ -410,7 +439,7 @@ const TaskPosterOnboarding = () => {
                     ]}>
                       {profile.location.region || "Select region"}
                     </Text>
-                    <Ionicons name="chevron-down" size={18} color="#6B7280" />
+                    <Ionicons name="chevron-down" size={18} color="#65676B" />
                   </TouchableOpacity>
                   {errors.region && <Text style={styles.errorText}>{errors.region}</Text>}
                 </View>
@@ -469,7 +498,7 @@ const TaskPosterOnboarding = () => {
                     style={styles.uploadOption}
                     onPress={() => handleImageUpload(false)}
                   >
-                    <Ionicons name="image" size={24} color="#6366F1" />
+                    <Ionicons name="image" size={24} color="#007AFF" />
                     <Text style={styles.uploadOptionText}>Choose Photo</Text>
                   </TouchableOpacity>
                   
@@ -477,7 +506,7 @@ const TaskPosterOnboarding = () => {
                     style={styles.uploadOption}
                     onPress={() => handleImageUpload(true)}
                   >
-                    <Ionicons name="camera" size={24} color="#6366F1" />
+                    <Ionicons name="camera" size={24} color="#007AFF" />
                     <Text style={styles.uploadOptionText}>Take Photo</Text>
                   </TouchableOpacity>
                 </View>
@@ -498,14 +527,13 @@ const TaskPosterOnboarding = () => {
                       style={styles.photoAction}
                       onPress={removeImage}
                     >
-                      <Text style={[styles.photoActionText, styles.removeText]}>Remove</Text>
+                      <Text style={styles.photoActionTextRemove}>Remove</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               )}
             </View>
 
-            {/* Submit Section */}
             <View style={styles.submitSection}>
               <TouchableOpacity 
                 style={[
@@ -533,19 +561,11 @@ const TaskPosterOnboarding = () => {
                   onPress={() => handleSubmit(true)}
                   disabled={isSubmitting}
                 >
-                 {/* <Text style={styles.skipButtonText}>Skip for now</Text>*/}
+                  <Text style={styles.skipButtonText}>Skip for now</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
-
-          {/* Info Card 
-          <View style={styles.infoCard}>
-            <Ionicons name="information-circle" size={18} color="#6366F1" />
-            <Text style={styles.infoText}>
-              Complete profiles get 3x more responses from taskers
-            </Text>
-          </View>*/}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -557,7 +577,7 @@ const TaskPosterOnboarding = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
   },
   scrollView: {
     flex: 1,
@@ -572,12 +592,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1C1E21',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#65676B',
     lineHeight: 22,
   },
   card: {
@@ -586,7 +606,7 @@ const styles = StyleSheet.create({
     padding: 0,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#E4E6EA',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -600,13 +620,13 @@ const styles = StyleSheet.create({
   errorBannerText: {
     flex: 1,
     fontSize: 14,
-    color: '#DC2626',
+    color: '#FF3B30',
     fontWeight: '500',
   },
   section: {
     padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#E4E6EA',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -618,30 +638,30 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#6366F1',
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1C1E21',
     flex: 1,
   },
   optionalBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E4E6EA',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   optionalText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#8E8E93',
     fontWeight: '500',
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#65676B',
     marginBottom: 20,
     lineHeight: 20,
   },
@@ -656,87 +676,98 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
+    color: '#1C1E21',
     marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#E4E6EA',
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     height: 48,
   },
   inputError: {
-    borderColor: '#DC2626',
+    borderColor: '#FF3B30',
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1E21',
     padding: 0,
   },
   pickerText: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1E21',
   },
   pickerPlaceholder: {
-    color: '#9CA3AF',
+    color: '#8E8E93',
   },
   errorText: {
-    color: '#DC2626',
+    color: '#FF3B30',
     fontSize: 12,
     marginTop: 4,
   },
   uploadOptions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   uploadOption: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F8F9FA',
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E4E6EA',
     gap: 8,
   },
   uploadOptionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6366F1',
+    color: '#007AFF',
   },
   photoPreview: {
     alignItems: 'center',
+    marginVertical: 20,
+    maxWidth: '80%',
+    alignSelf: 'center',
   },
   photoImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#F3F4F6',
+    borderColor: '#E4E6EA',
   },
   photoActions: {
-    flexDirection: 'row',
+    flexDirection: 'column',
+    alignItems: 'center',
     marginTop: 16,
-    gap: 16,
+    gap: 10,
+    width: '100%',
   },
   photoAction: {
-    paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E4E6EA',
   },
   photoActionText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6366F1',
+    color: '#007AFF',
   },
-  removeText: {
-    color: '#DC2626',
+  photoActionTextRemove: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FF3B30',
   },
   submitSection: {
     padding: 24,
@@ -746,7 +777,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: '#007AFF',
     padding: 16,
     borderRadius: 8,
     gap: 8,
@@ -765,24 +796,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   skipButtonText: {
-    color: '#6B7280',
+    color: '#65676B',
     fontSize: 14,
-    fontWeight: '500',
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-    padding: 16,
-    borderRadius: 8,
-    gap: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0EA5E9',
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#0369A1',
     fontWeight: '500',
   },
   modalOverlay: {
@@ -802,12 +817,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#E4E6EA',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1C1E21',
   },
   closeButton: {
     padding: 4,
@@ -817,10 +832,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     margin: 16,
     paddingHorizontal: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F8F9FA',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E4E6EA',
   },
   searchIcon: {
     marginRight: 8,
@@ -829,7 +844,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     fontSize: 16,
-    color: '#111827',
+    color: '#1C1E21',
   },
   regionItem: {
     flexDirection: 'row',
@@ -837,17 +852,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: '#F8F9FA',
   },
   regionItemSelected: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#E6F0FA',
   },
   regionItemText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#1C1E21',
   },
   regionItemTextSelected: {
-    color: '#6366F1',
+    color: '#007AFF',
     fontWeight: '600',
   },
 });

@@ -467,7 +467,7 @@ const EarningScreen = ({ navigation }) => {
               </Text>
               <TouchableOpacity 
                 style={styles.exploreTasksButton}
-                onPress={() => navigation.navigate('AvailableTasks')}
+                onPress={() => navigation.navigate('MainTabs',{ screen: 'AvailableTasks'})}
               >
                 <Text style={styles.exploreTasksText}>Explore Available Tasks</Text>
               </TouchableOpacity>

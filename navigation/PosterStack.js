@@ -16,6 +16,7 @@ import ClientViewSubmissionsScreen from "../screens/poster/ClientSubmissionsScre
 import ClientProfileScreen from "../screens/poster/ClientProfileScreen";
 import ChatScreen from "../screens/tasker/ChatScreen";
 import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
+import EmployerHelpSupportScreen from "../screens/poster/ClientSupportScreen"
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -38,6 +39,7 @@ function PosterStackNavigator() {
       <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Payments" component={PaymentsScreen} />
+       <Stack.Screen name="ClientSupport" component={EmployerHelpSupportScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
