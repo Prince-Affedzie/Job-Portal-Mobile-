@@ -5,14 +5,15 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
+  StatusBar,
   RefreshControl,
   Dimensions,
   TextInput,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../../component/tasker/Header';
 import { clientGetTaskSubmissions, reviewSubmission } from '../../api/miniTaskApi';
@@ -406,7 +407,8 @@ export default function ClientViewSubmissionsScreen({ route }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Review Submissions" showBackButton={true} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <Header title="Review Submissions1" showBackButton={true} />
       
       <ScrollView
         ref={scrollViewRef}

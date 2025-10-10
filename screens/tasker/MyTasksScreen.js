@@ -692,7 +692,7 @@ const MyApplicationsScreen = () => {
 
   const renderHeader = () => (
     <View>
-      <Header title="My Tasks" />
+     
       
       <SearchBar
         activeTab={activeTab}
@@ -807,6 +807,7 @@ const MyApplicationsScreen = () => {
 
   return (
     <View style={styles.container}>
+       <Header title="My Tasks" />
       <FlatList
         data={isEmpty ? [] : filteredData}
         keyExtractor={(item) => item._id || (item.task?._id + item.bid?._id)}

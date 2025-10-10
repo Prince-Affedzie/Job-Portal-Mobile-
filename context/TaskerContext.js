@@ -66,6 +66,7 @@ export const TaskerProvider = ({ children }) => {
   };
 
   const getAllEarnings = async()=>{
+    if(!token) return
     try{
       const res = await viewAllEarnings()
       setEarnings(res.data)

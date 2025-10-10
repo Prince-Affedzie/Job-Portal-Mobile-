@@ -197,8 +197,7 @@ const AvailableTasksScreen = () => {
 
   const renderHeader = () => (
     <View>
-      <StatusBar />
-      <Header title="Available Tasks" />
+      
       <HeroSection
         userName={user.name}
         onSearchPress={handleSearch}
@@ -286,6 +285,8 @@ const AvailableTasksScreen = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar />
+      <Header title="Available Tasks" />
       <FlatList
         data={availableTasks} // Always use actual data
         keyExtractor={(item) => item._id}

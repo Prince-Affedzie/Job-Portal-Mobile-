@@ -299,8 +299,6 @@ const EarningScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#6366F1" />
-      
       <Header 
         title="My Earnings" 
         showBackButton={true}

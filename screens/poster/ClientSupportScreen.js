@@ -131,7 +131,7 @@ const EmployerHelpSupportScreen = () => {
 
 
 const quickActions = [
-  {
+  /*{
     title: "Post New Task",
     description: "Create a new task listing",
     icon: "add-circle",
@@ -151,12 +151,12 @@ const quickActions = [
     icon: "close-circle",
     action: () => {}, // Navigate to task management
     color: "#ed8936"
-  },
+  },*/
   {
     title: "Urgent Support",
     description: "24/7 priority help",
     icon: "warning",
-    action: handleContactSupport,
+    action: ()=>Linking.openURL(`https://wa.me/233597802841`) ,
     color: "#e53e3e"
   },
   {
@@ -166,13 +166,13 @@ const quickActions = [
     action: () => {}, // Navigate to dispute resolution
     color: "#9f7aea"
   },
-  {
+  /*{
     title: "Budget Help",
     description: "Pricing guidance",
     icon: "cash",
     action: () => Linking.openURL("https://novaedgeapp.com/pricing-guide"),
     color: "#48bb78"
-  }
+  }*/
 ];
 
 
@@ -192,12 +192,12 @@ const quickActions = [
   const handleCallSupport = () => {
     Alert.alert(
       "Client Support",
-      "Call our dedicated client support team at +1 (555) 123-4568",
+      "Call our dedicated client support team at +23359782841",
       [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Call", 
-          onPress: () => Linking.openURL('tel:+15551234568'),
+          onPress: () => Linking.openURL('tel:+23359782841'),
           style: "default"
         }
       ]
@@ -236,7 +236,7 @@ const quickActions = [
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-      <Header title="Client Support" />
+      <Header title="Client Support" showBackButton={true} />
       
       <ScrollView 
         contentContainerStyle={styles.container} 
@@ -401,7 +401,7 @@ const quickActions = [
           )}
         </View>
 
-        {/* Client Resources */}
+        {/* Client Resources 
         <View style={styles.resourcesSection}>
           <Text style={styles.sectionTitle}>Client Resources</Text>
           <View style={styles.resourcesGrid}>
@@ -429,7 +429,7 @@ const quickActions = [
               <Text style={styles.resourceDesc}>Find the right taskers</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </View>*/}
 
         {/* Contact Section */}
         <View style={styles.contactSection}>
@@ -454,7 +454,7 @@ const quickActions = [
             >
               <Ionicons name="call" size={24} color="#48BB78" />
               <Text style={styles.contactOptionText}>Call Support</Text>
-              <Text style={styles.contactOptionSubtext}>+1 (555) 123-4568</Text>
+              <Text style={styles.contactOptionSubtext}>+233597802841</Text>
             </TouchableOpacity>
           </View>
         </View>

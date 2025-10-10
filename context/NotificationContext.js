@@ -25,7 +25,7 @@ export const NotificationProvider = ({ children }) => {
 
   // Load notifications
   const loadNotifications = async () => {
-    if (!token) return;
+    if (!token || ! user) return;
     setLoading(true);
     try {
       const res = await getNotifications();
@@ -122,11 +122,12 @@ export const NotificationProvider = ({ children }) => {
 
 
   useEffect(()=>{
+    if(user){
        const newSocket  = io(BackendURL,{
         auth: {
             token: token 
         },
-       
+      
     })
     setSocket(newSocket)
     newSocket.on('connections',()=>{
@@ -148,7 +149,7 @@ export const NotificationProvider = ({ children }) => {
      newSocket.off('notification')
       newSocket.disconnect()
   }   
-    },[BackendURL, token])
+    }},[BackendURL, token])
   
     
 

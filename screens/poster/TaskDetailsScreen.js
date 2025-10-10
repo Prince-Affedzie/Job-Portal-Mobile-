@@ -671,7 +671,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           }}
         >
         <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.fabActionText}>Mark Done</Text>
+        <Text style={styles.fabActionText}>Mark Task as Done</Text>
         </TouchableOpacity>
         )}
       </Animated.View>

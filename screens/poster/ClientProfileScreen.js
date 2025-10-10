@@ -528,15 +528,15 @@ const ClientProfileScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton} onPress={() => navigate('PaymentMethods')}>
+           {/* <TouchableOpacity style={styles.accountButton} onPress={() => navigate('PaymentMethods')}>
               <Ionicons name="card-outline" size={20} color="#6366F1" />
               <Text style={styles.accountButtonText}>Payment Methods</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
             
-            <TouchableOpacity style={styles.accountButton} onPress={() => navigate('BillingHistory')}>
+            <TouchableOpacity style={styles.accountButton} onPress={() => navigate('Payments')}>
               <Ionicons name="receipt-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Billing History</Text>
+              <Text style={styles.accountButtonText}>Payment History</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             

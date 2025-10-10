@@ -15,3 +15,6 @@ export const raiseDispute = (reportForm)=>API.post('/api/create_dispute',reportF
 export const addReportingEvidence=(data)=>API.post('/api/create/reporting/evidence',data)
 export const getSignedUrl =(data)=>API.post('/api/submissions/upload-url',data)
 export const getPreviewUrl =(fileKey,selectedSubmission)=> API.get(`/api/get_preview_url?fileKey=${encodeURIComponent(fileKey)}&selectedSubmission=${encodeURIComponent(selectedSubmission)}`);
+
+
+export const sendPushToken = (data)=>API.post('/api/user/push-token',data)

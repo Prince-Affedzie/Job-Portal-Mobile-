@@ -611,7 +611,11 @@ export default function PostedTasksScreen() {
               
               <TouchableOpacity 
                 style={styles.actionItem}
-                onPress={() => handleActionSelect('View Applicants')}
+                onPress={() => navigate('TaskApplicants', { 
+                      taskId:selectedTask._id,
+                      task: selectedTask,
+                      assignedTo:selectedTask.assignedTo || null
+                    })}
               >
                 <Ionicons name="people-outline" size={22} color="#9C27B0" />
                 <Text style={styles.actionText}>View Applicants</Text>

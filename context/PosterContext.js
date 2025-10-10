@@ -92,6 +92,7 @@ export const PosterProvider = ({ children }) => {
   };
 
    const fetchPayments = async () => {
+      if (!token) return;
       try {
         const response = await getClientPayments(); 
         setPayments(response.data || []);

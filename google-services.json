@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "830161939039",
+    "project_id": "workaflow-d2bf6",
+    "storage_bucket": "workaflow-d2bf6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:830161939039:android:82ecef751edf2f19df09ea",
+        "android_client_info": {
+          "package_name": "com.affedziep44.jobportalmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbKl4vRUL0YzWIeqV4Y6g7KG2jKNJnDlo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
