@@ -11,7 +11,7 @@ web-build/
 expo-env.d.ts
 
 .env
- workaflow-d2bf6-firebase-adminsdk-fbsvc-d6b1ae6524
+ workaflow-d2bf6-firebase-adminsdk-fbsvc-d6b1ae6524.json
 
 # Native
 .kotlin/
