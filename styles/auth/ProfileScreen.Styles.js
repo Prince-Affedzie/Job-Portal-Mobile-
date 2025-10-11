@@ -158,6 +158,7 @@ export const styles = StyleSheet.create({
   section: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
+    marginTop:12,
     marginBottom: 16,
     borderRadius: 16,
     padding: 20,

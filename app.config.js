@@ -10,9 +10,9 @@ export default {
   newArchEnabled: true,
 
   splash: {
-    image: "./assets/splash-icon.png",
+    image: "./assets/WorkaFlowLogo.png",
     resizeMode: "contain",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#1A1F3B",
   },
 
   ios: { 
@@ -49,7 +49,7 @@ export default {
       },
     ],
     "expo-font",
-    // 👇 Add expo-notifications here to ensure proper linking
+    
     "expo-notifications",
   ],
 

@@ -410,6 +410,7 @@ const formatDisplayDate = (dateString) => {
     );
   };
 
+  
   const StatsCard = ({ value, label, icon, color }) => (
     <View style={styles.statsCard}>
       <View style={[styles.statsIcon, { backgroundColor: color }]}>
@@ -480,12 +481,7 @@ const formatDisplayDate = (dateString) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView 
-        style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Enhanced Header */}
+      {/* Enhanced Header */}
         <Header 
           title="My Profile" 
           rightComponent={
@@ -505,6 +501,12 @@ const formatDisplayDate = (dateString) => {
           }
         />
 
+      <Animated.ScrollView 
+        style={{ opacity: fadeAnim }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        
         {/* Enhanced Profile Header */}
         <LinearGradient
           colors={['#1A1F3B', '#2D325D']}
@@ -550,19 +552,19 @@ const formatDisplayDate = (dateString) => {
         {/* Enhanced Stats Overview */}
         <View style={styles.statsContainer}>
           <StatsCard 
-            value={profileData.completedTasks || 0} 
+            value="Coming Soon" 
             label="Completed" 
             icon="checkmark-done" 
             color="#10B981" 
           />
           <StatsCard 
-            value={`${profileData.successRate || 0}%`} 
+            value="Coming Soon"  
             label="Success Rate" 
             icon="trending-up" 
             color="#6366F1" 
           />
           <StatsCard 
-            value={`₵${profileData.hourlyRate || 0}`} 
+            value="Coming Soon" 
             label="Hourly Rate" 
             icon="cash" 
             color="#F59E0B" 
@@ -809,6 +811,12 @@ const formatDisplayDate = (dateString) => {
     reviews={profileData.ratingsReceived || []}
     averageRating={profileData.rating || 0}
     totalReviews={profileData.numberOfRatings || 0}
+    onViewAll={()=>navigation.navigate('AllReviews', { 
+                      reviews: profileData.ratingsReceived || [],
+                      userName: profileData.name,
+                      averageRating: profileData.rating || 0,
+                      totalReviews: profileData.numberOfRatings || 0
+                    })}
   />
   </View>
 
@@ -895,13 +903,13 @@ const formatDisplayDate = (dateString) => {
           </View>
           
           <View style={styles.accountActions}>
-            <TouchableOpacity style={styles.accountButton}>
+            <TouchableOpacity style={styles.accountButton}  onPress={()=>navigate('EarningScreen')}>
               <Ionicons name="lock-closed-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Change Password</Text>
+              <Text style={styles.accountButtonText}>Earnings</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton}>
+            <TouchableOpacity style={styles.accountButton} onPress={() => Alert.alert('Payment Method', 'Payment Method Settings feature coming soon!')}>
               <Ionicons name="card-outline" size={20} color="#6366F1" />
               <Text style={styles.accountButtonText}>Payment Methods</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />

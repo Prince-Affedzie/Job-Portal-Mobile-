@@ -8,12 +8,13 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  SafeAreaView ,
   RefreshControl,
   Dimensions,
   TextInput,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../../component/tasker/Header';
 import { clientGetTaskSubmissions, reviewSubmission } from '../../api/miniTaskApi';

@@ -21,22 +21,42 @@ export default function usePushNotifications() {
   const responseListener = useRef();
   const { user } = useContext(AuthContext);
 
-  useEffect(()=>{
-    console.log("I'm Working")
-   
-  },[])
-
+  // Log when hook runs
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        console.log("Expo Push Token:", token);
-        setExpoPushToken(token);
-        sendPushTokenToBackend(user, token);
-      }
-    });
+    console.log("usePushNotifications initialized");
+  }, []);
 
+  // Handle push token registration and listeners
+  useEffect(() => {
+    let isMounted = true;
+
+    async function registerAndSendToken() {
+      try {
+        const token = await registerForPushNotificationsAsync();
+        if (isMounted && token) {
+          console.log("Expo Push Token:", token);
+          setExpoPushToken(token);
+          // Only send token to backend if user is logged in
+          if (user) {
+            await sendPushTokenToBackend(user, token);
+          } else {
+            console.log("User not logged in, skipping token send");
+          }
+        } else if (!token) {
+          console.error("No token returned from registerForPushNotificationsAsync");
+        }
+      } catch (error) {
+        console.error("Error in registerAndSendToken:", error);
+      }
+    }
+
+    // Register for push notifications
+    registerAndSendToken();
+
+    // Set up notification listeners
     notificationListener.current = Notifications.addNotificationReceivedListener(
       (notification) => {
+        console.log("Received notification:", notification);
         setNotification(notification);
       }
     );
@@ -48,8 +68,8 @@ export default function usePushNotifications() {
       }
     );
 
-    // Proper cleanup for newer Expo versions
-    return () => {
+    // Cleanup
+      return () => {
       if (notificationListener.current) {
         notificationListener.current.remove();
       }
@@ -57,19 +77,31 @@ export default function usePushNotifications() {
         responseListener.current.remove();
       }
     };
-  }, []);
+  }, [user]); // Re-run when user changes (e.g., logs in)
+
+  // Send token to backend when user logs in (if token already exists)
+  useEffect(() => {
+    if (user && expoPushToken) {
+      console.log("User logged in, sending existing token:", expoPushToken);
+      sendPushTokenToBackend(user, expoPushToken);
+    }
+  }, [user, expoPushToken]);
 
   return { expoPushToken, notification };
 }
 
 async function registerForPushNotificationsAsync() {
   let token;
-  console.log("I'm also working")
 
-  if (Device.isDevice) {
+  if (!Device.isDevice) {
+    Alert.alert("Push notifications only work on physical devices");
+    return null;
+  }
+
+  try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    console.log("I'm the final status",finalStatus)
+    console.log("Permission status:", finalStatus);
 
     if (existingStatus !== "granted") {
       const { status } = await Notifications.requestPermissionsAsync();
@@ -81,24 +113,19 @@ async function registerForPushNotificationsAsync() {
       return null;
     }
 
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    console.log("Project ID:", projectId);
+    if (!projectId) {
+      console.error("Project ID is missing or undefined");
+      return null;
+    }
 
-    try {
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  console.log("I'm the projectId: ", projectId);
-  if (!projectId) {
-    console.error("Project ID is missing or undefined");
+    const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
+    token = tokenResult.data;
+    console.log("Generated token:", token);
+  } catch (error) {
+    console.error("Error fetching Expo push token:", error);
     return null;
-  }
-  const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
-  token = tokenResult.data;
-  console.log("I'm the token", token);
-  
-} catch (error) {
-  console.error("Error fetching Expo push token:", error);
-  return null;
-}
-  } else {
-    Alert.alert("Push notifications only work on physical devices");
   }
 
   if (Platform.OS === "android") {
@@ -114,14 +141,17 @@ async function registerForPushNotificationsAsync() {
 }
 
 async function sendPushTokenToBackend(user, token) {
-  console.log('User here',user)
-  console.log('Token here',token)
+  console.log("Sending to backend - User ID:", user?._id, "Token:", token);
+  if (!user || !token) {
+    console.error("Missing user or token for backend send");
+    return;
+  }
   try {
-    const response = await sendPushToken({ token });
+    const response = await sendPushToken({ userId: user._id, token });
     if (response.status === 200) {
       console.log("Push token sent to backend successfully");
     } else {
-      console.error("Failed to send push token to backend");
+      console.error("Failed to send push token to backend:", response.status);
     }
   } catch (error) {
     console.error("Error sending push token to backend:", error);

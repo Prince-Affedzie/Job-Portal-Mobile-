@@ -1,5 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, Dimensions, TouchableOpacity, RefreshControl ,ActivityIndicator} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, Text,SafeAreaView,ScrollView, StyleSheet, Dimensions, TouchableOpacity, RefreshControl ,ActivityIndicator} from 'react-native'
+
 import React, { useMemo, useState, useContext, useEffect } from 'react'
 import { LinearGradient } from 'expo-linear-gradient'
 import Ionicons from '@expo/vector-icons/Ionicons'

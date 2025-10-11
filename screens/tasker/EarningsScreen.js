@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  SafeAreaView,
   RefreshControl,
   Dimensions,
   StatusBar,
   Animated,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -84,7 +84,7 @@ const EarningScreen = ({ navigation }) => {
     
     const totalReleased = filteredReleased.reduce((sum, payment) => sum + payment.amount, 0);
     const totalEscrow = filteredEscrow.reduce((sum, payment) => sum + payment.amount, 0);
-    const totalEarnings = totalReleased + totalEscrow;
+    const totalEarnings = totalReleased ;
     
     const completedTasks = filteredReleased.length;
     const pendingTasks = filteredEscrow.length;
@@ -302,7 +302,7 @@ const EarningScreen = ({ navigation }) => {
       <Header 
         title="My Earnings" 
         showBackButton={true}
-        rightComponent={<WithdrawalButton />}
+       // rightComponent={<WithdrawalButton />}
       />
       
       <Animated.ScrollView 
@@ -323,7 +323,7 @@ const EarningScreen = ({ navigation }) => {
           style={styles.earningsHeader}
         >
           <View style={styles.earningsOverview}>
-            <Text style={styles.earningsLabel}>Total Balance ({getTimeRangeLabel(timeRange)})</Text>
+            <Text style={styles.earningsLabel}>Total Earnings (Released Payments)</Text>
             <Text style={styles.earningsAmount}>
               ₵{earningsStats.totalEarnings.toLocaleString()}
             </Text>
@@ -332,7 +332,7 @@ const EarningScreen = ({ navigation }) => {
               <View style={styles.balanceItem}>
                 <View style={[styles.balanceDot, { backgroundColor: '#10B981' }]} />
                 <Text style={styles.balanceText}>
-                  Available: ₵{earningsStats.totalReleased.toLocaleString()}
+                  Released: ₵{earningsStats.totalReleased.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.balanceItem}>

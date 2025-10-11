@@ -5,7 +5,7 @@ import { initializeTaskPayment } from "../api/paymentApi";
 import { verifyTaskPayment } from "../api/paymentApi";
 
 
-export const triggerPayment = async ({ popup, email, amount, taskId, beneficiary }) => {
+export const triggerPayment = async ({ popup, email,phone, amount, taskId, beneficiary }) => {
   try {
     const initRes = await initializeTaskPayment({
       taskId,
@@ -17,6 +17,7 @@ export const triggerPayment = async ({ popup, email, amount, taskId, beneficiary
     return new Promise((resolve) => {
       popup.newTransaction({
         email,
+        phone,
         amount: amount,
         reference,
         onSuccess: async (res) => {

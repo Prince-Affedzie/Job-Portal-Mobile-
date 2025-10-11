@@ -10,6 +10,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import NotificationPopup from "./component/common/NotificationPopUp";
 import usePushNotifications from "./hooks/usePushNotifications";
 import { PaystackProvider } from "react-native-paystack-webview";
+import { StatusBar } from "react-native";
 const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
 
 
@@ -26,15 +27,17 @@ export default function App() {
       <TaskerOnboardingProvider>
       <TaskerProvider>
         <PosterProvider>
+          <NotificationProvider>
           <PaystackProvider debug 
            publicKey={PayStack_Public_Key}
            currency="GHS"
-           defaultChannels={['card','mobile_money']}
+           defaultChannels={['card','mobile_money','bank']}
            >
           <PushNotificationInitializer />
+           <NotificationPopup/>
           <RootNavigator />
           </PaystackProvider>
-          
+          </NotificationProvider>
         </PosterProvider>
       </TaskerProvider>
       </TaskerOnboardingProvider>

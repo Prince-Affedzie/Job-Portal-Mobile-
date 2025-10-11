@@ -9,6 +9,7 @@ import {
   LayoutAnimation, 
   Platform, 
   UIManager,
+   SafeAreaView,
   Alert,
   TextInput,
   ActivityIndicator
@@ -16,7 +17,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from "../../component/tasker/Header";
-import { SafeAreaView } from "react-native-safe-area-context";
+//import { SafeAreaView } from "react-native-safe-area-context";
 
 // Enable smooth animation for accordion on Android
 if (Platform.OS === "android") {

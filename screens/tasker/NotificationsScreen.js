@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Animated,
   Dimensions,
+  StatusBar,
   Switch,
   Alert,
   Modal
@@ -415,8 +416,9 @@ const NotificationsScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Fixed Header with Actions */}
+      <StatusBar/>
       <View style={styles.headerContainer}>
         <Header 
           title="Notifications" 
@@ -667,7 +669,7 @@ const NotificationsScreen = ({ navigation }) => {
           </Animated.View>
         </Animated.View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -675,9 +677,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFF',
+    
   },
   headerContainer: {
-    // Ensure header has proper styling
+   backgroundColor: '#dark-header-color',
   },
   loadingContainer: {
     flex: 1,

@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+   SafeAreaView,
   ActivityIndicator,
   Dimensions,
   StatusBar,
   Alert,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -435,6 +436,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+
   },
    ratingStars: {
     flexDirection: 'row',
@@ -442,6 +444,8 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom:8,
+    marginBottom:8,
   },
   loadingContainer: {
     flex: 1,

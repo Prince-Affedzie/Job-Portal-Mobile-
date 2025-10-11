@@ -34,14 +34,772 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 40,
   },
   errorText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#64748B',
+    marginTop: 12,
   },
   scrollView: {
     flex: 1,
   },
+
+  // Enhanced Hero Card
+  heroCard: {
+    margin: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  heroGradient: {
+    padding: 20,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  heroTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    lineHeight: 26,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  heroMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  heroMetaText: {
+    fontSize: 12,
+    color: '#E0E7FF',
+    fontWeight: '500',
+  },
+  assignmentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    gap: 4,
+  },
+  assignmentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  quickStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  quickStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickStatText: {
+    fontSize: 12,
+    color: '#E0E7FF',
+    fontWeight: '500',
+  },
+
+  // Enhanced Completion Card
+  completionCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  completionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  progressContainer: {
+    gap: 8,
+  },
+  progressStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressDotCompleted: {
+    backgroundColor: '#10B981',
+  },
+  progressDotCurrent: {
+    backgroundColor: '#3B82F6',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  progressContent: {
+    flex: 1,
+  },
+  progressLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  progressLabelCompleted: {
+    color: '#10B981',
+  },
+  progressLabelCurrent: {
+    color: '#1E293B',
+  },
+  progressDate: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  progressLine: {
+    width: 2,
+    height: 20,
+    backgroundColor: '#E2E8F0',
+    marginLeft: 11,
+  },
+  mutualCompletion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  mutualCompletionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+
+  // Enhanced Tab Styles
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    gap: 6,
+  },
+  tabButtonActive: {
+    backgroundColor: '#6366F1',
+  },
+  tabIconContainer: {
+    position: 'relative',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+
+  // Enhanced Section Cards
+  tabContent: {
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  taskDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  // Enhanced Info Grid
+  infoGrid: {
+    gap: 12,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  infoIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  infoValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  infoSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+
+  // Enhanced Timeline
+  timeline: {
+    gap: 4,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#6366F1',
+  },
+  timelineConnector: {
+    width: 2,
+    height: 20,
+    backgroundColor: '#E2E8F0',
+    marginLeft: 5,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  timelineDate: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+
+  // Enhanced Employer Card
+  employerCard: {
+    gap: 16,
+  },
+  employerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  employerAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  employerInfo: {
+    flex: 1,
+  },
+  employerName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+    marginBottom: 6,
+  },
+  verifiedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  employerBio: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 18,
+  },
+  contactSection: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  contactLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  contactValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
+  },
+  employerStats: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  ratingStatsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 120,
+  },
+  ratingMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    marginRight: 8,
+  },
+  ratingValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  reviewsCount: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+
+  // Enhanced Skills Section
+  skillsSection: {
+    marginBottom: 16,
+  },
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 12,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  skillTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  skillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Enhanced Verification Section
+  verificationSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FCD34D',
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    marginBottom: 16,
+  },
+  verificationContent: {
+    flex: 1,
+  },
+  verificationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  verificationText: {
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 16,
+  },
+  instructionsSection: {
+    marginTop: 16,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+
+  // Enhanced Safety Guidelines
+  safetyCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop:10,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  safetyList: {
+    gap: 8,
+  },
+  safetyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+  },
+  safetyText: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  // Assignment Acceptance Card
+  assignmentAcceptanceCard: {
+    backgroundColor: '#FFFBEB',
+    margin: 16,
+    marginTop: 8,
+    padding: 20,
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  assignmentTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  assignmentMessage: {
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  assignmentButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  assignmentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  acceptButton: {
+    backgroundColor: '#10B981',
+  },
+  declineButton: {
+    backgroundColor: '#EF4444',
+  },
+  acceptButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  declineButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Enhanced FAB System
+  fabContainer: {
+    position: 'absolute',
+    bottom: 54,
+    right: 24,
+    zIndex: 1000,
+    alignItems: 'flex-end',
+  },
+  fabBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    
+  },
+  fabActionButtons: {
+    position: 'absolute',
+    bottom: 72,
+    right: 0,
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  fabActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    gap: 8,
+    minWidth: 160,
+  },
+  fabSubmit: {
+    backgroundColor: '#8B5CF6',
+  },
+  fabSubmissions: {
+    backgroundColor: '#6366F1',
+  },
+  fabReport: {
+    backgroundColor: '#EF4444',
+  },
+  fabComplete: {
+    backgroundColor: '#10B981',
+  },
+  fabCompleteDisabled: {
+    backgroundColor: '#10B981',
+    opacity: 0.8,
+  },
+  fabAccept: {
+    backgroundColor: '#10B981',
+  },
+  fabDecline: {
+    backgroundColor: '#EF4444',
+  },
+  fabActionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  mainFAB: {
+    width: 60,
+    height: 60,
+    bottomm:55,
+    borderRadius: 30,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  mainFABDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  mainFABExpanded: {
+    backgroundColor: '#4F46E5',
+  },
+
+  // Enhanced Hint Cards
+  fabHintCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    width: 280,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366F1',
+  },
+  hintTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  hintTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  hintDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: 70,
+    right: 0,
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  tooltipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // Keep existing styles for compatibility
   headerCard: {
     backgroundColor: '#FFFFFF',
     margin: 16,
@@ -106,107 +864,54 @@ export const styles = StyleSheet.create({
     color: '#64748B',
     marginLeft: 6,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
+  completionStatusSection: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  tabButton: {
+  completionStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  completionStatusItem: {
     flex: 1,
+    alignItems: 'center',
+  },
+  completionStatusText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  completionStatusTextDone: {
+    color: '#10B981',
+    fontWeight: '600',
+  },
+  completionTimeText: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  mutualCompletionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    gap: 4,
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'center',
   },
-  tabButtonActive: {
-    backgroundColor: '#6366F1',
-  },
-  tabText: {
+  mutualCompletionText: {
     fontSize: 12,
+    color: '#065F46',
     fontWeight: '600',
-    color: '#6B7280',
-  },
-  tabTextActive: {
-    color: '#FFFFFF',
-  },
-  tabContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  infoGrid: {
-    gap: 12,
-    marginBottom: 16,
-  },
-   ratingStatsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    minWidth: 80,
-  },
-  ratingMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  ratingStars: {
-    flexDirection: 'row',
-    marginRight: 6,
-  },
-  ratingValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  reviewsCount: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '500',
+    marginLeft: 4,
   },
   markedDoneEmerald: {
     backgroundColor: '#10B981',
@@ -220,148 +925,6 @@ export const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-    gap: 12,
-  },
-  infoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  locationSection: {
-    marginTop: 16,
-  },
-  locationGrid: {
-    gap: 8,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  locationLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  locationValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  timeline: {
-    gap: 12,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  timelineLabel: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  timelineDate: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
-  },
-  employerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  employerAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  employerInfo: {
-    flex: 1,
-  },
-  employerName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 2,
-    marginBottom: 4,
-  },
-  verifiedText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#065F46',
-  },
-  employerBio: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 18,
-  },
-  contactSection: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  contactLabel: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
-  },
-  contactValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1E293B',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -387,31 +950,6 @@ export const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
   },
-  skillsSection: {
-    marginBottom: 16,
-  },
-  subsectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  skillTag: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  skillText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
   verificationNotice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -427,14 +965,6 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: '#92400E',
     flex: 1,
-  },
-  instructionsSection: {
-    marginTop: 16,
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
   },
   sidebar: {
     padding: 16,
@@ -517,32 +1047,6 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
   },
-  safetyCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  safetyList: {
-    gap: 8,
-  },
-  safetyItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 8,
-  },
-  safetyText: {
-    fontSize: 12,
-    fontWeight: '500',
-    flex: 1,
-  },
   progressCard: {
     backgroundColor: '#FFFFFF',
     padding: 16,
@@ -603,127 +1107,18 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
   },
-  assignmentAcceptanceCard: {
-  backgroundColor: '#FFFBEB',
-  margin: 16,
-  marginTop: 8,
-  padding: 16,
-  borderRadius: 12,
-  borderLeftWidth: 4,
-  borderLeftColor: '#F59E0B',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3,
-},
-assignmentHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 8,
-  gap: 8,
-},
-assignmentTitle: {
-  fontSize: 18,
-  fontWeight: '700',
-  color: '#92400E',
-},
-assignmentMessage: {
-  fontSize: 14,
-  color: '#92400E',
-  lineHeight: 20,
-  marginBottom: 16,
-},
-assignmentButtons: {
-  flexDirection: 'row',
-  gap: 12,
-},
-assignmentButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 12,
-  paddingHorizontal: 16,
-  borderRadius: 8,
-  gap: 8,
-},
-acceptButton: {
-  backgroundColor: '#10B981',
-},
-declineButton: {
-  backgroundColor: '#EF4444',
-},
-acceptButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-declineButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-pendingAssignment: {
-  alignItems: 'center',
-  padding: 20,
-  backgroundColor: '#FFFBEB',
-  borderRadius: 8,
-},
-pendingText: {
-  fontSize: 14,
-  color: '#92400E',
-  textAlign: 'center',
-  marginTop: 8,
-  lineHeight: 20,
-},completionStatusSection: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  completionStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  completionStatusItem: {
-    flex: 1,
+  pendingAssignment: {
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 8,
   },
-  completionStatusText: {
-    fontSize: 12,
-    color: '#6B7280',
+  pendingText: {
+    fontSize: 14,
+    color: '#92400E',
     textAlign: 'center',
-    marginTop: 4,
-  },
-  completionStatusTextDone: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  completionTimeText: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  mutualCompletionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'center',
-  },
-  mutualCompletionText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '600',
-    marginLeft: 4,
+    marginTop: 8,
+    lineHeight: 20,
   },
   alreadyDoneSection: {
     alignItems: 'center',
@@ -746,159 +1141,27 @@ pendingText: {
     marginTop: 4,
     textAlign: 'center',
   },
-  markDoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#10B981',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
+  locationSection: {
+    marginTop: 16,
   },
-  markDoneText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  fabContainer: {
-  position: 'absolute',
-  top: '80%', // Center vertically
-  right: 20,
-  zIndex: 1000,
-  alignItems: 'flex-end',
-  transform: [{ translateY:0}], // Adjust for FAB height (56/2 = 28)
-},
-
- // Backdrop for when FAB is expanded
-  fabBackdrop: {
-    position: 'absolute',
-    top: -Dimensions.get('window').height,
-    left: -Dimensions.get('window').width,
-    right: -Dimensions.get('window').width,
-    bottom: -Dimensions.get('window').height,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  
-  // Container for action buttons
-  fabActionButtons: {
-    position: 'absolute',
-    bottom: 70,
-    right: 0,
-    gap: 12,
-    alignItems: 'flex-end',
-    minWidth: 160,
-  },
-  
-  // Individual action button
-  fabActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 25,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { 
-      width: 0, 
-      height: 2 
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  locationGrid: {
     gap: 8,
-    minWidth: 160,
-    justifyContent: 'flex-start',
   },
-  
-  // Action button text
-  fabActionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  
-  // Main FAB button
-  mainFAB: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { 
-      width: 0, 
-      height: 4 
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    // Optional: Add a subtle border for better visibility
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-
-  // Additional styles for better visual hierarchy
-  fabActionButtonHighlight: {
-    shadowColor: '#000',
-    shadowOffset: { 
-      width: 0, 
-      height: 3 
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  fabHintCard: {
+  locationItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
-    width: 280,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  hintTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  hintTitle: {
+  locationLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
+    color: '#64748B',
   },
-  hintDescription: {
-    fontSize: 12,
-    color: '#6B7280',
-    lineHeight: 16,
-  },
-  mainFABDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  tooltip: {
-    position: 'absolute',
-    bottom: 70,
-    right: 0,
-    backgroundColor: '#1F2937',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  tooltipText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  locationValue: {
+    fontSize: 14,
     fontWeight: '500',
+    color: '#1E293B',
   },
 });

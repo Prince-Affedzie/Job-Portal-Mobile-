@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback,useContext } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import Header from '../tasker/Header';
+import { AuthContext } from '../../context/AuthContext';
 dayjs.extend(relativeTime);
 
 const RoomList = ({ 
@@ -28,6 +29,7 @@ const RoomList = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const {user} = useContext(AuthContext)
 
   const onRefreshHandler = async () => {
     setRefreshing(true);
@@ -220,15 +222,23 @@ const RoomList = ({
             colors={['#6366F1']}
           />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyStateTitle}>No conversations. You can chat with Taskers here once you Assign task to them.</Text>
-            <Text style={styles.emptyStateText}>
-              {searchQuery ? 'No conversations match your search' : 'Start a conversation to see it here'}
-            </Text>
-          </View>
-        }
+       ListEmptyComponent={
+  <View style={styles.emptyState}>
+    <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+    <Text style={styles.emptyStateTitle}>
+      {user.role === 'client'
+        ? 'No conversations yet. Assign a task to chat with Taskers.'
+        : 'No conversations yet. Apply to tasks to start chatting with Clients.'}
+    </Text>
+    <Text style={styles.emptyStateText}>
+      {searchQuery
+        ? 'No conversations match your search.'
+        : user.role === 'client'
+          ? 'Once you assign a task, conversations will appear here.'
+          : 'Once a client assigns you a task, conversations will appear here.'}
+    </Text>
+  </View>
+}
       />
     </View>
   );
@@ -384,23 +394,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    marginTop: 60,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 40,
+  marginTop: 60,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+  paddingBottom: 20,
+},
+emptyStateTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginTop: 16,
+  marginBottom: 8,
+  textAlign: 'center',
+  maxWidth: '80%',
+},
+emptyStateText: {
+  fontSize: 14,
+  color: '#6B7280',
+  textAlign: 'center',
+  maxWidth: '80%',
+  lineHeight: 20,
+},
 });
 
 export default RoomList;

@@ -9,44 +9,58 @@ import {
   ActivityIndicator,
   Dimensions,
   StatusBar,
+  SafeAreaView,
   Alert,
   RefreshControl,
   FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
 import { AuthContext } from '../../context/AuthContext';
-import { assignApplicantToTask,  } from '../../api/miniTaskApi';
-import { getMicroTaskApplicants,acceptBidForTask, getMicroTaskBids } from '../../api/bidApi';
+import { assignApplicantToTask,clientGetTaskInfo } from '../../api/miniTaskApi'; // Added getMicroTaskById
+import { getMicroTaskApplicants, acceptBidForTask, getMicroTaskBids } from '../../api/bidApi';
 import { navigate } from '../../services/navigationService';
 import { triggerPayment } from '../../services/PaymentServices';
 import { usePaystack } from "react-native-paystack-webview";
 
-
 const { width } = Dimensions.get('window');
 
 export default function ApplicantsScreen({ route }) {
-  const { taskId, task } = route.params;
+  const { taskId, task: initialTask } = route.params; // Renamed to initialTask
   const { user } = useContext(AuthContext);
   const { popup } = usePaystack();
   
-  const [data, setData] = useState([]); // Will hold either applicants or bids
+  const [data, setData] = useState([]);
+  const [task, setTask] = useState(initialTask); // Local task state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [sortBy, setSortBy] = useState('score');
   const [processingAction, setProcessingAction] = useState(null);
-  const [biddingType, setBiddingType] = useState(task?.biddingType || 'fixed');
+  const [biddingType, setBiddingType] = useState(initialTask?.biddingType || 'fixed');
 
-  // Check if task is already assigned or in progress/completed
+  // Update derived states based on current task
   const isTaskAssigned = task?.assignedTo && task?.status !== 'Open' && task?.status !== 'Pending';
   const isTaskInProgress = task?.status === 'In-progress' || task?.status === 'Review';
   const isTaskCompleted = task?.status === 'Completed' || task?.status === 'Closed';
-  const canAssign =  !isTaskInProgress && !isTaskCompleted;
-  const isAlreadyFunded = task?.funded  // Assuming 'Pending' means funded but not yet accepted
+  const canAssign = !isTaskInProgress && !isTaskCompleted;
+  const isAlreadyFunded = task?.funded;
+
+  // Fetch latest task data
+  const fetchTaskData = async () => {
+    try {
+      const response = await clientGetTaskInfo(taskId);
+      if (response.status === 200) {
+        setTask(response.data);
+        return response.data;
+      }
+    } catch (error) {
+      console.error('Error fetching task data:', error);
+    }
+    return task; // Return current task if fetch fails
+  };
 
   useEffect(() => {
     loadData();
@@ -57,30 +71,27 @@ export default function ApplicantsScreen({ route }) {
       setLoading(true);
       let response;
 
+      // First, get the latest task data
+      const latestTask = await fetchTaskData();
+      
       if (biddingType === 'fixed') {
         response = await getMicroTaskApplicants(taskId);
         if (response.status === 200) {
-          // Mark assigned applicant
           const applicants = response.data.map(applicant => ({
             ...applicant,
-            isAssigned: task?.assignedTo?.toString() === applicant._id?.toString()
+            isAssigned: latestTask?.assignedTo?.toString() === applicant._id?.toString()
           }));
           setData(applicants);
         }
       } else {
         response = await getMicroTaskBids(taskId);
         if (response.status === 200) {
-          // Mark accepted bid
-         
           const bids = response.data.map(bid => ({
             ...bid,
-            isAccepted: task?.assignedTo?.toString() === bid.bidder?._id?.toString()
+            isAccepted: latestTask?.assignedTo?.toString() === bid.bidder?._id?.toString()
           }));
           setData(bids);
-          
-
         }
-        
       }
 
       if (response.status !== 200) {
@@ -101,78 +112,82 @@ export default function ApplicantsScreen({ route }) {
   };
 
   const handleAssign = async (applicantId, applicantName) => {
-  const alertTitle = isAlreadyFunded ? "Reassign Task" : "Assign Task & Make Payment";
-  const alertMessage = isAlreadyFunded 
-    ? `You can reassign this task to ${applicantName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
-    : `Assigning ${applicantName} will initiate a secure payment of ${task.budget} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
+    const alertTitle = isAlreadyFunded ? "Reassign Task" : "Assign Task & Make Payment";
+    const alertMessage = isAlreadyFunded 
+      ? `You can reassign this task to ${applicantName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
+      : `Assigning ${applicantName} will initiate a secure payment of ${task.budget} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
 
-  Alert.alert(
-    alertTitle,
-    alertMessage,
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: isAlreadyFunded ? "Reassign" : "Continue",
-        style: "default",
-        onPress: async () => {
-          try {
-            setProcessingAction(applicantId);
+    Alert.alert(
+      alertTitle,
+      alertMessage,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: isAlreadyFunded ? "Reassign" : "Continue",
+          style: "default",
+          onPress: async () => {
+            try {
+              setProcessingAction(applicantId);
 
-            let paymentSuccess = true; // Default to true if already funded
-            if (!isAlreadyFunded) {
-              paymentSuccess = await triggerPayment({
-                popup,
-                email: user.email,
-                amount: task.budget,
-                taskId: task._id,
-                beneficiary: applicantId,
-              });
-              
-              if (!paymentSuccess) {
-                Alert.alert(
-                  "Payment Not Completed",
-                  "Task assignment has been cancelled since payment was not successful."
-                );
-                return; 
+              let paymentSuccess = true;
+              if (!isAlreadyFunded) {
+                paymentSuccess = await triggerPayment({
+                  popup,
+                  email: user.email,
+                  phone: user.phone,
+                  amount: task.budget,
+                  taskId: task._id,
+                  beneficiary: applicantId,
+                });
+                
+                if (!paymentSuccess) {
+                  Alert.alert(
+                    "Payment Not Completed",
+                    "Task assignment has been cancelled since payment was not successful."
+                  );
+                  return; 
+                }
               }
-            }
 
-            // Proceed with assignment (reassignment if already funded)
-            const response = await assignApplicantToTask(taskId, applicantId);
-            if (response.status === 200) {
-              const successMessage = isAlreadyFunded 
-                ? `Task reassigned to ${applicantName}!` 
-                : `Task assigned to ${applicantName}!`;
-              Alert.alert("Success", successMessage);
+              const response = await assignApplicantToTask(taskId, applicantId);
+              if (response.status === 200) {
+                const successMessage = isAlreadyFunded 
+                  ? `Task reassigned to ${applicantName}!` 
+                  : `Task assigned to ${applicantName}!`;
+                Alert.alert("Success", successMessage);
 
-              setData((prev) =>
-                prev.map((item) => ({
+                // Refresh all data immediately after successful assignment
+                await Promise.all([
+                  fetchTaskData(), // Update task data
+                  loadData() // Update applicants/bids data
+                ]);
+
+                // Force UI update
+                setData(prev => prev.map(item => ({
                   ...item,
                   isAssigned: item._id === applicantId,
-                }))
-              );
-               loadData()
-            } else {
-              throw new Error(response.data?.message || "Assignment failed");
+                })));
+
+              } else {
+                throw new Error(response.data?.message || "Assignment failed");
+              }
+            } catch (error) {
+              const errorMessage =
+                error.response?.data?.message ||
+                error.response?.data?.error ||
+                "Error assigning task";
+              Alert.alert("Error", errorMessage);
+              console.error(error);
+            } finally {
+              setProcessingAction(null);
             }
-          } catch (error) {
-            const errorMessage =
-              error.response?.data?.message ||
-              error.response?.data?.error ||
-              "Error assigning task";
-            Alert.alert("Error", errorMessage);
-            console.error(error);
-          } finally {
-            setProcessingAction(null);
-          }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
-
-  const handleAcceptBid = async (bidder, amount,bidId, bidderName) => {
+  const handleAcceptBid = async (bidder, amount, bidId, bidderName) => {
     const alertTitle = isAlreadyFunded ? "Reassign Task" : "Accept Bid";
     const alertMessage = isAlreadyFunded 
       ? `You can reassign this task to ${bidderName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
@@ -190,26 +205,26 @@ export default function ApplicantsScreen({ route }) {
             try {
               setProcessingAction(bidId);
 
-              let paymentSuccess = true; // Default to true if already funded
+              let paymentSuccess = true;
               if (!isAlreadyFunded) {
                 paymentSuccess = await triggerPayment({
-                popup,
-                email: user.email,
-                amount: amount,
-                taskId: task._id,
-                beneficiary: bidder._id,
-              });
-              
-              if (!paymentSuccess) {
-                Alert.alert(
-                  "Payment Not Completed",
-                  "Task assignment has been cancelled since payment was not successful."
-                );
-                return; 
-              }
+                  popup,
+                  email: user.email,
+                  phone: user.phone,
+                  amount: amount,
+                  taskId: task._id,
+                  beneficiary: bidder._id,
+                });
+                
+                if (!paymentSuccess) {
+                  Alert.alert(
+                    "Payment Not Completed",
+                    "Task assignment has been cancelled since payment was not successful."
+                  );
+                  return; 
+                }
               }
 
-              // Proceed with bid acceptance (reassignment if already funded)
               const response = await acceptBidForTask(taskId, bidId);
               if (response.status === 200) {
                 const successMessage = isAlreadyFunded 
@@ -217,12 +232,18 @@ export default function ApplicantsScreen({ route }) {
                   : `Bid accepted from ${bidderName}!`;
                 Alert.alert("Success", successMessage);
                 
+                // Refresh all data immediately after successful acceptance
+                await Promise.all([
+                  fetchTaskData(), // Update task data
+                  loadData() // Update bids data
+                ]);
+
+                // Force UI update
                 setData(prev => prev.map(item => ({
                   ...item,
                   isAccepted: item._id === bidId
                 })));
 
-                loadData()
               } else {
                 throw new Error(response.data?.message || 'Bid acceptance failed');
               }
@@ -269,6 +290,7 @@ export default function ApplicantsScreen({ route }) {
       return 0;
     });
 
+  // Rest of your component rendering remains the same...
   const renderApplicantCard = ({ item: applicant }) => (
     <View style={styles.applicantCard}>
       {/* Applicant Header */}
@@ -286,7 +308,7 @@ export default function ApplicantsScreen({ route }) {
               </Text>
             </View>
           )}
-          {(isTaskAssigned && (task.assignedTo._id === applicant._id)) && (
+          {(applicant.isAssigned || applicant.isAccepted) && (
             <View style={styles.assignedBadge}>
               <Ionicons name="checkmark" size={12} color="#FFFFFF" />
             </View>
@@ -307,7 +329,7 @@ export default function ApplicantsScreen({ route }) {
         </View>
       </View>
 
-      {/* Applicant Stats */}
+      {/* Rest of the applicant card rendering... */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Ionicons name="star" size={16} color="#F59E0B" />
@@ -381,15 +403,7 @@ export default function ApplicantsScreen({ route }) {
           <Text style={styles.profileButtonText}>Profile</Text>
         </TouchableOpacity>
 
-       {/* <TouchableOpacity 
-          style={[styles.actionButton, styles.chatButton]}
-          onPress={() => handleChat(applicant)}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#8B5CF6" />
-          <Text style={styles.chatButtonText}>Chat</Text>
-        </TouchableOpacity>*/}
-
-        {task.assignedTo?._id !== applicant._id ? (
+        {!applicant.isAssigned ? (
           <TouchableOpacity 
             style={[styles.actionButton, styles.assignButton, !canAssign && styles.disabledButton]}
             onPress={() => handleAssign(applicant._id, applicant.name)}
@@ -417,223 +431,183 @@ export default function ApplicantsScreen({ route }) {
   );
 
   const renderBidCard = ({ item: bid }) => {
-  // Add more defensive checks
-  const bidder = bid?.bidder || {};
-  
-  return (
-    <View style={styles.applicantCard}>
-      {/* Bidder Header */}
-      <View style={styles.applicantHeader}>
-        <View style={styles.avatarContainer}>
-          {bidder?.profileImage ? (
-            <Image
-              source={{ uri: bidder?.profileImage }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarText}>
-                {bidder?.name?.charAt(0)?.toUpperCase() || 'B'}
-              </Text>
-            </View>
-          )}
-          {bid?.isAccepted && (
-            <View style={styles.assignedBadge}>
-              <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.applicantInfo}>
-          <Text style={styles.applicantName} numberOfLines={1}>
-            {bidder?.name || 'Bidder'}
-          </Text>
-          
-        </View>
-
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreLabel}>Bid</Text>
-          <Text style={styles.scoreValue}>₵{bid?.amount || '0'}</Text>
-        </View>
-      </View>
-
-      {/* Bid Details */}
-      <View style={styles.bidDetails}>
-        <View style={styles.bidInfo}>
-          <View style={styles.bidInfoItem}>
-            <Ionicons name="cash-outline" size={16} color="#10B981" />
-            <Text style={styles.bidInfoText}>₵{bid?.amount || '0'}</Text>
-          </View>
-          {bid?.timeline && (
-            <View style={styles.bidInfoItem}>
-              <Ionicons name="time-outline" size={16} color="#6366F1" />
-              <Text style={styles.bidInfoText}>{bid.timeline} </Text>
-            </View>
-          )}
-        </View>
-        
-        {bid?.message && (
-          <Text style={styles.bidMessage} numberOfLines={3}>
-            "{bid.message}"
-          </Text>
-        )}
-      </View>
-
-     
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Ionicons name="star" size={16} color="#F59E0B" />
-          <Text style={styles.statValue}>{bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'}</Text>
-          <Text style={styles.statLabel}>Rating</Text>
-        </View>
-        
-        <View style={styles.statItem}>
-          <Ionicons name="checkmark-done" size={16} color="#10B981" />
-          <Text style={styles.statValue}>{bidder?.completedTasks || 0}</Text>
-          <Text style={styles.statLabel}>Completed</Text>
-        </View>
-        
-        <View style={styles.statItem}>
-          <Ionicons name="trending-up" size={16} color="#6366F1" />
-          <Text style={styles.statValue}>
-            {bidder?.completionRate ? `${bidder.completionRate}%` : 'N/A'}
-          </Text>
-          <Text style={styles.statLabel}>Success</Text>
-        </View>
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.profileButton]}
-          onPress={() => handleViewProfile(bid)}
-        >
-          <Ionicons name="person-outline" size={16} color="#6366F1" />
-          <Text style={styles.profileButtonText}>Profile</Text>
-        </TouchableOpacity>
-
-        {/*<TouchableOpacity 
-          style={[styles.actionButton, styles.chatButton]}
-          onPress={() => handleChat(bid)}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#8B5CF6" />
-          <Text style={styles.chatButtonText}>Chat</Text>
-        </TouchableOpacity>*/}
-
-        {task.assignedTo?._id !==  bidder?._id  ? (
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.assignButton, !canAssign && styles.disabledButton]}
-            onPress={() => handleAcceptBid( bidder,bid?.amount, bid?._id, bidder?.name || 'Bidder')}
-            disabled={processingAction === bid?._id || !canAssign}
-          >
-            {processingAction === bid?._id ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.assignButtonText}>
-                  {!canAssign ? 'Cannot Accept' : 'Accept Bid'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <View style={[styles.actionButton, styles.assignedButton]}>
-            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            <Text style={styles.assignedButtonText}>Accepted</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-};
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIllustration}>
-        <Ionicons 
-          name={biddingType === 'fixed' ? "people-outline" : "cash-outline"} 
-          size={60} 
-          color="#9CA3AF" 
-        />
-      </View>
-      <Text style={styles.emptyTitle}>
-        No {biddingType === 'fixed' ? 'Applicants' : 'Bids'} Yet
-      </Text>
-      <Text style={styles.emptyDescription}>
-        {biddingType === 'fixed' 
-          ? 'Applicants who apply to your task will appear here. Share your task to attract more applicants.'
-          : 'Bidders who place bids on your task will appear here. Share your task to attract more bids.'
-        }
-      </Text>
-      <TouchableOpacity 
-        style={styles.shareButton}
-        onPress={() => {/* Implement share functionality */}}
-      >
-        <Ionicons name="share-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.shareButtonText}>Share Task</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
- const renderAssignedTasker = () => {
-  if (!isTaskAssigned) return null;
-
-  const assignedUser = data.find(item => 
-    item?.isAssigned || item?.isAccepted
-  );
-
-  // If no assigned user found in data, use task.assignedTo
-  if (!assignedUser && !task?.assignedTo) return null;
-
-  let userData;
-  if (assignedUser) {
-    userData = biddingType === 'fixed' ? assignedUser : (assignedUser?.bidder || {});
-  } else {
-    // Fallback to task.assignedTo if available
-    userData = task?.assignedTo || {};
-  }
-
-  return (
-    <View style={styles.assignedTaskerCard}>
-      <View style={styles.assignedHeader}>
-        <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-        <Text style={styles.assignedTitle}>Task Assigned to:</Text>
-      </View>
-      
-      <View style={styles.assignedContent}>
-        <View style={styles.assignedUser}>
+    const bidder = bid?.bidder || {};
+    
+    return (
+      <View style={styles.applicantCard}>
+        {/* Bidder Header */}
+        <View style={styles.applicantHeader}>
           <View style={styles.avatarContainer}>
-            {userData?.profileImage ? (
+            {bidder?.profileImage ? (
               <Image
-                source={{ uri: userData?.profileImage }}
+                source={{ uri: bidder?.profileImage }}
                 style={styles.avatar}
               />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Text style={styles.avatarText}>
-                  {userData?.name?.charAt(0)?.toUpperCase() || 'T'}
+                  {bidder?.name?.charAt(0)?.toUpperCase() || 'B'}
                 </Text>
               </View>
             )}
-          </View>
-          <View style={styles.assignedUserInfo}>
-            <Text style={styles.assignedUserName}>{userData?.name || 'Assigned Tasker'}</Text>
-            <Text style={styles.assignedUserEmail}>{userData?.email || 'No email available'}</Text>
-             <Text style={styles.assignedUserEmail}>{userData?.phone || 'No email available'}</Text>
-            {biddingType === 'open-bid' && assignedUser?.amount && (
-              <Text style={styles.assignedBidAmount}>Accepted Bid: ₵{assignedUser.amount}</Text>
+            {bid?.isAccepted && (
+              <View style={styles.assignedBadge}>
+                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+              </View>
             )}
           </View>
+          
+          <View style={styles.applicantInfo}>
+            <Text style={styles.applicantName} numberOfLines={1}>
+              {bidder?.name || 'Bidder'}
+            </Text>
+          </View>
+
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreLabel}>Bid</Text>
+            <Text style={styles.scoreValue}>₵{bid?.amount || '0'}</Text>
+          </View>
+        </View>
+
+        {/* Rest of the bid card rendering... */}
+        <View style={styles.bidDetails}>
+          <View style={styles.bidInfo}>
+            <View style={styles.bidInfoItem}>
+              <Ionicons name="cash-outline" size={16} color="#10B981" />
+              <Text style={styles.bidInfoText}>₵{bid?.amount || '0'}</Text>
+            </View>
+            {bid?.timeline && (
+              <View style={styles.bidInfoItem}>
+                <Ionicons name="time-outline" size={16} color="#6366F1" />
+                <Text style={styles.bidInfoText}>{bid.timeline} </Text>
+              </View>
+            )}
+          </View>
+          
+          {bid?.message && (
+            <Text style={styles.bidMessage} numberOfLines={3}>
+              "{bid.message}"
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Ionicons name="star" size={16} color="#F59E0B" />
+            <Text style={styles.statValue}>{bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'}</Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Ionicons name="checkmark-done" size={16} color="#10B981" />
+            <Text style={styles.statValue}>{bidder?.completedTasks || 0}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Ionicons name="trending-up" size={16} color="#6366F1" />
+            <Text style={styles.statValue}>
+              {bidder?.completionRate ? `${bidder.completionRate}%` : 'N/A'}
+            </Text>
+            <Text style={styles.statLabel}>Success</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.profileButton]}
+            onPress={() => handleViewProfile(bid)}
+          >
+            <Ionicons name="person-outline" size={16} color="#6366F1" />
+            <Text style={styles.profileButtonText}>Profile</Text>
+          </TouchableOpacity>
+
+          {!bid.isAccepted ? (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.assignButton, !canAssign && styles.disabledButton]}
+              onPress={() => handleAcceptBid(bidder, bid?.amount, bid?._id, bidder?.name || 'Bidder')}
+              disabled={processingAction === bid?._id || !canAssign}
+            >
+              {processingAction === bid?._id ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.assignButtonText}>
+                    {!canAssign ? 'Cannot Accept' : 'Accept Bid'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.actionButton, styles.assignedButton]}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.assignedButtonText}>Accepted</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderAssignedTasker = () => {
+    if (!isTaskAssigned) return null;
+
+    const assignedUser = data.find(item => 
+      item?.isAssigned || item?.isAccepted
+    );
+
+    if (!assignedUser && !task?.assignedTo) return null;
+
+    let userData;
+    if (assignedUser) {
+      userData = biddingType === 'fixed' ? assignedUser : (assignedUser?.bidder || {});
+    } else {
+      userData = task?.assignedTo || {};
+    }
+
+    return (
+      <View style={styles.assignedTaskerCard}>
+        <View style={styles.assignedHeader}>
+          <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+          <Text style={styles.assignedTitle}>Task Assigned to:</Text>
         </View>
         
-        <Text style={styles.taskStatus}>
-          Current Status: <Text style={styles.statusText}>{task?.status || 'Unknown'}</Text>
-        </Text>
+        <View style={styles.assignedContent}>
+          <View style={styles.assignedUser}>
+            <View style={styles.avatarContainer}>
+              {userData?.profileImage ? (
+                <Image
+                  source={{ uri: userData?.profileImage }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                  <Text style={styles.avatarText}>
+                    {userData?.name?.charAt(0)?.toUpperCase() || 'T'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.assignedUserInfo}>
+              <Text style={styles.assignedUserName}>{userData?.name || 'Assigned Tasker'}</Text>
+              <Text style={styles.assignedUserEmail}>{userData?.email || 'No email available'}</Text>
+              <Text style={styles.assignedUserEmail}>{userData?.phone || 'No phone available'}</Text>
+              {biddingType === 'open-bid' && assignedUser?.amount && (
+                <Text style={styles.assignedBidAmount}>Accepted Bid: ₵{assignedUser.amount}</Text>
+              )}
+            </View>
+          </View>
+          
+          <Text style={styles.taskStatus}>
+            Current Status: <Text style={styles.statusText}>{task?.status || 'Unknown'}</Text>
+          </Text>
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
+
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -648,141 +622,138 @@ export default function ApplicantsScreen({ route }) {
     );
   }
 
- return (
-  <SafeAreaView style={styles.container}>
-    <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-    <Header title={biddingType === 'fixed' ? "Applicants" : "Bids"} showBackButton={true} />
-    
-    <ScrollView 
-      style={styles.scrollView}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Task Info Header */}
-      <View style={styles.taskHeader}>
-        <View style={styles.taskInfo}>
-          <Text style={styles.taskTitle} numberOfLines={2}>
-            {task?.title || 'Task'}
-          </Text>
-          <View style={styles.taskMetaRow}>
-            <Text style={styles.taskMeta}>
-              {data.length} {biddingType === 'fixed' ? 'applicant' : 'bid'}{data.length !== 1 ? 's' : ''}
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <Header title={biddingType === 'fixed' ? "Applicants" : "Bids"} showBackButton={true} />
+      
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Task Info Header */}
+        <View style={styles.taskHeader}>
+          <View style={styles.taskInfo}>
+            <Text style={styles.taskTitle} numberOfLines={2}>
+              {task?.title || 'Task'}
             </Text>
-            <View style={[styles.budgetBadge, biddingType === 'open-bid' && styles.openBidBadge]}>
-              <Ionicons 
-                name={biddingType === 'fixed' ? "cash-outline" : "pricetag-outline"} 
-                size={16} 
-                color={biddingType === 'fixed' ? "#10B981" : "#6366F1"} 
-              />
-              <Text style={[styles.budgetText, biddingType === 'open-bid' && styles.openBidText]}>
-                {biddingType === 'fixed' ? `₵${task?.budget || '0'}` : 'Open Bid'}
+            <View style={styles.taskMetaRow}>
+              <Text style={styles.taskMeta}>
+                {data.length} {biddingType === 'fixed' ? 'applicant' : 'bid'}{data.length !== 1 ? 's' : ''}
               </Text>
+              <View style={[styles.budgetBadge, biddingType === 'open-bid' && styles.openBidBadge]}>
+                <Ionicons 
+                  name={biddingType === 'fixed' ? "cash-outline" : "pricetag-outline"} 
+                  size={16} 
+                  color={biddingType === 'fixed' ? "#10B981" : "#6366F1"} 
+                />
+                <Text style={[styles.budgetText, biddingType === 'open-bid' && styles.openBidText]}>
+                  {biddingType === 'fixed' ? `₵${task?.budget || '0'}` : 'Open Bid'}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      {/* Assigned Tasker Section */}
-      {renderAssignedTasker()}
+        {/* Assigned Tasker Section - This will now update immediately */}
+        {renderAssignedTasker()}
 
-      {/* Task Status Warning */}
-      {!canAssign && (
-        <View style={styles.statusWarning}>
-          <Ionicons name="information-circle" size={20} color="#F59E0B" />
-          <Text style={styles.statusWarningText}>
-            {isTaskCompleted 
-              ? 'This task has been completed and cannot be assigned.'
-              : isTaskInProgress
-              ? 'This task is already in progress and cannot be reassigned.'
-              : 'This task has already been assigned.'
-            }
-          </Text>
-        </View>
-      )}
-
-      {/* Filters and Sort */}
-      <View style={styles.controlsContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.filtersScroll}
-        >
-          <View style={styles.filtersContainer}>
-            <TouchableOpacity
-              style={[styles.filterButton, activeFilter === 'all' && styles.filterButtonActive]}
-              onPress={() => setActiveFilter('all')}
-            >
-              <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>
-                All ({data.length})
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.filterButton, activeFilter === 'unassigned' && styles.filterButtonActive]}
-              onPress={() => setActiveFilter('unassigned')}
-            >
-              <Text style={[styles.filterText, activeFilter === 'unassigned' && styles.filterTextActive]}>
-                Available ({data.filter(a => !a.isAssigned && !a.isAccepted).length})
-              </Text>
-            </TouchableOpacity>
-            
-           {/* <TouchableOpacity
-              style={[styles.filterButton, activeFilter === 'assigned' && styles.filterButtonActive]}
-              onPress={() => setActiveFilter('assigned')}
-            >
-              <Text style={[styles.filterText, activeFilter === 'assigned' && styles.filterTextActive]}>
-                {biddingType === 'fixed' ? 'Assigned' : 'Accepted'} ({data.filter(a => a.isAssigned || a.isAccepted).length})
-              </Text>
-            </TouchableOpacity>*/}
+        {/* Task Status Warning */}
+        {!canAssign && (
+          <View style={styles.statusWarning}>
+            <Ionicons name="information-circle" size={20} color="#F59E0B" />
+            <Text style={styles.statusWarningText}>
+              {isTaskCompleted 
+                ? 'This task has been completed and cannot be assigned.'
+                : isTaskInProgress
+                ? 'This task is already in progress and cannot be reassigned.'
+                : 'This task has already been assigned.'
+              }
+            </Text>
           </View>
-        </ScrollView>
-
-        <TouchableOpacity 
-          style={styles.sortButton}
-          onPress={() => {
-            const sortOptions = [
-              { text: "Score", onPress: () => setSortBy('score') },
-              { text: "Rating", onPress: () => setSortBy('rating') },
-              { text: "Experience", onPress: () => setSortBy('experience') },
-            ];
-            
-            if (biddingType === 'open-bid') {
-              sortOptions.push({ text: "Bid Amount", onPress: () => setSortBy('amount') });
-            }
-            
-            sortOptions.push({ text: "Cancel", style: "cancel" });
-            
-            Alert.alert("Sort By", "Choose how to sort", sortOptions);
-          }}
-        >
-          <Ionicons name="filter" size={16} color="#6366F1" />
-          <Text style={styles.sortText}>
-            Sort: {sortBy === 'score' ? 'Score' : sortBy === 'rating' ? 'Rating' : sortBy === 'experience' ? 'Experience' : 'Bid Amount'}
-          </Text>
-          <Ionicons name="chevron-down" size={16} color="#6366F1" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Data List - Now using regular mapping instead of FlatList */}
-      <View style={styles.dataContainer}>
-        {filteredAndSortedData.length > 0 ? (
-          filteredAndSortedData.map((item) => 
-            biddingType === 'fixed' ? renderApplicantCard({ item }) : renderBidCard({ item })
-          )
-        ) : (
-          renderEmptyState()
         )}
-      </View>
-    </ScrollView>
-  </SafeAreaView>
-); 
+
+        {/* Rest of your component... */}
+        <View style={styles.controlsContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.filtersScroll}
+          >
+            <View style={styles.filtersContainer}>
+              <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'all' && styles.filterButtonActive]}
+                onPress={() => setActiveFilter('all')}
+              >
+                <Text style={[styles.filterText, activeFilter === 'all' && styles.filterTextActive]}>
+                  All ({data.length})
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.filterButton, activeFilter === 'unassigned' && styles.filterButtonActive]}
+                onPress={() => setActiveFilter('unassigned')}
+              >
+                <Text style={[styles.filterText, activeFilter === 'unassigned' && styles.filterTextActive]}>
+                  Available ({data.filter(a => !a.isAssigned && !a.isAccepted).length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+
+          <TouchableOpacity 
+            style={styles.sortButton}
+            onPress={() => {
+              const sortOptions = [
+                { text: "Score", onPress: () => setSortBy('score') },
+                { text: "Rating", onPress: () => setSortBy('rating') },
+                { text: "Experience", onPress: () => setSortBy('experience') },
+              ];
+              
+              if (biddingType === 'open-bid') {
+                sortOptions.push({ text: "Bid Amount", onPress: () => setSortBy('amount') });
+              }
+              
+              sortOptions.push({ text: "Cancel", style: "cancel" });
+              
+              Alert.alert("Sort By", "Choose how to sort", sortOptions);
+            }}
+          >
+            <Ionicons name="filter" size={16} color="#6366F1" />
+            <Text style={styles.sortText}>
+              Sort: {sortBy === 'score' ? 'Score' : sortBy === 'rating' ? 'Rating' : sortBy === 'experience' ? 'Experience' : 'Bid Amount'}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Data List */}
+        <View style={styles.dataContainer}>
+          {filteredAndSortedData.length > 0 ? (
+            filteredAndSortedData.map((item) => 
+              biddingType === 'fixed' ? renderApplicantCard({ item }) : renderBidCard({ item })
+            )
+          ) : (
+            renderEmptyState()
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
 }
+
 const styles = StyleSheet.create({
    container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollView: {
+    flex: 1,
+    paddingBottom:8,
+    marginBottom:16,
   },
   loadingContainer: {
     flex: 1,

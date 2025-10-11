@@ -195,13 +195,10 @@ const ClientProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView 
-        style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <Header 
+  
+
+         {/* Header */}
+       <Header 
           title="My Profile" 
           rightComponent={
             <TouchableOpacity 
@@ -219,6 +216,13 @@ const ClientProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
           }
         />
+      <Animated.ScrollView 
+        style={{ opacity: fadeAnim }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+       
+       
 
         {/* Enhanced Profile Header */}
         <LinearGradient
@@ -411,6 +415,12 @@ const ClientProfileScreen = ({ navigation }) => {
              reviews={profileData.ratingsReceived || []}
              averageRating={profileData.rating || 0}
              totalReviews={profileData.numberOfRatings || 0}
+             onViewAll={()=>navigation.navigate('AllReviews', { 
+                  reviews: profileData.ratingsReceived || [],
+                  userName: profileData.name,
+                  averageRating: profileData.rating || 0,
+                  totalReviews: profileData.numberOfRatings || 0
+                })}
            />
            </View>
 

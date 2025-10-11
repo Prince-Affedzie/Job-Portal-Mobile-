@@ -265,12 +265,12 @@ const styles = StyleSheet.create({
     borderColor: '#1A1F3B',
   },
   notificationBadgeSmall: {
-    minWidth: 16,
-    height: 16,
+    minWidth: 18,
+    height: 18,
   },
   notificationText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
     lineHeight: 12,

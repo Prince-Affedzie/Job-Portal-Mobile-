@@ -5,7 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
- 
+ SafeAreaView,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -13,7 +13,6 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -111,7 +110,7 @@ const CreateTaskScreen = ({ navigation }) => {
     if (!task.budget || isNaN(task.budget) || parseFloat(task.budget) <= 0) {
       newErrors.budget = 'Valid budget is required';
     }
-    if (parseFloat(task.budget) < 5) {
+    if (parseFloat(task.budget) < 1) {
       newErrors.budget = 'Minimum budget is ₵5';
     }
     
