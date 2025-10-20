@@ -456,19 +456,19 @@ const RegisterScreen = ({ navigation }) => {
 
               {/* Role Selection */}
               <View style={styles.roleSection}>
-                <Text style={styles.roleLabel}>I AM A</Text>
+                <Text style={styles.roleLabel}>SELECT YOUR PURPOSE</Text>
                 <View style={styles.roleContainer}>
                   <RoleOption
                     icon="search-outline"
-                    title="Job Seeker"
+                    title="Looking for Work"
                     value="job_seeker"
                     selected={formData.role === "job_seeker"}
                     handleChange={handleChange}
                     status={status}
                   />
                   <RoleOption
-                    icon="document-text-outline"
-                    title="Task Poster"
+                    icon="business-outline"
+                    title="I want to Hire"
                     value="client"
                     selected={formData.role === "client"}
                     handleChange={handleChange}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect ,useContext} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTaskerOnboarding } from '../../context/TaskerOnboardingContext';
+import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import { Ionicons } from '@expo/vector-icons';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
@@ -26,6 +27,14 @@ const ReviewScreen = () => {
     profileImage,
     submitOnboarding
   } = useTaskerOnboarding();
+
+ const { user, logout, updateProfile } = useContext(AuthContext);
+
+ useEffect(()=>{
+  if(!user){
+   navigate('AuthStack', { screen: 'Login' });
+  }
+ },[])
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;

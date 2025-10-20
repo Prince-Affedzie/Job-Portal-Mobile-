@@ -49,8 +49,8 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   logoImage: {
-    width: 80,
-    height: 80,
+    width: 100,
+    height: 100,
   },
   logoGlow: {
     position: 'absolute',

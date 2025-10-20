@@ -159,7 +159,7 @@ const HeroSection = ({
                       style={styles.searchActionButton}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close-circle" size={18} color="#8B9CB1" />
+                      <Ionicons name="close-circle" size={24} color="#8B9CB1" />
                     </TouchableOpacity>
                     
                     <TouchableOpacity 
@@ -171,7 +171,7 @@ const HeroSection = ({
                         colors={['#6366F1', '#4F46E5']}
                         style={styles.searchSubmitGradient}
                       >
-                        <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                        <Ionicons name="arrow-forward" size={24} color="#FFFFFF" />
                       </LinearGradient>
                     </TouchableOpacity>
                   </>

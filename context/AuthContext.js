@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       if (res.data?.token) {
         await AsyncStorage.setItem("authToken", res.data.token);
         setToken(res.data.token);
+        setUser(res.data.user);
         return res;
       }
       return false;
@@ -92,10 +93,17 @@ const login = async (credentials) => {
     try {
       const res = await logoutUser();
       if(res.status===200){
-         navigate('Login');
-         setUser(null);
-         setToken(null);
-         await AsyncStorage.removeItem("authToken");
+        setUser(null);
+        setToken(null);
+       await AsyncStorage.removeItem("authToken");
+      
+      
+      if (navigationRef.isReady()) {
+      navigationRef.reset({
+        index: 0,
+        routes: [{ name: 'AuthStack' }],
+      });
+    }
         
       }
     } catch {}

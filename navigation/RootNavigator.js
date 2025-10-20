@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext,useState,useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import TaskerProfileScreen from "../screens/tasker/ProfileScreen";
 import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
 import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import TaskDetailsScreen from "../screens/tasker/TaskDetails";
+import SplashScreen from "../screens/SplashScreen";
 
 
 import TaskerOnboardingStack from './TaskerOnboardingStack'
@@ -25,9 +26,22 @@ const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { user, loading } = useContext(AuthContext);
+   const [isSplashVisible, setIsSplashVisible] = useState(true);
 
-  if (loading) {
-    return null; // or a splash screen component
+    useEffect(() => {
+    // Hide splash screen when auth check is complete AND minimum time has passed
+    const minSplashTime = 3000; // Minimum 2 seconds
+    const timer = setTimeout(() => {
+      if (!loading) {
+        setIsSplashVisible(false);
+      }
+    }, minSplashTime);
+
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (isSplashVisible) {
+    return <SplashScreen onAnimationComplete={() => {}} />
   }
 
  return (

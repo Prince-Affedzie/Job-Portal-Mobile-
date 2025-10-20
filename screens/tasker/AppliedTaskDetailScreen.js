@@ -225,7 +225,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.container}>
         <View  style={styles.container1}>
         <Header title="Task Details" showBackButton={true} />
-        <LoadingIndicator text='Loading Task Details...'/>
+        <LoadingIndicator text='Loading Task Details...' logoStyle="glow"/>
         </View>
       </SafeAreaView>
     );

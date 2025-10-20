@@ -161,7 +161,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   };
 
   if (loading) {
-    return <LoadingIndicator text="Loading task details..." />;
+    return <LoadingIndicator text="Loading task details..." logoStyle="glow" />;
   }
 
   if (!task) {

@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import Header from '../../component/tasker/Header';
 import { getMyWorkSubmissions, deleteWorkSubmission } from '../../api/miniTaskApi';
 import { getPreviewUrl } from '../../api/commonApi'; // Import your API function
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
@@ -438,10 +439,7 @@ const SubmissionsScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="Submissions" showBackButton={true} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading submissions...</Text>
-        </View>
+        <LoadingIndicator text={`Loading Your Submission for ${taskTitle}...`}/>
       </SafeAreaView>
     );
   }
