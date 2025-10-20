@@ -51,25 +51,42 @@ export const AuthProvider = ({ children }) => {
   };
 
 
-  const login = async (credentials) => {
-    try {
-      const res = await loginUser(credentials);
-      console.log(res)
-      if (res.data?.token) {
-        await AsyncStorage.setItem("authToken", res.data.token);
-        setToken(res.data.token);
-        setUser(res.data.user);
-        return res;
-      }
-      return false;
-    } catch (err) {
-        const errorMessage =
-        err.res?.data?.message ||
-        err.message
-      console.log("Login failed:", errorMessage);
-      return false;
+ 
+const login = async (credentials) => {
+  try {
+    const res = await loginUser(credentials);
+    if (res.data?.token) {
+      await AsyncStorage.setItem('authToken', res.data.token);
+      setToken(res.data.token);
+      setUser(res.data.user);
+      return {
+        status: res.status,
+        data: res.data,
+        success: true,
+      };
     }
-  };
+    return {
+      status: res.status || 400,
+      success: false,
+      message: 'No token received from server',
+    };
+  } catch (err) {
+    console.error('Login failed:', err);
+    return {
+      success: false,
+      status: err.response?.status || (err.request ? 0 : 500),
+      message:
+        err.response?.data?.message ||
+        (err.response?.status === 404
+          ? 'User not found. Please check your email or sign up.'
+          : err.response?.status === 401
+          ? 'Invalid email or password. Please try again.'
+          : err.request
+          ? 'Network error. Please check your internet connection.'
+          : 'An unexpected error occurred. Please try again.'),
+    };
+  }
+};
 
   const logout = async () => {
     try {

@@ -11,16 +11,10 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
-  Share,
   Animated,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMiniTaskInfo, applyToMiniTask, bidOnMiniTask } from '../../api/miniTaskApi';
 import moment from 'moment';
@@ -37,7 +31,6 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(0);
   const [showScamAlert, setShowScamAlert] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
   const [applyClicked, setApplyClicked] = useState(false);
@@ -188,91 +181,86 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+       <Header title="Task Details" showBackButton={true} />
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Header title="Task Details" showBackButton={true} />
-        {/* Header Images */}
-        <View style={styles.imageContainer}>
-          <View style={styles.avatarWrapper}>
-            <Image source={HANDYMAN_AVATAR} style={styles.taskAvatar} resizeMode="contain" />
+       
+        
+        {/* Hero Section */}
+        <LinearGradient colors={['#1A1F3B', '#2D1B69']} style={styles.heroSection}>
+          <View style={styles.heroContent}>
+            <View style={styles.avatarContainer}>
+              <Image source={HANDYMAN_AVATAR} style={styles.taskAvatar} resizeMode="contain" />
+            </View>
+            <View style={styles.heroTextContainer}>
+              <Text style={styles.heroTitle}>{task.title}</Text>
+              <View style={styles.heroBadges}>
+                <View style={styles.budgetBadge}>
+                  <Ionicons name="cash" size={16} color="#FFFFFF" />
+                  <Text style={styles.budgetText}>₵{task.budget}</Text>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  task.status?.toLowerCase() === 'active' ? styles.activeStatus : styles.inactiveStatus
+                ]}>
+                  <Text style={styles.statusText}>{task.status || 'Active'}</Text>
+                </View>
+              </View>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Main Content */}
         <View style={styles.content}>
-          {/* Title and Bidding Type */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{task.title}</Text>
-            {task.biddingType && (
-              <View
-                style={[
-                  styles.biddingTypeBadge,
-                  task.biddingType === 'open-bid' ? styles.openBidBadge : styles.fixedBidBadge,
-                ]}
-              >
-                <Ionicons
-                  name={task.biddingType === 'open-bid' ? 'pricetags' : 'lock-closed'}
-                  size={14}
-                  color={task.biddingType === 'open-bid' ? '#1D4ED8' : '#059669'}
-                />
-                <Text
-                  style={[
-                    styles.biddingTypeText,
-                    task.biddingType === 'open-bid' ? styles.openBidText : styles.fixedBidText,
-                  ]}
-                >
-                  {task.biddingType === 'open-bid' ? 'Open for Bids' : 'Fixed Budget'}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Price and Status */}
-          <View style={styles.priceStatusContainer}>
-            <LinearGradient colors={['#10B981', '#059669']} style={styles.priceBadge}>
-              <Text style={styles.price}>₵{task.budget}</Text>
-            </LinearGradient>
-            <View
-              style={[
-                styles.statusBadge,
-                task.status?.toLowerCase() === 'active' ? styles.activeStatus : styles.inactiveStatus,
-              ]}
-            >
-              <Text style={styles.statusText}>{task.status || 'Active'}</Text>
+          {/* Task Meta Info */}
+          <View style={styles.metaContainer}>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={18} color="#6366F1" />
+              <Text style={styles.metaText}>{calculateTimeLeft()}</Text>
             </View>
-          </View>
-
-          {/* Stats */}
-          <View style={styles.stats}>
-            <View style={styles.stat}>
-              <Ionicons name="time" size={16} color="#64748B" />
-              <Text style={styles.statText}>{calculateTimeLeft()}</Text>
+            <View style={styles.metaItem}>
+              <Ionicons name={task.biddingType === 'open-bid' ? 'pricetags-outline' : 'lock-closed-outline'} 
+                       size={18} color="#6366F1" />
+              <Text style={styles.metaText}>
+                {task.biddingType === 'open-bid' ? 'Open for Bids' : 'Fixed Budget'}
+              </Text>
             </View>
           </View>
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="document-text-outline" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>Description</Text>
+            </View>
             <Text style={styles.description}>{task.description}</Text>
           </View>
 
           {/* Requirements */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What We're Looking For</Text>
-            {requirements.map((req, index) => (
-              <View key={index} style={styles.requirementItem}>
-                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                <Text style={styles.requirementText}>{req}</Text>
-              </View>
-            ))}
+            <View style={styles.sectionHeader}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>What We're Looking For</Text>
+            </View>
+            <View style={styles.requirementsList}>
+              {requirements.map((req, index) => (
+                <View key={index} style={styles.requirementItem}>
+                  <Ionicons name="checkmark" size={16} color="#10B981" />
+                  <Text style={styles.requirementText}>{req}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* Skills */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recommended Skills</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="build-outline" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>Recommended Skills</Text>
+            </View>
             <View style={styles.skillsContainer}>
               {skills.map((skill, index) => (
                 <View key={index} style={styles.skillTag}>
@@ -284,11 +272,14 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
           {/* Location */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Location</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="location-outline" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>Location</Text>
+            </View>
             <View style={styles.locationCard}>
-              <Ionicons name="location" size={20} color="#6366F1" />
+              <Ionicons name="location" size={24} color="#6366F1" style={styles.locationIcon} />
               <View style={styles.locationInfo}>
-                <Text style={styles.locationText}>{task.locationType || 'Flexible Location'}</Text>
+                <Text style={styles.locationType}>{task.locationType || 'Flexible Location'}</Text>
                 <Text style={styles.addressText}>
                   {task.address
                     ? `${task.address.region}, ${task.address.city}, ${task.address.suburb}`
@@ -300,7 +291,10 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
           {/* Client Information */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About the Client</Text>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="person-outline" size={20} color="#1E293B" />
+              <Text style={styles.sectionTitle}>About the Client</Text>
+            </View>
             <View style={styles.clientCard}>
               <View style={styles.clientHeader}>
                 <View style={styles.clientAvatar}>
@@ -308,13 +302,15 @@ const TaskDetailsScreen = ({ route, navigation }) => {
                 </View>
                 <View style={styles.clientInfo}>
                   <Text style={styles.clientName}>{task.employer?.name || 'Client'}</Text>
-                  <View style={styles.rating}>
-                    <Ionicons name="star" size={14} color="#F59E0B" />
-                    <Text style={styles.ratingText}>Rating: {task.employer.rating}</Text>
+                  <View style={styles.clientMeta}>
+                    <View style={styles.rating}>
+                      <Ionicons name="star" size={14} color="#F59E0B" />
+                      <Text style={styles.ratingText}>Rating: {task.employer.rating}</Text>
+                    </View>
                     {task.employer?.isVerified && (
-                      <View style={styles.verifiedContainer}>
-                       <Text style={styles.verifiedText}>Verified</Text>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" style={styles.verifiedIcon} />
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                        <Text style={styles.verifiedText}>Verified</Text>
                       </View>
                     )}
                   </View>
@@ -325,14 +321,12 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
           {/* Safety Tips */}
           <View style={styles.section}>
-            <View style={styles.safetyHeader}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="shield-checkmark-outline" size={20} color="#1E293B" />
               <Text style={styles.sectionTitle}>Safety First</Text>
-              <TouchableOpacity onPress={() => setShowScamAlert(true)}>
-                <Text style={styles.learnMoreText}>Learn More</Text>
-              </TouchableOpacity>
             </View>
             <View style={styles.safetyCard}>
-              <View style={styles.safetyContent}>
+              <View style={styles.safetyHeader}>
                 <Ionicons name="warning" size={24} color="#F59E0B" />
                 <View style={styles.safetyTextContainer}>
                   <Text style={styles.safetyTitle}>Your Safety Is Our Priority</Text>
@@ -341,30 +335,43 @@ const TaskDetailsScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
               </View>
-            </View>
-          </View>
-
-          {/* Footer Inside ScrollView */}
-          <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
-            <View style={styles.footerContent}>
-              <TouchableOpacity
-                style={[styles.applyButton, (applying || applyClicked) && styles.applyButtonDisabled]}
-                onPress={handleApplyOrBid}
-                disabled={applying || applyClicked}
+              <TouchableOpacity 
+                style={styles.learnMoreButton}
+                onPress={() => setShowScamAlert(true)}
               >
-                {applying ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name={applyClicked ? 'checkmark-circle' : 'hand-right'} size={20} color="#FFFFFF" />
-                    <Text style={styles.applyText}>{getButtonText()}</Text>
-                  </>
-                )}
+                <Text style={styles.learnMoreText}>Learn More About Safety</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Animated.ScrollView>
+
+      {/* Fixed Apply Button */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <TouchableOpacity
+          style={[
+            styles.applyButton,
+            (applying || applyClicked) && styles.applyButtonDisabled
+          ]}
+          onPress={handleApplyOrBid}
+          disabled={applying || applyClicked}
+        >
+          {applying ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Ionicons 
+                name={applyClicked ? 'checkmark-circle' : 
+                      task?.biddingType === 'open-bid' ? 'pricetag' : 'hand-right'} 
+                size={22} 
+                color="#FFFFFF" 
+              />
+              <Text style={styles.applyText}>{getButtonText()}</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
 
       {/* Modals */}
       <ScamAlertModal visible={showScamAlert} onClose={() => setShowScamAlert(false)} />
@@ -385,16 +392,8 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748B',
+  scrollContent: {
+    paddingBottom: 100,
   },
   errorContainer: {
     flex: 1,
@@ -421,138 +420,143 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
-  scrollContent: {
-    paddingBottom: 16, // Reduced from 100 to minimal padding
+  
+  // Hero Section
+  heroSection: {
+    padding: 24,
+    marginHorizontal:12,
+    borderRadius: 24,
+    
   },
-  imageContainer: {
+  heroContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1A1F3B',
-    borderRadius: 16,
-    padding: 5,
-    marginHorizontal: 2,
-    marginVertical: 2,
-    marginTop: 10,
   },
-  avatarWrapper: {
-    width: 250,
-    height: 250,
-    borderRadius: 0,
+  avatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 16,
   },
   taskAvatar: {
-    width: 200,
-    height: 200,
-    borderRadius: 10,
+    width: 60,
+    height: 60,
+    borderRadius: 12,
   },
-  backButton: {
-    position: 'absolute',
-    left: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
+  heroTextContainer: {
+    flex: 1,
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 12,
+    lineHeight: 32,
+  },
+  heroBadges: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  budgetBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
   },
-  shareButton: {
-    position: 'absolute',
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  budgetText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
   },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  activeStatus: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  inactiveStatus: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  // Content
   content: {
     padding: 20,
   },
-  header: {
+  metaContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1E293B',
-    flex: 1,
-    marginRight: 12,
-    lineHeight: 32,
-  },
-  priceBadge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  price: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  stats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  stat: {
-    alignItems: 'center',
+  metaItem: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  statText: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 4,
-    textAlign: 'center',
+  metaText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#475569',
   },
+
+  // Sections
   section: {
-    marginBottom: 24,
+    marginBottom: 28,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 12,
   },
   description: {
     fontSize: 15,
     color: '#64748B',
     lineHeight: 24,
   },
+
+  // Requirements
+  requirementsList: {
+    gap: 12,
+  },
   requirementItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    gap: 12,
   },
   requirementText: {
     fontSize: 14,
     color: '#64748B',
-    marginLeft: 8,
     flex: 1,
+    lineHeight: 20,
   },
+
+  // Skills
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -560,73 +564,70 @@ export const styles = StyleSheet.create({
   },
   skillTag: {
     backgroundColor: '#E0E7FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   skillText: {
     color: '#3730A3',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
+
+  // Location
   locationCard: {
     flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  locationIcon: {
+    marginRight: 12,
+    marginTop: 2,
   },
   locationInfo: {
-    marginLeft: 12,
     flex: 1,
   },
-  locationText: {
+  locationType: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   addressText: {
     fontSize: 14,
     color: '#64748B',
+    lineHeight: 20,
   },
-  mapContainer: {
-    height: 200,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
+
+  // Client
   clientCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 3,
   },
   clientHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   clientAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   avatarText: {
     color: '#FFFFFF',
@@ -637,238 +638,118 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   clientName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1E293B',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  clientMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   rating: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   ratingText: {
     fontSize: 14,
     color: '#64748B',
-    marginLeft: 4,
-    marginRight: 8,
   },
-  verifiedIcon: {
-    marginLeft: 4,
-  },
-  clientStats: {
+  verifiedBadge: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 16,
-  },
-  clientStat: {
     alignItems: 'center',
-    flex: 1,
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
   },
-  clientStatNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#6366F1',
-    marginBottom: 2,
-  },
-  clientStatLabel: {
+  verifiedText: {
     fontSize: 12,
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#059669',
   },
+
+  // Safety
+  safetyCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  safetyHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  safetyTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  safetyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 6,
+  },
+  safetyText: {
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 20,
+  },
+  learnMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  learnMoreText: {
+    color: '#6366F1',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+
+  // Footer/Apply Button
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  footerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-  contactButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-  },
-  contactText: {
-    color: '#6366F1',
-    fontWeight: '600',
-    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
   },
   applyButton: {
-    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
-    padding: 12,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
     gap: 8,
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 12,
+    elevation: 8,
   },
   applyText: {
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 16,
   },
-  biddingTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 8,
-  },
-  openBidBadge: {
-    backgroundColor: '#DBEAFE',
-  },
-  fixedBidBadge: {
-    backgroundColor: '#D1FAE5',
-  },
-  biddingTypeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  openBidText: {
-    color: '#1D4ED8',
-  },
-  fixedBidText: {
-    color: '#059669',
-  },
-  priceStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  activeStatus: {
-    backgroundColor: '#D1FAE5',
-  },
-  inactiveStatus: {
-    backgroundColor: '#FEE2E2',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalBody: {
-    maxHeight: 400,
-    padding: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  labelText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginLeft: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#1E293B',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: '#6366F1',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginLeft: 12,
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  secondaryButtonText: {
-    color: '#64748B',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+  applyButtonDisabled: {
+    opacity: 0.7,
   },
   scamAlertOverlay: {
     flex: 1,
@@ -914,64 +795,6 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 16,
-  },
-  safetyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  learnMoreText: {
-    color: '#6366F1',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  safetyCard: {
-    backgroundColor: '#FFFBEB',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  safetyContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  safetyTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  safetyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 4,
-  },
-  safetyText: {
-    fontSize: 14,
-    color: '#92400E',
-    lineHeight: 20,
-  },
-  applyButtonDisabled: {
-    opacity: 0.7,
-  },
-  verifiedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5', // Light green background for verified status
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8, // Space from the rating text
-  },
-  verifiedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669', // Matches the active status color
-    marginRight: 4, // Space between text and icon
-  },
-  verifiedIcon: {
-    marginLeft: 0, // Reset any existing margin to align properly
   },
 });
 

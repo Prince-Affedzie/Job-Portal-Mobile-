@@ -280,7 +280,7 @@ const AvailableTasksScreen = () => {
   };
 
   if (loading && !refreshing) {
-    return <LoadingIndicator text="Finding available tasks..." />;
+    return <LoadingIndicator text="Finding available tasks..."  showLogo={true} logoStyle="animated" />;
   }
 
   return (

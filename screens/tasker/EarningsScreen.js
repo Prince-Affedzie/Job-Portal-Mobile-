@@ -20,6 +20,8 @@ import moment from 'moment';
 import Header from "../../component/tasker/Header";
 import { AuthContext } from '../../context/AuthContext';
 import { TaskerContext } from '../../context/TaskerContext';
+import LoadingIndicator from '../../component/common/LoadingIndicator'
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -285,10 +287,7 @@ const EarningScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="My Earnings" showBackButton={true} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading your earnings...</Text>
-        </View>
+         <LoadingIndicator text='Loading your Earnings...'/>
       </SafeAreaView>
     );
   }

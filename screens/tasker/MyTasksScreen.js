@@ -1016,6 +1016,7 @@ const styles = StyleSheet.create({
   infoBanner: {
     backgroundColor: '#F0F9FF',
     marginHorizontal: 20,
+    marginBottom:12,
     marginTop: 16,
     padding: 16,
     borderRadius: 12,
@@ -1072,6 +1073,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    marginHorizontal:10,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderColor: '#F3F4F6',
   },
   cardHeader: {
@@ -1085,8 +1092,8 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#111827',
     lineHeight: 22,
     marginBottom: 12,

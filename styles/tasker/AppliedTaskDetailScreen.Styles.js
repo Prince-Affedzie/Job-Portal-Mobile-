@@ -18,6 +18,11 @@ const { width } = Dimensions.get('window');
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor:'#1A1F3B'
+    
+  },
+   container1: {
+    flex: 1,
     backgroundColor: '#F8FAFC',
   },
   loadingContainer: {

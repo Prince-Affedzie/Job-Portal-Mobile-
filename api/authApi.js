@@ -21,13 +21,7 @@ export const completeProfile = (data) =>
     headers: { "Content-Type": "multipart/form-data" },
   });
 
-export const uploadImage = (file) => {
-  const form = new FormData();
-  form.append("profileImage", file);
-  return API.put("/api/user/image_profile", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-};
+export const uploadProfileImage = (data) => API.post("/api/user/upload-profile-image",data);
 
 export const addPortfolio = (data) => API.post("/api/user/upload_portfolio", data);
 

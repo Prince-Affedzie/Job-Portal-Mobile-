@@ -8,13 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
-  SafeAreaView ,
   RefreshControl,
   Dimensions,
   TextInput,
   Linking,
 } from 'react-native';
-//import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../../component/tasker/Header';
 import { clientGetTaskSubmissions, reviewSubmission } from '../../api/miniTaskApi';
@@ -397,11 +396,13 @@ export default function ClientViewSubmissionsScreen({ route }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <ScrollView  style={styles.scrollView}>
         <Header title="Review Submissions" showBackButton={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
           <Text style={styles.loadingText}>Loading submissions...</Text>
         </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -409,7 +410,7 @@ export default function ClientViewSubmissionsScreen({ route }) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <Header title="Review Submissions1" showBackButton={true} />
+      <Header title="Review Submissions" showBackButton={true} />
       
       <ScrollView
         ref={scrollViewRef}
@@ -677,7 +678,7 @@ export default function ClientViewSubmissionsScreen({ route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#2D325D',
   },
   loadingContainer: {
     flex: 1,
@@ -691,6 +692,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   headerSection: {
     padding: 16,

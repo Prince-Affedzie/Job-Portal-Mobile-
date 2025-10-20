@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Image,
   Dimensions,
   Linking,
   Platform,
@@ -72,9 +73,6 @@ const SubmissionsScreen = () => {
       
       // Get the file URL from API
       const fileUrl = await getFileUrl(file.fileKey, submissionStatus);
-      
-      console.log('Attempting to open file:', fileUrl);
-
       if (!fileUrl) {
         Alert.alert('Error', 'File URL not found');
         return;

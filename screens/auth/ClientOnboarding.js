@@ -21,7 +21,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 import { navigate } from '../../services/navigationService';
-import { completeProfile, fetchUser } from '../../api/authApi';
+import { completeProfile, fetchUser, uploadProfileImage } from '../../api/authApi';
+import { sendFileToS3 } from '../../api/commonApi';
 import { AuthContext } from '../../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -105,6 +106,47 @@ const TaskPosterOnboarding = () => {
       await AsyncStorage.removeItem(DRAFT_KEY);
     } catch (error) {
       console.error('Error clearing draft:', error);
+    }
+  };
+
+  // Upload image to S3
+  const uploadImageToS3 = async (imageData) => {
+    try {
+      // Extract file info from imageData
+      const filename = imageData.name || 'profile.jpg';
+      const type = imageData.type || 'image/jpeg';
+      
+      // Create file object
+      const file = {
+        uri: imageData.uri,
+        name: filename,
+        type: type,
+      };
+
+      // Get pre-signed URL from backend
+      const res = await uploadProfileImage({ 
+        filename: file.name, 
+        contentType: file.type 
+      });
+      
+      if (res.status !== 200) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      const { fileKey, fileUrl, publicUrl } = res.data;
+      
+      if (!fileUrl) {
+        throw new Error('No upload URL in response');
+      }
+      
+      // Upload file to S3 using the pre-signed URL
+      await sendFileToS3(fileUrl, file);
+      
+      return publicUrl;
+      
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw new Error('Failed to upload image');
     }
   };
 
@@ -245,6 +287,7 @@ const TaskPosterOnboarding = () => {
     }));
   };
 
+  // UPDATED: handleSubmit function with S3 upload
   const handleSubmit = async (skipImage = false) => {
     if (!validateForm()) return;
 
@@ -252,18 +295,46 @@ const TaskPosterOnboarding = () => {
       setIsSubmitting(true);
       setErrors({});
 
-      const formData = new FormData();
+      let profileImageUrl = '';
       
-      formData.append("phone", profile.phone);
-      formData.append("location[city]", profile.location.city);
-      formData.append("location[region]", profile.location.region);
-      formData.append("location[town]", profile.location.town || "");
-      
+      // Upload profile image to S3 if it exists and not skipped
       if (!skipImage && profile.profileImage) {
-        formData.append("profileImage", profile.profileImage);
+        console.log('Uploading profile image to S3...');
+        try {
+          profileImageUrl = await uploadImageToS3(profile.profileImage);
+          console.log('Profile image uploaded successfully:', profileImageUrl);
+        } catch (uploadError) {
+          console.error('Failed to upload profile image:', uploadError);
+          throw new Error('Failed to upload profile image. Please try again.');
+        }
+      } else {
+        console.log('No profile image to upload');
       }
 
-      const response = await completeProfile(formData);
+      // Prepare data for API - using regular object instead of FormData
+      const requestData = {
+        phone: profile.phone,
+        location: {
+          city: profile.location.city,
+          region: profile.location.region,
+          town: profile.location.town || ""
+        }
+      };
+
+      // Add profile image URL if it was uploaded
+      if (profileImageUrl) {
+        requestData.profileImage = profileImageUrl;
+      }
+
+      // Log request data for debugging
+      console.log('Request data being sent:', {
+        phone: profile.phone,
+        location: profile.location,
+        hasProfileImage: !!profileImageUrl,
+        profileImageUrl: profileImageUrl
+      });
+
+      const response = await completeProfile(requestData);
       
       if (response.status === 200) {
         const res = await fetchUser();
@@ -287,9 +358,10 @@ const TaskPosterOnboarding = () => {
       console.error('Profile completion error:', error);
       const errorMessage = error.response?.data?.message ||
         error.response?.data?.error ||
+        error.message ||
         "Unable to complete profile. Please check your connection and try again.";
       
-      Alert.alert(errorMessage)
+      Alert.alert('Error', errorMessage);
       setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
@@ -574,6 +646,7 @@ const TaskPosterOnboarding = () => {
   );
 };
 
+// Your existing styles remain exactly the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,

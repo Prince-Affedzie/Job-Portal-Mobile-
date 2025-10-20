@@ -223,8 +223,10 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <View  style={styles.container1}>
         <Header title="Task Details" showBackButton={true} />
         <LoadingIndicator text='Loading Task Details...'/>
+        </View>
       </SafeAreaView>
     );
   }
@@ -232,10 +234,12 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   if (!task) {
     return (
       <SafeAreaView style={styles.container}>
+         <View  style={styles.container1}>
         <Header title="Task Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <Ionicons name="sad-outline" size={48} color="#94A3B8" />
           <Text style={styles.errorText}>Task not found</Text>
+        </View>
         </View>
       </SafeAreaView>
     );
@@ -315,6 +319,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.container1}>
       <StatusBar barStyle="light-content" backgroundColor="#1A1F3B" />
       <Header title="Task Details" showBackButton={true} />
       
@@ -815,7 +820,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                     }}
                   >
                     <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                    <Text style={styles.fabActionText}>Mark as Done</Text>
+                    <Text style={styles.fabActionText}>Mark Complete</Text>
                   </TouchableOpacity>
                 </Animated.View>
               ) : null}
@@ -956,6 +961,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
         userName={task.employer?.name}
         userRole='client'
       />
+      </View>
     </SafeAreaView>
   );
 };

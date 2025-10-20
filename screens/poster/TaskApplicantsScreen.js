@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   Dimensions,
   StatusBar,
-  SafeAreaView,
   Alert,
   RefreshControl,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -611,6 +611,7 @@ export default function ApplicantsScreen({ route }) {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
+        <ScrollView  style={styles.scrollView}>
         <Header title={biddingType === 'fixed' ? "Applicants" : "Bids"} showBackButton={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366F1" />
@@ -618,6 +619,7 @@ export default function ApplicantsScreen({ route }) {
             Loading {biddingType === 'fixed' ? 'applicants' : 'bids'}...
           </Text>
         </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -732,14 +734,16 @@ export default function ApplicantsScreen({ route }) {
 
         {/* Data List */}
         <View style={styles.dataContainer}>
-          {filteredAndSortedData.length > 0 ? (
-            filteredAndSortedData.map((item) => 
-              biddingType === 'fixed' ? renderApplicantCard({ item }) : renderBidCard({ item })
-            )
-          ) : (
-            renderEmptyState()
-          )}
-        </View>
+  {filteredAndSortedData.length > 0 ? (
+    filteredAndSortedData.map((item) => (
+      <View key={item._id}>
+        {biddingType === 'fixed' ? renderApplicantCard({ item }) : renderBidCard({ item })}
+      </View>
+    ))
+  ) : (
+    renderEmptyState()
+  )}
+</View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -748,12 +752,11 @@ export default function ApplicantsScreen({ route }) {
 const styles = StyleSheet.create({
    container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#2D325D',
   },
   scrollView: {
     flex: 1,
-    paddingBottom:8,
-    marginBottom:16,
+    backgroundColor:"#FFFF"
   },
   loadingContainer: {
     flex: 1,
@@ -785,8 +788,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#1E293B',
     marginBottom: 4,
   },

@@ -27,22 +27,26 @@ import ReviewsComponent from '../../component/common/ReviewsComponent';
 import { ProfileField } from '../../component/tasker/ProfileField';
 import { LocationField } from '../../component/tasker/LocationField';
 import { styles } from '../../styles/auth/ProfileScreen.Styles';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { sendFileToS3 } from '../../api/commonApi';
+import { uploadProfileImage } from '../../api/authApi';
 
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 
 // Default profile image
-const DEFAULT_PROFILE_IMAGE = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
 const TaskerProfileScreen = ({ navigation }) => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
   const [newSkill, setNewSkill] = useState('');
   const [showExperienceModal, setShowExperienceModal] = useState(false);
   const [editingExperience, setEditingExperience] = useState(null);
   const [profileData, setProfileData] = useState({});
+  const [originalProfileImage, setOriginalProfileImage] = useState('');
   const [notifications, setNotifications] = useState({
     taskAlerts: true,
     messageNotifications: true,
@@ -53,42 +57,41 @@ const TaskerProfileScreen = ({ navigation }) => {
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
-  
-
 
   const onStartDateChange = (event, selectedDate) => {
-  setShowStartDatePicker(false);
-  if (selectedDate) {
-    setExperienceForm({ 
-      ...experienceForm, 
-      startDate: selectedDate.toISOString().split('T')[0] 
-    });
-  }
-};
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setExperienceForm({ 
+        ...experienceForm, 
+        startDate: selectedDate.toISOString().split('T')[0] 
+      });
+    }
+  };
 
-const onEndDateChange = (event, selectedDate) => {
-  setShowEndDatePicker(false);
-  if (selectedDate) {
-    setExperienceForm({ 
-      ...experienceForm, 
-      endDate: selectedDate.toISOString().split('T')[0] 
-    });
-  }
-};
+  const onEndDateChange = (event, selectedDate) => {
+    setShowEndDatePicker(false);
+    if (selectedDate) {
+      setExperienceForm({ 
+        ...experienceForm, 
+        endDate: selectedDate.toISOString().split('T')[0] 
+      });
+    }
+  };
 
-// Format date for display
-const formatDisplayDate = (dateString) => {
-  if (!dateString) return 'Select Date';
-  try {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  } catch {
-    return 'Select Date';
-  }
-};
+  // Format date for display
+  const formatDisplayDate = (dateString) => {
+    if (!dateString) return 'Select Date';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Select Date';
+    }
+  };
+
   // Work Experience Form State
   const [experienceForm, setExperienceForm] = useState({
     jobTitle: '',
@@ -123,6 +126,8 @@ const formatDisplayDate = (dateString) => {
         // Add other schema fields as needed
         ...user
       });
+      // Store original profile image to detect changes
+      setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
     }
   }, [user]);
 
@@ -134,104 +139,153 @@ const formatDisplayDate = (dateString) => {
     }).start();
   }, []);
 
-  const handleSave = async () => {
-  setLoading(true);
-  try {
-    // Prepare data for FormData
-    const formData = new FormData();
-    
-    // Add all profile data fields
-    formData.append('name', profileData.name);
-    formData.append('email', profileData.email);
-    formData.append('phone', profileData.phone);
-    formData.append('Bio', profileData.Bio);
-    formData.append('hourlyRate', profileData.hourlyRate.toString());
-    formData.append('availability', profileData.availability);
-    
-    // Handle location object
-    if (profileData.location) {
-      formData.append('location[region]', profileData.location.region || '');
-      formData.append('location[city]', profileData.location.city || '');
-      formData.append('location[town]', profileData.location.town || '');
-      formData.append('location[street]', profileData.location.street || '');
-    }
-    
-    // Handle arrays
-    if (profileData.skills) {
-      profileData.skills.forEach((skill, index) => {
-        formData.append(`skills[${index}]`, skill);
+  // Upload image to S3
+  const uploadImageToS3 = async(imageUri) => {
+    try {
+      setImageUploading(true);
+      
+      // Extract file info from URI
+      const filename = imageUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      // Create file object
+      const file = {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      };
+
+      // Get pre-signed URL from backend
+      const res = await uploadProfileImage({ 
+        filename: file.name, 
+        contentType: file.type 
       });
+
+      console.log(res)
+      
+      if (res.status !== 200) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      const { fileKey, fileUrl, publicUrl } = res.data;
+      
+      // Upload file to S3 using the pre-signed URL
+      await sendFileToS3(fileUrl, file);
+      
+      return publicUrl;
+      
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw new Error('Failed to upload image');
+    } finally {
+      setImageUploading(false);
     }
-    
-    // FIX: Properly handle work experience dates
-    if (profileData.workExperience) {
-      profileData.workExperience.forEach((exp, index) => {
-        formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
-        formData.append(`workExperience[${index}][company]`, exp.company || '');
-        
-        // Ensure startDate is a valid date string
-        if (exp.startDate && exp.startDate instanceof Date) {
-          formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
-        } else if (exp.startDate && typeof exp.startDate === 'string') {
-          // If it's already a string, validate it's a proper date
-          const date = new Date(exp.startDate);
-          if (!isNaN(date.getTime())) {
-            formData.append(`workExperience[${index}][startDate]`, date.toISOString());
-          } else {
-            console.warn('Invalid startDate:', exp.startDate);
-            // Skip this experience entry or handle error
-            return;
-          }
-        } else {
-          console.warn('Missing or invalid startDate for experience:', exp);
-          // Skip this experience entry
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      let finalProfileImage = profileData.profileImage;
+      
+      // Check if profile image has changed and needs to be uploaded
+      const hasImageChanged = profileData.profileImage !== originalProfileImage && 
+                             profileData.profileImage.startsWith('file://');
+      
+      if (hasImageChanged) {
+        try {
+          finalProfileImage = await uploadImageToS3(profileData.profileImage);
+        } catch (error) {
+          Alert.alert('Upload Error', 'Failed to upload profile image. Please try again.');
+          setLoading(false);
           return;
         }
-        
-        // Handle endDate (can be null if currently working)
-        if (exp.endDate && exp.endDate instanceof Date) {
-          formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
-        } else if (exp.endDate && typeof exp.endDate === 'string') {
-          const date = new Date(exp.endDate);
-          if (!isNaN(date.getTime())) {
-            formData.append(`workExperience[${index}][endDate]`, date.toISOString());
-          }
-        }
-        // If endDate is null/undefined, don't send it (handles "currently working" case)
-        
-        formData.append(`workExperience[${index}][description]`, exp.description || '');
-      });
-    }
-    
-    // Handle profile image if it's a local file URI
-    if (profileData.profileImage && profileData.profileImage.startsWith('file://')) {
-      const filename = profileData.profileImage.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image';
-      
-      formData.append('profileImage', {
-        uri: profileData.profileImage,
-        name: filename,
-        type,
-      });
-    } else if (profileData.profileImage) {
-      // If it's a URL, just send the URL
-      formData.append('profileImageUrl', profileData.profileImage);
-    }
+      }
 
-    const res = await updateProfile(formData);
-    if (res?.status === 200) {
+      // Prepare data for FormData
+      const formData = new FormData();
+      
+      // Add all profile data fields
+      formData.append('name', profileData.name);
+      formData.append('email', profileData.email);
+      formData.append('phone', profileData.phone);
+      formData.append('Bio', profileData.Bio);
+      formData.append('hourlyRate', profileData.hourlyRate.toString());
+      formData.append('availability', profileData.availability);
+      
+      // Add the profile image URL (either the existing one or the new S3 URL)
+      formData.append('profileImage', finalProfileImage);
+      
+      // Handle location object
+      if (profileData.location) {
+        formData.append('location[region]', profileData.location.region || '');
+        formData.append('location[city]', profileData.location.city || '');
+        formData.append('location[town]', profileData.location.town || '');
+        formData.append('location[street]', profileData.location.street || '');
+      }
+      
+      // Handle arrays
+      if (profileData.skills) {
+        profileData.skills.forEach((skill, index) => {
+          formData.append(`skills[${index}]`, skill);
+        });
+      }
+      
+      // Properly handle work experience dates
+      if (profileData.workExperience) {
+        profileData.workExperience.forEach((exp, index) => {
+          formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
+          formData.append(`workExperience[${index}][company]`, exp.company || '');
+          
+          // Ensure startDate is a valid date string
+          if (exp.startDate && exp.startDate instanceof Date) {
+            formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
+          } else if (exp.startDate && typeof exp.startDate === 'string') {
+            // If it's already a string, validate it's a proper date
+            const date = new Date(exp.startDate);
+            if (!isNaN(date.getTime())) {
+              formData.append(`workExperience[${index}][startDate]`, date.toISOString());
+            } else {
+              console.warn('Invalid startDate:', exp.startDate);
+              // Skip this experience entry or handle error
+              return;
+            }
+          } else {
+            console.warn('Missing or invalid startDate for experience:', exp);
+            // Skip this experience entry
+            return;
+          }
+          
+          // Handle endDate (can be null if currently working)
+          if (exp.endDate && exp.endDate instanceof Date) {
+            formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
+          } else if (exp.endDate && typeof exp.endDate === 'string') {
+            const date = new Date(exp.endDate);
+            if (!isNaN(date.getTime())) {
+              formData.append(`workExperience[${index}][endDate]`, date.toISOString());
+            }
+          }
+          // If endDate is null/undefined, don't send it (handles "currently working" case)
+          
+          formData.append(`workExperience[${index}][description]`, exp.description || '');
+        });
+      }
+
+      const res = await updateProfile(formData);
+      if (res?.status === 200) {
+        // Update the original image reference
+        setOriginalProfileImage(finalProfileImage);
+        setEditing(false);
+        Alert.alert('Success', 'Profile updated successfully!');
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      Alert.alert('Error', 'Failed to update profile. Please try again.');
+    } finally {
+      setLoading(false);
       setEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
     }
-  } catch (error) {
-    console.error('Update error:', error);
-    Alert.alert('Error', 'Failed to update profile. Please try again.');
-  } finally {
-    setLoading(false);
-    setEditing(false);
-  }
-};
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -312,65 +366,65 @@ const formatDisplayDate = (dateString) => {
   };
 
   const saveExperience = () => {
-  const { jobTitle, company, startDate, description } = experienceForm;
-  
-  if (!jobTitle.trim() || !company.trim() || !startDate || !description.trim()) {
-    Alert.alert('Error', 'Please fill in all required fields');
-    return;
-  }
-
-  // FIX: Ensure we have valid Date objects
-  let startDateObj;
-  try {
-    startDateObj = new Date(startDate);
-    if (isNaN(startDateObj.getTime())) {
-      Alert.alert('Error', 'Invalid start date');
+    const { jobTitle, company, startDate, description } = experienceForm;
+    
+    if (!jobTitle.trim() || !company.trim() || !startDate || !description.trim()) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-  } catch (error) {
-    Alert.alert('Error', 'Invalid start date format');
-    return;
-  }
 
-  let endDateObj = null;
-  if (!experienceForm.currentlyWorking && experienceForm.endDate) {
+    // FIX: Ensure we have valid Date objects
+    let startDateObj;
     try {
-      endDateObj = new Date(experienceForm.endDate);
-      if (isNaN(endDateObj.getTime())) {
-        Alert.alert('Error', 'Invalid end date');
+      startDateObj = new Date(startDate);
+      if (isNaN(startDateObj.getTime())) {
+        Alert.alert('Error', 'Invalid start date');
         return;
       }
     } catch (error) {
-      Alert.alert('Error', 'Invalid end date format');
+      Alert.alert('Error', 'Invalid start date format');
       return;
     }
-  }
 
-  const newExperience = {
-    jobTitle: jobTitle.trim(),
-    company: company.trim(),
-    startDate: startDateObj, // Use the Date object
-    endDate: endDateObj, // Use the Date object or null
-    description: description.trim(),
+    let endDateObj = null;
+    if (!experienceForm.currentlyWorking && experienceForm.endDate) {
+      try {
+        endDateObj = new Date(experienceForm.endDate);
+        if (isNaN(endDateObj.getTime())) {
+          Alert.alert('Error', 'Invalid end date');
+          return;
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Invalid end date format');
+        return;
+      }
+    }
+
+    const newExperience = {
+      jobTitle: jobTitle.trim(),
+      company: company.trim(),
+      startDate: startDateObj, // Use the Date object
+      endDate: endDateObj, // Use the Date object or null
+      description: description.trim(),
+    };
+
+    let updatedExperience;
+    if (editingExperience) {
+      updatedExperience = profileData.workExperience?.map(exp => 
+        exp === editingExperience ? newExperience : exp
+      ) || [];
+    } else {
+      updatedExperience = [...(profileData.workExperience || []), newExperience];
+    }
+
+    setProfileData({
+      ...profileData,
+      workExperience: updatedExperience,
+    });
+
+    closeExperienceModal();
+    Alert.alert('Success', `Experience ${editingExperience ? 'updated' : 'added'} successfully!`);
   };
-
-  let updatedExperience;
-  if (editingExperience) {
-    updatedExperience = profileData.workExperience?.map(exp => 
-      exp === editingExperience ? newExperience : exp
-    ) || [];
-  } else {
-    updatedExperience = [...(profileData.workExperience || []), newExperience];
-  }
-
-  setProfileData({
-    ...profileData,
-    workExperience: updatedExperience,
-  });
-
-  closeExperienceModal();
-  Alert.alert('Success', `Experience ${editingExperience ? 'updated' : 'added'} successfully!`);
-};
 
   const removeExperience = (experienceToRemove) => {
     Alert.alert(
@@ -410,7 +464,6 @@ const formatDisplayDate = (dateString) => {
     );
   };
 
-  
   const StatsCard = ({ value, label, icon, color }) => (
     <View style={styles.statsCard}>
       <View style={[styles.statsIcon, { backgroundColor: color }]}>
@@ -421,7 +474,6 @@ const formatDisplayDate = (dateString) => {
     </View>
   );
 
-  
   const formatDate = (dateString) => {
     if (!dateString) return 'Present';
     try {
@@ -482,24 +534,24 @@ const formatDisplayDate = (dateString) => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Enhanced Header */}
-        <Header 
-          title="My Profile" 
-          rightComponent={
-            <TouchableOpacity 
-              style={[styles.headerButton, editing && styles.headerButtonActive]}
-              onPress={editing ? handleSave : () => setEditing(true)}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#6366F1" />
-              ) : (
-                <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
-                  {editing ? 'Save' : 'Edit'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          }
-        />
+      <Header 
+        title="My Profile" 
+        rightComponent={
+          <TouchableOpacity 
+            style={[styles.headerButton, editing && styles.headerButtonActive]}
+            onPress={editing ? handleSave : () => setEditing(true)}
+            disabled={loading || imageUploading}
+          >
+            {loading || imageUploading ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
+                {editing ? 'Save' : 'Edit'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <Animated.ScrollView 
         style={{ opacity: fadeAnim }}
@@ -521,8 +573,16 @@ const formatDisplayDate = (dateString) => {
               defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
             />
             {editing && (
-              <TouchableOpacity style={styles.editImageButton} onPress={pickImage}>
-                <Ionicons name="camera" size={18} color="#FFFFFF" />
+              <TouchableOpacity 
+                style={styles.editImageButton} 
+                onPress={pickImage}
+                disabled={imageUploading}
+              >
+                {imageUploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="camera" size={18} color="#FFFFFF" />
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -549,22 +609,23 @@ const formatDisplayDate = (dateString) => {
           </View>
         </LinearGradient>
 
+        {/* Rest of your existing JSX remains the same */}
         {/* Enhanced Stats Overview */}
         <View style={styles.statsContainer}>
           <StatsCard 
-            value="Coming Soon" 
+            value="N/A" 
             label="Completed" 
             icon="checkmark-done" 
             color="#10B981" 
           />
           <StatsCard 
-            value="Coming Soon"  
+            value="N/A"  
             label="Success Rate" 
             icon="trending-up" 
             color="#6366F1" 
           />
           <StatsCard 
-            value="Coming Soon" 
+            value="N/A" 
             label="Hourly Rate" 
             icon="cash" 
             color="#F59E0B" 
@@ -584,8 +645,8 @@ const formatDisplayDate = (dateString) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, name: text })}
               placeholder="Enter your full name"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
             <ProfileField
               label="Email"
@@ -593,8 +654,8 @@ const formatDisplayDate = (dateString) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, email: text })}
               placeholder="Enter your email"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
             <ProfileField
               label="Phone"
@@ -602,8 +663,8 @@ const formatDisplayDate = (dateString) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, phone: text })}
               placeholder="Enter your phone number"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
               profileData={profileData}
             />
             
@@ -613,8 +674,8 @@ const formatDisplayDate = (dateString) => {
               field="city"
               value={profileData.location?.city}
               editable
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
               profileData={profileData}
             />
             <LocationField
@@ -622,18 +683,17 @@ const formatDisplayDate = (dateString) => {
               field="region"
               value={profileData.location?.region}
               editable
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
               profileData={profileData}
-
             />
             <LocationField
               label="Town"
               field="town"
               value={profileData.location?.town}
               editable
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
               profileData={profileData}
             />
             <LocationField
@@ -641,8 +701,8 @@ const formatDisplayDate = (dateString) => {
               field="street"
               value={profileData.location?.street}
               editable
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
               profileData={profileData}
             />
             
@@ -653,8 +713,8 @@ const formatDisplayDate = (dateString) => {
               onChange={(text) => setProfileData({ ...profileData, Bio: text })}
               multiline
               placeholder="Tell us about yourself and your skills..."
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
           </View>
         </View>
@@ -787,38 +847,38 @@ const formatDisplayDate = (dateString) => {
         </View>
 
         {/* Reviews & Ratings Section */}
-      <View style={styles.section}>
-     <View style={styles.sectionHeader}>
-      <Ionicons name="star-outline" size={20} color="#6366F1" />
-    <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
-    {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
-      <TouchableOpacity 
-        style={styles.viewAllButton}
-        onPress={() => navigation.navigate('AllReviews', { 
-         reviews: profileData.ratingsReceived || [],
-         userName: profileData.name,
-         averageRating: profileData.rating || 0,
-         totalReviews: profileData.numberOfRatings || 0
-       })}
-      >
-        <Text style={styles.viewAllText}>View All</Text>
-        <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-      </TouchableOpacity>
-    )}
-  </View>
-  
-    <ReviewsComponent 
-    reviews={profileData.ratingsReceived || []}
-    averageRating={profileData.rating || 0}
-    totalReviews={profileData.numberOfRatings || 0}
-    onViewAll={()=>navigation.navigate('AllReviews', { 
-                      reviews: profileData.ratingsReceived || [],
-                      userName: profileData.name,
-                      averageRating: profileData.rating || 0,
-                      totalReviews: profileData.numberOfRatings || 0
-                    })}
-  />
-  </View>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="star-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={() => navigation.navigate('AllReviews', { 
+                  reviews: profileData.ratingsReceived || [],
+                  userName: profileData.name,
+                  averageRating: profileData.rating || 0,
+                  totalReviews: profileData.numberOfRatings || 0
+                })}
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <ReviewsComponent 
+            reviews={profileData.ratingsReceived || []}
+            averageRating={profileData.rating || 0}
+            totalReviews={profileData.numberOfRatings || 0}
+            onViewAll={()=>navigation.navigate('AllReviews', { 
+              reviews: profileData.ratingsReceived || [],
+              userName: profileData.name,
+              averageRating: profileData.rating || 0,
+              totalReviews: profileData.numberOfRatings || 0
+            })}
+          />
+        </View>
 
         {/* Enhanced Availability */}
         <View style={styles.section}>
@@ -957,125 +1017,125 @@ const formatDisplayDate = (dateString) => {
               </TouchableOpacity>
             </View>
 
-           <ScrollView style={styles.modalForm}>
-  <View style={styles.formGroup}>
-    <Text style={styles.formLabel}>Job Title *</Text>
-    <TextInput
-      style={styles.formInput}
-      value={experienceForm.jobTitle}
-      onChangeText={(text) => setExperienceForm({ ...experienceForm, jobTitle: text })}
-      placeholder="e.g., Freelance Handyman"
-      placeholderTextColor="#94A3B8"
-    />
-  </View>
+            <ScrollView style={styles.modalForm}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Job Title *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={experienceForm.jobTitle}
+                  onChangeText={(text) => setExperienceForm({ ...experienceForm, jobTitle: text })}
+                  placeholder="e.g., Freelance Handyman"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-  <View style={styles.formGroup}>
-    <Text style={styles.formLabel}>Company or Client *</Text>
-    <TextInput
-      style={styles.formInput}
-      value={experienceForm.company}
-      onChangeText={(text) => setExperienceForm({ ...experienceForm, company: text })}
-      placeholder="e.g., Self-Employed or ABC Properties"
-      placeholderTextColor="#94A3B8"
-    />
-  </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Company or Client *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={experienceForm.company}
+                  onChangeText={(text) => setExperienceForm({ ...experienceForm, company: text })}
+                  placeholder="e.g., Self-Employed or ABC Properties"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-  {/* Updated Date Fields with Pickers */}
-  <View style={styles.formRow}>
-    <View style={styles.formGroupHalf}>
-      <Text style={styles.formLabel}>Start Date *</Text>
-      <TouchableOpacity 
-        style={styles.dateInput}
-        onPress={() => setShowStartDatePicker(true)}
-      >
-        <Text style={[
-          styles.dateInputText, 
-          !experienceForm.startDate && styles.placeholderText
-        ]}>
-          {formatDisplayDate(experienceForm.startDate)}
-        </Text>
-        <Ionicons name="calendar-outline" size={20} color="#6366F1" />
-      </TouchableOpacity>
-    </View>
-    
-    <View style={styles.formGroupHalf}>
-      <Text style={styles.formLabel}>End Date</Text>
-      <TouchableOpacity 
-        style={[
-          styles.dateInput,
-          experienceForm.currentlyWorking && styles.dateInputDisabled
-        ]}
-        onPress={() => !experienceForm.currentlyWorking && setShowEndDatePicker(true)}
-        disabled={experienceForm.currentlyWorking}
-      >
-        <Text style={[
-          styles.dateInputText, 
-          !experienceForm.endDate && styles.placeholderText,
-          experienceForm.currentlyWorking && styles.disabledText
-        ]}>
-          {experienceForm.currentlyWorking ? 'Present' : formatDisplayDate(experienceForm.endDate)}
-        </Text>
-        {!experienceForm.currentlyWorking && (
-          <Ionicons name="calendar-outline" size={20} color="#6366F1" />
-        )}
-      </TouchableOpacity>
-    </View>
-  </View>
+              {/* Updated Date Fields with Pickers */}
+              <View style={styles.formRow}>
+                <View style={styles.formGroupHalf}>
+                  <Text style={styles.formLabel}>Start Date *</Text>
+                  <TouchableOpacity 
+                    style={styles.dateInput}
+                    onPress={() => setShowStartDatePicker(true)}
+                  >
+                    <Text style={[
+                      styles.dateInputText, 
+                      !experienceForm.startDate && styles.placeholderText
+                    ]}>
+                      {formatDisplayDate(experienceForm.startDate)}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.formGroupHalf}>
+                  <Text style={styles.formLabel}>End Date</Text>
+                  <TouchableOpacity 
+                    style={[
+                      styles.dateInput,
+                      experienceForm.currentlyWorking && styles.dateInputDisabled
+                    ]}
+                    onPress={() => !experienceForm.currentlyWorking && setShowEndDatePicker(true)}
+                    disabled={experienceForm.currentlyWorking}
+                  >
+                    <Text style={[
+                      styles.dateInputText, 
+                      !experienceForm.endDate && styles.placeholderText,
+                      experienceForm.currentlyWorking && styles.disabledText
+                    ]}>
+                      {experienceForm.currentlyWorking ? 'Present' : formatDisplayDate(experienceForm.endDate)}
+                    </Text>
+                    {!experienceForm.currentlyWorking && (
+                      <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-  <View style={styles.formGroup}>
-    <TouchableOpacity 
-      style={styles.checkboxContainer}
-      onPress={() => setExperienceForm({ 
-        ...experienceForm, 
-        currentlyWorking: !experienceForm.currentlyWorking,
-        endDate: !experienceForm.currentlyWorking ? '' : experienceForm.endDate
-      })}
-    >
-      <View style={[styles.checkbox, experienceForm.currentlyWorking && styles.checkboxChecked]}>
-        {experienceForm.currentlyWorking && (
-          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-        )}
-      </View>
-      <Text style={styles.checkboxLabel}>I currently work here</Text>
-    </TouchableOpacity>
-  </View>
+              <View style={styles.formGroup}>
+                <TouchableOpacity 
+                  style={styles.checkboxContainer}
+                  onPress={() => setExperienceForm({ 
+                    ...experienceForm, 
+                    currentlyWorking: !experienceForm.currentlyWorking,
+                    endDate: !experienceForm.currentlyWorking ? '' : experienceForm.endDate
+                  })}
+                >
+                  <View style={[styles.checkbox, experienceForm.currentlyWorking && styles.checkboxChecked]}>
+                    {experienceForm.currentlyWorking && (
+                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>I currently work here</Text>
+                </TouchableOpacity>
+              </View>
 
-  <View style={styles.formGroup}>
-    <Text style={styles.formLabel}>Description *</Text>
-    <TextInput
-      style={[styles.formInput, styles.textArea]}
-      value={experienceForm.description}
-      onChangeText={(text) => setExperienceForm({ ...experienceForm, description: text })}
-      placeholder="Describe your responsibilities, skills used, and achievements..."
-      placeholderTextColor="#94A3B8"
-      multiline
-      numberOfLines={4}
-      textAlignVertical="top"
-    />
-  </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description *</Text>
+                <TextInput
+                  style={[styles.formInput, styles.textArea]}
+                  value={experienceForm.description}
+                  onChangeText={(text) => setExperienceForm({ ...experienceForm, description: text })}
+                  placeholder="Describe your responsibilities, skills used, and achievements..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
 
-  {/* Date Pickers */}
-  {showStartDatePicker && (
-    <DateTimePicker
-      value={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date()}
-      mode="date"
-      display="default"
-      onChange={onStartDateChange}
-      maximumDate={new Date()}
-    />
-  )}
+              {/* Date Pickers */}
+              {showStartDatePicker && (
+                <DateTimePicker
+                  value={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={onStartDateChange}
+                  maximumDate={new Date()}
+                />
+              )}
 
-  {showEndDatePicker && (
-    <DateTimePicker
-      value={experienceForm.endDate ? new Date(experienceForm.endDate) : new Date()}
-      mode="date"
-      display="default"
-      onChange={onEndDateChange}
-      minimumDate={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date(1900, 0, 1)}
-      maximumDate={new Date()}
-    />
-  )}
-</ScrollView>
+              {showEndDatePicker && (
+                <DateTimePicker
+                  value={experienceForm.endDate ? new Date(experienceForm.endDate) : new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={onEndDateChange}
+                  minimumDate={experienceForm.startDate ? new Date(experienceForm.startDate) : new Date(1900, 0, 1)}
+                  maximumDate={new Date()}
+                />
+              )}
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <TouchableOpacity 
@@ -1099,7 +1159,5 @@ const formatDisplayDate = (dateString) => {
     </SafeAreaView>
   );
 };
-
-
 
 export default TaskerProfileScreen;

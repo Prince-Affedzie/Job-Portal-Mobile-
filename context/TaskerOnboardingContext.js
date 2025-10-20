@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useReducer } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { completeProfile, fetchUser } from '../api/authApi';
+import { completeProfile, fetchUser, uploadProfileImage } from '../api/authApi';
+import { sendFileToS3 } from '../api/commonApi';
 import { AuthContext } from './AuthContext';
 
 const TaskerOnboardingContext = createContext();
@@ -206,6 +207,47 @@ export const TaskerOnboardingProvider = ({ children }) => {
     }
   };
 
+  // Upload image to S3
+  const uploadImageToS3 = async (imageData) => {
+    try {
+      // Extract file info from imageData
+      const filename = imageData.name || 'profile.jpg';
+      const type = imageData.type || 'image/jpeg';
+      
+      // Create file object
+      const file = {
+        uri: imageData.uri,
+        name: filename,
+        type: type,
+      };
+
+      // Get pre-signed URL from backend
+      const res = await uploadProfileImage({ 
+        filename: file.name, 
+        contentType: file.type 
+      });
+      
+      if (res.status !== 200) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      const { fileKey, fileUrl, publicUrl } = res.data;
+      
+      if (!fileUrl) {
+        throw new Error('No upload URL in response');
+      }
+      
+      // Upload file to S3 using the pre-signed URL
+      await sendFileToS3(fileUrl, file);
+      
+      return publicUrl;
+      
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw new Error('Failed to upload image');
+    }
+  };
+
   // Action creators
   const updateBasicInfo = (basicInfo) => {
     dispatch({ type: ACTION_TYPES.UPDATE_BASIC_INFO, payload: basicInfo });
@@ -344,53 +386,57 @@ export const TaskerOnboardingProvider = ({ children }) => {
     return false;
   };
 
-  // FIXED: submitOnboarding function
+  // UPDATED: submitOnboarding function with S3 upload
   const submitOnboarding = async () => {
     try {
       setSubmitting(true);
       
-      // Prepare data for API
-      const formData = new FormData();
+      let profileImageUrl = '';
       
-      // Append basic info
-      formData.append('Bio', state.bio);
-      formData.append('phone', state.phone);
-      
-      // Append location
-      formData.append('location[region]', state.location.region);
-      formData.append('location[city]', state.location.city);
-      formData.append('location[town]', state.location.town || '');
-      formData.append('location[street]', state.location.street || '');
-      
-      // Append skills
-      state.skills.forEach((skill, index) => {
-        formData.append(`skills[${index}]`, skill);
-      });
-      
-      // FIXED: Properly append profile image if it exists
+      // Upload profile image to S3 if it exists
       if (state.profileImage && state.profileImage.uri) {
-        console.log('Appending profile image:', state.profileImage);
-        
-        // Create the file object properly for React Native
-        formData.append('profileImage', {
-          uri: state.profileImage.uri,
-          type: state.profileImage.type || 'image/jpeg',
-          name: state.profileImage.name || 'profile.jpg',
-        });
+        console.log('Uploading profile image to S3...');
+        try {
+          profileImageUrl = await uploadImageToS3(state.profileImage);
+          console.log('Profile image uploaded successfully:', profileImageUrl);
+        } catch (uploadError) {
+          console.error('Failed to upload profile image:', uploadError);
+          throw new Error('Failed to upload profile image. Please try again.');
+        }
       } else {
-        console.log('No profile image to append');
+        console.log('No profile image to upload');
       }
       
-      // Log formData for debugging
-      console.log('FormData being sent:', {
+      // Prepare data for API - now using regular object instead of FormData
+      const requestData = {
+        Bio: state.bio,
+        phone: state.phone,
+        location: {
+          region: state.location.region,
+          city: state.location.city,
+          town: state.location.town || '',
+          street: state.location.street || ''
+        },
+        skills: state.skills
+      };
+      
+      // Add profile image URL if it was uploaded
+      if (profileImageUrl) {
+        requestData.profileImage = profileImageUrl;
+      }
+      
+      // Log request data for debugging
+      console.log('Request data being sent:', {
         bio: state.bio,
         phone: state.phone,
         location: state.location,
         skills: state.skills,
-        hasProfileImage: !!(state.profileImage && state.profileImage.uri)
+        hasProfileImage: !!profileImageUrl,
+        profileImageUrl: profileImageUrl
       });
       
-      const response = await completeProfile(formData);
+      // Send the data to complete profile (now as JSON, not FormData)
+      const response = await completeProfile(requestData);
       
       // After Onboarding Process is Complete, we fetch the User and set it
       const res = await fetchUser();

@@ -639,26 +639,17 @@ const NotificationsScreen = ({ navigation }) => {
       </Modal>
 
       {/* Animated Notification Detail Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="none" // We handle animation manually
-        onRequestClose={closeModal}
-      >
-        <Animated.View 
-          style={[
-            styles.modalOverlay,
-            { opacity: modalOpacity }
-          ]}
+     
+        <View 
+          style={
+            styles.modalOverlay
+           
+          }
         >
-          <Animated.View 
-            style={[
-              styles.detailModalContent,
-              {
-                transform: [{ scale: modalScale }],
-                opacity: modalOpacity
+          <View 
+            style={
+              styles.detailModalContent
               }
-            ]}
           >
             <NotificationDetailModal
               visible={modalVisible}
@@ -666,9 +657,9 @@ const NotificationsScreen = ({ navigation }) => {
               onClose={closeModal}
               onAction={handleNotificationAction}
             />
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+          </View>
+        </View>
+     
     </View>
   );
 };

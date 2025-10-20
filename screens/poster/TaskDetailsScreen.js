@@ -187,8 +187,10 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
         <Header title="Task Details" showBackButton={true} />
         <LoadingIndicator text='Loading Task Details...' />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -196,6 +198,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   if (!task) {
     return (
       <SafeAreaView style={styles.container}>
+        <ScrollView style={styles.scrollView}>
         <Header title="Task Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <Ionicons name="sad-outline" size={64} color="#94A3B8" />
@@ -209,6 +212,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -281,7 +285,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A1F3B" translucent={true} />
       <Header title="Task Details" showBackButton={true} transparent />
       <ScrollView
         style={styles.scrollView}
@@ -295,6 +298,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         )}
         scrollEventThrottle={16}
       >
+        
         {/* Main Content */}
         <View style={styles.content}>
 
@@ -611,10 +615,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                     </Text>
                   </View>
                 ))}
+                
               </ScrollView>
             </View>
           )}
         </View>
+      
       </ScrollView>
 
       {/* Enhanced FAB with Better UX */}
@@ -794,6 +800,8 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         userName={task.assignedTo?.name}
         userRole='tasker'
       />
+
+     
     </SafeAreaView>
   );
 };
@@ -801,8 +809,9 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#2D325D',
   },
+
 
   heroCard: {
     margin: 16,
@@ -1141,6 +1150,14 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
+  taskDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+
   // Enhanced Tasker Card
   taskerCard: {
     gap: 16,
@@ -1457,6 +1474,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor:'#FFFF'
   },
 });
 

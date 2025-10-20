@@ -25,18 +25,22 @@ import { LocationField } from '../../component/tasker/LocationField';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
 import ReviewsComponent from '../../component/common/ReviewsComponent';
+import { sendFileToS3 } from '../../api/commonApi';
+import { uploadProfileImage } from '../../api/authApi';
 
 const { width } = Dimensions.get('window');
 
 // Default profile image
-const DEFAULT_PROFILE_IMAGE = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
+const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
 const ClientProfileScreen = ({ navigation }) => {
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
-  const { postedTasks,payments } = useContext(PosterContext);
+  const { postedTasks, payments } = useContext(PosterContext);
   const [profileData, setProfileData] = useState({});
+  const [originalProfileImage, setOriginalProfileImage] = useState('');
   const [notifications, setNotifications] = useState({
     taskUpdates: true,
     applicantAlerts: true,
@@ -59,23 +63,25 @@ const ClientProfileScreen = ({ navigation }) => {
             .reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
   // Initialize profile data with user data and fallbacks
- useEffect(() => {
-     if (user) {
-       setProfileData({
-         name: user.name || '',
-         email: user.email || '',
-         phone: user.phone || '',
-         location: user.location || {
-           region: '',
-           city: '',
-           town: '',
-           street: ''
-         },
-         profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
-         ...user
-       });
-     }
-   }, [user]);
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        location: user.location || {
+          region: '',
+          city: '',
+          town: '',
+          street: ''
+        },
+        profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
+        ...user
+      });
+      // Store original profile image to detect changes
+      setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
+    }
+  }, [user]);
 
   React.useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -85,38 +91,92 @@ const ClientProfileScreen = ({ navigation }) => {
     }).start();
   }, []);
 
+  // Upload image to S3
+  const uploadImageToS3 = async (imageUri) => {
+    try {
+      setImageUploading(true);
+      
+      // Extract file info from URI
+      const filename = imageUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      // Create file object
+      const file = {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      };
+
+      // Get pre-signed URL from backend
+      const res = await uploadProfileImage({ 
+        filename: file.name, 
+        contentType: file.type 
+      });
+      
+      if (res.status !== 200) {
+        throw new Error('Failed to get upload URL');
+      }
+
+      const { fileKey, fileUrl, publicUrl } = res.data;
+      
+      if (!fileUrl) {
+        throw new Error('No upload URL in response');
+      }
+      
+      // Upload file to S3 using the pre-signed URL
+      await sendFileToS3(fileUrl, file);
+      
+      return publicUrl;
+      
+    } catch (error) {
+      console.error('Image upload error:', error);
+      throw new Error('Failed to upload image');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
+      let finalProfileImage = profileData.profileImage;
+      
+      // Check if profile image has changed and needs to be uploaded
+      const hasImageChanged = profileData.profileImage !== originalProfileImage && 
+                             profileData.profileImage.startsWith('file://');
+      
+      if (hasImageChanged) {
+        try {
+          finalProfileImage = await uploadImageToS3(profileData.profileImage);
+        } catch (error) {
+          Alert.alert('Upload Error', 'Failed to upload profile image. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const formData = new FormData();
     
-    // Add all profile data fields
-    formData.append('name', profileData.name);
-    formData.append('email', profileData.email);
-    formData.append('phone', profileData.phone);
+      // Add all profile data fields
+      formData.append('name', profileData.name);
+      formData.append('email', profileData.email);
+      formData.append('phone', profileData.phone);
 
-   if (profileData.location) {
-      formData.append('location[region]', profileData.location.region || '');
-      formData.append('location[city]', profileData.location.city || '');
-      formData.append('location[town]', profileData.location.town || '');
-      formData.append('location[street]', profileData.location.street || '');
-    }
+      if (profileData.location) {
+        formData.append('location[region]', profileData.location.region || '');
+        formData.append('location[city]', profileData.location.city || '');
+        formData.append('location[town]', profileData.location.town || '');
+        formData.append('location[street]', profileData.location.street || '');
+      }
 
-    if (profileData.profileImage && profileData.profileImage.startsWith('file://')) {
-      const filename = profileData.profileImage.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image';
-      
-      formData.append('profileImage', {
-        uri: profileData.profileImage,
-        name: filename,
-        type,
-      });
-    } else if (profileData.profileImage) {
-      // If it's a URL, just send the URL
-      formData.append('profileImageUrl', profileData.profileImage);
-    }
+      // Add the profile image URL (either the existing one or the new S3 URL)
+      formData.append('profileImage', finalProfileImage);
+
       await updateProfile(formData);
+      
+      // Update the original image reference
+      setOriginalProfileImage(finalProfileImage);
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
@@ -175,6 +235,7 @@ const ClientProfileScreen = ({ navigation }) => {
       <Text style={styles.statsLabel}>{label}</Text>
     </View>
   );
+
   const formatMemberSince = () => {
     try {
       return new Date(profileData.memberSince).toLocaleDateString('en-US', {
@@ -195,35 +256,31 @@ const ClientProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-  
+      {/* Header */}
+      <Header 
+        title="My Profile" 
+        rightComponent={
+          <TouchableOpacity 
+            style={[styles.headerButton, editing && styles.headerButtonActive]}
+            onPress={editing ? handleSave : () => setEditing(true)}
+            disabled={loading || imageUploading}
+          >
+            {loading || imageUploading ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
+                {editing ? 'Save' : 'Edit'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
-         {/* Header */}
-       <Header 
-          title="My Profile" 
-          rightComponent={
-            <TouchableOpacity 
-              style={[styles.headerButton, editing && styles.headerButtonActive]}
-              onPress={editing ? handleSave : () => setEditing(true)}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#6366F1" />
-              ) : (
-                <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
-                  {editing ? 'Save' : 'Edit'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          }
-        />
       <Animated.ScrollView 
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-       
-       
-
         {/* Enhanced Profile Header */}
         <LinearGradient
           colors={['#1A1F3B', '#2D325D']}
@@ -238,8 +295,16 @@ const ClientProfileScreen = ({ navigation }) => {
               defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
             />
             {editing && (
-              <TouchableOpacity style={styles.editImageButton} onPress={pickImage}>
-                <Ionicons name="camera" size={18} color="#FFFFFF" />
+              <TouchableOpacity 
+                style={styles.editImageButton} 
+                onPress={pickImage}
+                disabled={imageUploading}
+              >
+                {imageUploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="camera" size={18} color="#FFFFFF" />
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -326,8 +391,8 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, name: text })}
               placeholder="Enter your full name"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
             <ProfileField
               label="Email"
@@ -335,8 +400,8 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, email: text })}
               placeholder="Enter your email"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
             <ProfileField
               label="Phone"
@@ -344,85 +409,83 @@ const ClientProfileScreen = ({ navigation }) => {
               editable
               onChange={(text) => setProfileData({ ...profileData, phone: text })}
               placeholder="Enter your phone number"
-              editing = {editing}
-              setProfileData ={setProfileData}
+              editing={editing}
+              setProfileData={setProfileData}
             />
             
             {/* Location Fields */}
-               <LocationField
-                label="City"
-                field="city"
-                value={profileData.location?.city}
-                editable
-                editing = {editing}
-                setProfileData ={setProfileData}
-                profileData={profileData}
-                />
-                <LocationField
-                label="Region"
-                field="region"
-                value={profileData.location?.region}
-                editable
-                editing = {editing}
-                setProfileData ={setProfileData}
-                profileData={profileData}
-            
-                  />
-                 <LocationField
-                  label="Town"
-                  ield="town"
-                  value={profileData.location?.town}
-                  editable
-                  editing = {editing}
-                  setProfileData ={setProfileData}
-                  profileData={profileData}
-                  />
-                  <LocationField
-                  label="Street"
-                  field="street"
-                  value={profileData.location?.street}
-                  editable
-                  editing = {editing}
-                  setProfileData ={setProfileData}
-                  profileData={profileData}
-                />
-            
+            <LocationField
+              label="City"
+              field="city"
+              value={profileData.location?.city}
+              editable
+              editing={editing}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
+            <LocationField
+              label="Region"
+              field="region"
+              value={profileData.location?.region}
+              editable
+              editing={editing}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
+            <LocationField
+              label="Town"
+              field="town"
+              value={profileData.location?.town}
+              editable
+              editing={editing}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
+            <LocationField
+              label="Street"
+              field="street"
+              value={profileData.location?.street}
+              editable
+              editing={editing}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
           </View>
         </View>
 
-           {/* Reviews & Ratings Section */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-               <Ionicons name="star-outline" size={20} color="#6366F1" />
-             <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
-             {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
-               <TouchableOpacity 
-                 style={styles.viewAllButton}
-                 onPress={() => navigation.navigate('AllReviews', { 
+        {/* Reviews & Ratings Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="star-outline" size={20} color="#6366F1" />
+            <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={() => navigation.navigate('AllReviews', { 
                   reviews: profileData.ratingsReceived || [],
                   userName: profileData.name,
                   averageRating: profileData.rating || 0,
                   totalReviews: profileData.numberOfRatings || 0
                 })}
-               >
-                 <Text style={styles.viewAllText}>View All</Text>
-                 <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-               </TouchableOpacity>
-             )}
-           </View>
-           
-             <ReviewsComponent 
-             reviews={profileData.ratingsReceived || []}
-             averageRating={profileData.rating || 0}
-             totalReviews={profileData.numberOfRatings || 0}
-             onViewAll={()=>navigation.navigate('AllReviews', { 
-                  reviews: profileData.ratingsReceived || [],
-                  userName: profileData.name,
-                  averageRating: profileData.rating || 0,
-                  totalReviews: profileData.numberOfRatings || 0
-                })}
-           />
-           </View>
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <ReviewsComponent 
+            reviews={profileData.ratingsReceived || []}
+            averageRating={profileData.rating || 0}
+            totalReviews={profileData.numberOfRatings || 0}
+            onViewAll={()=>navigation.navigate('AllReviews', { 
+              reviews: profileData.ratingsReceived || [],
+              userName: profileData.name,
+              averageRating: profileData.rating || 0,
+              totalReviews: profileData.numberOfRatings || 0
+            })}
+          />
+        </View>
 
         {/* Task Preferences */}
         <View style={styles.section}>
@@ -538,12 +601,6 @@ const ClientProfileScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
-           {/* <TouchableOpacity style={styles.accountButton} onPress={() => navigate('PaymentMethods')}>
-              <Ionicons name="card-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Payment Methods</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </TouchableOpacity> */}
-            
             <TouchableOpacity style={styles.accountButton} onPress={() => navigate('Payments')}>
               <Ionicons name="receipt-outline" size={20} color="#6366F1" />
               <Text style={styles.accountButtonText}>Payment History</Text>
@@ -580,6 +637,7 @@ const ClientProfileScreen = ({ navigation }) => {
   );
 };
 
+// Your existing styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,

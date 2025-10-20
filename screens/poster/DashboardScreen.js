@@ -28,11 +28,6 @@ export default function DashboardScreen() {
          fetchPayments()
     }, [])
 
-
-     useEffect(() => {
-        console.log(payments)
-    }, [])
-
     // Enhanced statistics calculation
     const dashboardStats = useMemo(() => {
         if (!postedTasks || postedTasks.length === 0) {

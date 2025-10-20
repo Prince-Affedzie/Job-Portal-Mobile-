@@ -387,17 +387,17 @@ export default function PostedTasksScreen() {
             </View>
           </View>
 
-          {item.budget && (
-            <View style={styles.detailRow}>
-              <View style={styles.detailItem}>
-                <Ionicons name="cash-outline" size={16} color="#666" />
-                <Text style={styles.detailText}>Budget: GHS {item.budget}</Text>
-              </View>
-            </View>
-          )}
+          {item.budget ? (
+           <View style={styles.detailRow}>
+       <View style={styles.detailItem}>
+         <Ionicons name="cash-outline" size={16} color="#666" />
+         <Text style={styles.detailText}>Budget: GHS {item.budget}</Text>
+       </View>
+      </View>
+       ) : null}
         </View>
       </TouchableOpacity>
-    );
+     );
   };
 
   if (loading && !refreshing) {
@@ -515,17 +515,19 @@ export default function PostedTasksScreen() {
         )}
 
         {/* Results Header */}
-       <View style={styles.resultsHeader}>
+     <View style={styles.resultsHeader}>
   <Text style={styles.resultsTitle}>
     {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Found
   </Text>
   {hasActiveFilters && (
     <View style={styles.filtersContainer}>
-      <Text style={styles.resultsSubtitle}>
-        {selectedFilter !== 'All' ? `• ${selectedFilter} ` : ''}
-        {selectedCategory !== 'All' ? `• ${selectedCategory} ` : ''}
-        {searchQuery ? `• "${searchQuery}"` : ''}
-      </Text>
+      {(selectedFilter !== 'All' || selectedCategory !== 'All' || searchQuery) && (
+        <Text style={styles.resultsSubtitle}>
+          {selectedFilter !== 'All' && `• ${selectedFilter} `}
+          {selectedCategory !== 'All' && `• ${selectedCategory} `}
+          {searchQuery && `• "${searchQuery}"`}
+        </Text>
+      )}
     </View>
   )}
 </View>

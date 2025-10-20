@@ -377,7 +377,7 @@ const HelpSupportScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1A1F3B",
   },
   container: {
     flexGrow: 1,

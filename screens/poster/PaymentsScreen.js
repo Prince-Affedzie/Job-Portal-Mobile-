@@ -814,6 +814,7 @@ const styles = StyleSheet.create({
   section: {
     backgroundColor: '#FFFFFF',
     margin: 16,
+    marginHorizontal:10,
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',

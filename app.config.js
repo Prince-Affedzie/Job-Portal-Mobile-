@@ -5,12 +5,12 @@ export default {
   slug: "mobile",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icon.png",
+  icon: "./assets/WorkaFlowLogo.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
 
   splash: {
-    image: "./assets/WorkaFlowLogo.png",
+    image: "./assets/Logo.png",
     resizeMode: "contain",
     backgroundColor: "#1A1F3B",
   },
@@ -28,7 +28,7 @@ export default {
     package: "com.affedziep44.jobportalmobile",
     edgeToEdgeEnabled: true,
 
-    // 👇 Add this line to connect your google-services.json file
+    
     googleServicesFile: "./google-services.json",
   },
 
