@@ -29,6 +29,7 @@ import { LocationField } from '../../component/tasker/LocationField';
 import { styles } from '../../styles/auth/ProfileScreen.Styles';
 import { sendFileToS3 } from '../../api/commonApi';
 import { uploadProfileImage } from '../../api/authApi';
+import { updateAvailability } from '../../api/authApi'; 
 
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -37,8 +38,25 @@ const { width } = Dimensions.get('window');
 // Default profile image
 const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
+// Availability options
+const AVAILABILITY_OPTIONS = [
+  { value: 'available', label: 'Available', color: '#10B981', icon: 'checkmark-circle', description: 'Ready for new tasks' },
+  { value: 'busy', label: 'Busy', color: '#F59E0B', icon: 'time', description: 'Working on tasks' },
+  { value: 'away', label: 'Away', color: '#6366F1', icon: 'bed', description: 'Temporarily unavailable' },
+  { value: 'offline', label: 'Offline', color: '#6B7280', icon: 'power', description: 'Not accepting tasks' },
+];
+
 const TaskerProfileScreen = ({ navigation }) => {
-  const [editing, setEditing] = useState(false);
+  // Section editing states
+  const [editingSections, setEditingSections] = useState({
+    personalInfo: false,
+    skills: false,
+    workExperience: false,
+    availability: false,
+    notifications: false
+  });
+
+  const [originalData, setOriginalData] = useState({});
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const { user, logout, updateProfile } = useContext(AuthContext);
@@ -55,6 +73,9 @@ const TaskerProfileScreen = ({ navigation }) => {
   });
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
+  const [showNextAvailablePicker, setShowNextAvailablePicker] = useState(false);
+  const [updatingAvailability, setUpdatingAvailability] = useState(false);
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
 
@@ -78,6 +99,19 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
+  const onNextAvailableChange = (event, selectedDate) => {
+    setShowNextAvailablePicker(false);
+    if (selectedDate) {
+      setProfileData({
+        ...profileData,
+        availability: {
+          ...profileData.availability,
+          nextAvailableAt: selectedDate.toISOString()
+        }
+      });
+    }
+  };
+
   // Format date for display
   const formatDisplayDate = (dateString) => {
     if (!dateString) return 'Select Date';
@@ -89,6 +123,19 @@ const TaskerProfileScreen = ({ navigation }) => {
       });
     } catch {
       return 'Select Date';
+    }
+  };
+
+  // Format time for display
+  const formatDisplayTime = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return '';
     }
   };
 
@@ -105,7 +152,8 @@ const TaskerProfileScreen = ({ navigation }) => {
   // Initialize profile data with user data and proper schema structure
   useEffect(() => {
     if (user) {
-      setProfileData({
+      const userAvailability = user.availability || {};
+      const initialData = {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
@@ -118,14 +166,30 @@ const TaskerProfileScreen = ({ navigation }) => {
         Bio: user.Bio || '',
         skills: user.skills || [],
         hourlyRate: user.hourlyRate || 0,
-        availability: user.availability || 'Available',
+        availability: {
+          status: userAvailability.status || 'available',
+          nextAvailableAt: userAvailability.nextAvailableAt || '',
+          lastActiveAt: userAvailability.lastActiveAt || new Date().toISOString(),
+          manuallySet: userAvailability.manuallySet || false,
+          workingHours: userAvailability.workingHours || {
+            timezone: 'Africa/Accra',
+            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            startTime: '09:00',
+            endTime: '17:00'
+          },
+          maxConcurrentTasks: userAvailability.maxConcurrentTasks || 3,
+          currentTaskCount: userAvailability.currentTaskCount || 0
+        },
         profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
         workExperience: user.workExperience || [],
         education: user.education || [],
         workPortfolio: user.workPortfolio || [],
         // Add other schema fields as needed
         ...user
-      });
+      };
+
+      setProfileData(initialData);
+      setOriginalData(initialData);
       // Store original profile image to detect changes
       setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
     }
@@ -138,6 +202,56 @@ const TaskerProfileScreen = ({ navigation }) => {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  // Section editing handlers
+  const startEditingSection = (section) => {
+    setEditingSections(prev => ({
+      ...prev,
+      [section]: true
+    }));
+  };
+
+  const cancelEditingSection = (section) => {
+    // Reset to original data for this section
+    setProfileData(prev => ({
+      ...prev,
+      ...getSectionOriginalData(section)
+    }));
+    
+    setEditingSections(prev => ({
+      ...prev,
+      [section]: false
+    }));
+
+    // Reset skills if cancelling skills section
+    if (section === 'skills') {
+      setNewSkill('');
+    }
+  };
+
+  const getSectionOriginalData = (section) => {
+    switch (section) {
+      case 'personalInfo':
+        return {
+          name: originalData.name,
+          email: originalData.email,
+          phone: originalData.phone,
+          location: { ...originalData.location },
+          Bio: originalData.Bio,
+          hourlyRate: originalData.hourlyRate
+        };
+      case 'skills':
+        return { skills: [...originalData.skills] };
+      case 'workExperience':
+        return { workExperience: [...originalData.workExperience] };
+      case 'availability':
+        return { availability: { ...originalData.availability } };
+      case 'notifications':
+        return {}; // Notifications are handled separately
+      default:
+        return {};
+    }
+  };
 
   // Upload image to S3
   const uploadImageToS3 = async(imageUri) => {
@@ -183,7 +297,54 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleSave = async () => {
+  // Update availability status
+  const handleUpdateAvailability = async (newStatus) => {
+    try {
+      setUpdatingAvailability(true);
+      
+      const availabilityData = {
+        status: newStatus,
+        nextAvailableAt: profileData.availability.nextAvailableAt
+      };
+
+      const res = await updateAvailability(availabilityData);
+      
+      if (res.status === 200) {
+        // Update local state
+        setProfileData({
+          ...profileData,
+          availability: {
+            ...profileData.availability,
+            status: newStatus,
+            manuallySet: true,
+            lastActiveAt: new Date().toISOString()
+          }
+        });
+
+        // Update original data
+        setOriginalData(prev => ({
+          ...prev,
+          availability: {
+            ...prev.availability,
+            status: newStatus,
+            manuallySet: true,
+            lastActiveAt: new Date().toISOString()
+          }
+        }));
+        
+        setShowAvailabilityModal(false);
+        setEditingSections(prev => ({ ...prev, availability: false }));
+        Alert.alert('Success', 'Availability updated successfully!');
+      }
+    } catch (error) {
+      console.error('Availability update error:', error);
+      Alert.alert('Error', 'Failed to update availability. Please try again.');
+    } finally {
+      setUpdatingAvailability(false);
+    }
+  };
+
+  const handleSaveSection = async (section) => {
     setLoading(true);
     try {
       let finalProfileImage = profileData.profileImage;
@@ -205,58 +366,48 @@ const TaskerProfileScreen = ({ navigation }) => {
       // Prepare data for FormData
       const formData = new FormData();
       
-      // Add all profile data fields
-      formData.append('name', profileData.name);
-      formData.append('email', profileData.email);
-      formData.append('phone', profileData.phone);
-      formData.append('Bio', profileData.Bio);
-      formData.append('hourlyRate', profileData.hourlyRate.toString());
-      formData.append('availability', profileData.availability);
-      
-      // Add the profile image URL (either the existing one or the new S3 URL)
-      formData.append('profileImage', finalProfileImage);
-      
-      // Handle location object
-      if (profileData.location) {
-        formData.append('location[region]', profileData.location.region || '');
-        formData.append('location[city]', profileData.location.city || '');
-        formData.append('location[town]', profileData.location.town || '');
-        formData.append('location[street]', profileData.location.street || '');
+      // Add all profile data fields that are being edited
+      if (section === 'personalInfo' || section === 'skills') {
+        formData.append('name', profileData.name);
+        formData.append('email', profileData.email);
+        formData.append('phone', profileData.phone);
+        formData.append('Bio', profileData.Bio);
+        formData.append('hourlyRate', profileData.hourlyRate.toString());
+        
+        // Add the profile image URL
+        formData.append('profileImage', finalProfileImage);
+        
+        // Handle location object
+        if (profileData.location) {
+          formData.append('location[region]', profileData.location.region || '');
+          formData.append('location[city]', profileData.location.city || '');
+          formData.append('location[town]', profileData.location.town || '');
+          formData.append('location[street]', profileData.location.street || '');
+        }
+        
+        // Handle skills array
+        if (profileData.skills) {
+          profileData.skills.forEach((skill, index) => {
+            formData.append(`skills[${index}]`, skill);
+          });
+        }
       }
-      
-      // Handle arrays
-      if (profileData.skills) {
-        profileData.skills.forEach((skill, index) => {
-          formData.append(`skills[${index}]`, skill);
-        });
-      }
-      
-      // Properly handle work experience dates
-      if (profileData.workExperience) {
+
+      // Handle work experience
+      if (section === 'workExperience' && profileData.workExperience) {
         profileData.workExperience.forEach((exp, index) => {
           formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
           formData.append(`workExperience[${index}][company]`, exp.company || '');
           
-          // Ensure startDate is a valid date string
           if (exp.startDate && exp.startDate instanceof Date) {
             formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
           } else if (exp.startDate && typeof exp.startDate === 'string') {
-            // If it's already a string, validate it's a proper date
             const date = new Date(exp.startDate);
             if (!isNaN(date.getTime())) {
               formData.append(`workExperience[${index}][startDate]`, date.toISOString());
-            } else {
-              console.warn('Invalid startDate:', exp.startDate);
-              // Skip this experience entry or handle error
-              return;
             }
-          } else {
-            console.warn('Missing or invalid startDate for experience:', exp);
-            // Skip this experience entry
-            return;
           }
           
-          // Handle endDate (can be null if currently working)
           if (exp.endDate && exp.endDate instanceof Date) {
             formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
           } else if (exp.endDate && typeof exp.endDate === 'string') {
@@ -265,7 +416,6 @@ const TaskerProfileScreen = ({ navigation }) => {
               formData.append(`workExperience[${index}][endDate]`, date.toISOString());
             }
           }
-          // If endDate is null/undefined, don't send it (handles "currently working" case)
           
           formData.append(`workExperience[${index}][description]`, exp.description || '');
         });
@@ -273,18 +423,29 @@ const TaskerProfileScreen = ({ navigation }) => {
 
       const res = await updateProfile(formData);
       if (res?.status === 200) {
-        // Update the original image reference
+        // Update the original data and image reference
+        setOriginalData(profileData);
         setOriginalProfileImage(finalProfileImage);
-        setEditing(false);
-        Alert.alert('Success', 'Profile updated successfully!');
+        setEditingSections(prev => ({ ...prev, [section]: false }));
+        Alert.alert('Success', `${getSectionDisplayName(section)} updated successfully!`);
       }
     } catch (error) {
       console.error('Update error:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      Alert.alert('Error', `Failed to update ${getSectionDisplayName(section).toLowerCase()}. Please try again.`);
     } finally {
       setLoading(false);
-      setEditing(false);
     }
+  };
+
+  const getSectionDisplayName = (section) => {
+    const names = {
+      personalInfo: 'Personal information',
+      skills: 'Skills',
+      workExperience: 'Work experience',
+      availability: 'Availability',
+      notifications: 'Notification settings'
+    };
+    return names[section] || section;
   };
 
   const pickImage = async () => {
@@ -373,7 +534,6 @@ const TaskerProfileScreen = ({ navigation }) => {
       return;
     }
 
-    // FIX: Ensure we have valid Date objects
     let startDateObj;
     try {
       startDateObj = new Date(startDate);
@@ -403,8 +563,8 @@ const TaskerProfileScreen = ({ navigation }) => {
     const newExperience = {
       jobTitle: jobTitle.trim(),
       company: company.trim(),
-      startDate: startDateObj, // Use the Date object
-      endDate: endDateObj, // Use the Date object or null
+      startDate: startDateObj,
+      endDate: endDateObj,
       description: description.trim(),
     };
 
@@ -531,27 +691,62 @@ const TaskerProfileScreen = ({ navigation }) => {
     return '#EF4444';
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Enhanced Header */}
-      <Header 
-        title="My Profile" 
-        rightComponent={
+  const getCurrentAvailability = () => {
+    return AVAILABILITY_OPTIONS.find(option => option.value === profileData.availability?.status) || AVAILABILITY_OPTIONS[0];
+  };
+
+  const getAvailabilityDescription = () => {
+    const current = getCurrentAvailability();
+    if (profileData.availability?.status === 'away' && profileData.availability?.nextAvailableAt) {
+      return `Back ${formatDisplayDate(profileData.availability.nextAvailableAt)} at ${formatDisplayTime(profileData.availability.nextAvailableAt)}`;
+    }
+    return current.description;
+  };
+
+  // Section Header Component with Edit/Save/Cancel buttons
+  const SectionHeader = ({ title, section, icon }) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionTitleContainer}>
+        <Ionicons name={icon} size={20} color="#6366F1" />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {!editingSections[section] ? (
+        <TouchableOpacity 
+          style={styles.sectionEditButton}
+          onPress={() => startEditingSection(section)}
+        >
+          <Ionicons name="create-outline" size={18} color="#6366F1" />
+          <Text style={styles.sectionEditButtonText}>Edit</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.sectionActionButtons}>
           <TouchableOpacity 
-            style={[styles.headerButton, editing && styles.headerButtonActive]}
-            onPress={editing ? handleSave : () => setEditing(true)}
-            disabled={loading || imageUploading}
+            style={styles.sectionCancelButton}
+            onPress={() => cancelEditingSection(section)}
+            disabled={loading}
           >
-            {loading || imageUploading ? (
-              <ActivityIndicator size="small" color="#6366F1" />
+            <Text style={styles.sectionCancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.sectionSaveButton}
+            onPress={() => handleSaveSection(section)}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
-                {editing ? 'Save' : 'Edit'}
-              </Text>
+              <Text style={styles.sectionSaveButtonText}>Save</Text>
             )}
           </TouchableOpacity>
-        }
-      />
+        </View>
+      )}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Simplified Header - No global edit button */}
+      <Header title="My Profile" />
 
       <Animated.ScrollView 
         style={{ opacity: fadeAnim }}
@@ -572,19 +767,17 @@ const TaskerProfileScreen = ({ navigation }) => {
               style={styles.profileImage}
               defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
             />
-            {editing && (
-              <TouchableOpacity 
-                style={styles.editImageButton} 
-                onPress={pickImage}
-                disabled={imageUploading}
-              >
-                {imageUploading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="camera" size={18} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              style={styles.editImageButton} 
+              onPress={pickImage}
+              disabled={imageUploading}
+            >
+              {imageUploading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           </View>
           
           <View style={styles.profileInfo}>
@@ -609,61 +802,61 @@ const TaskerProfileScreen = ({ navigation }) => {
           </View>
         </LinearGradient>
 
-        {/* Rest of your existing JSX remains the same */}
-        {/* Enhanced Stats Overview */}
+        {/* Stats Overview */}
         <View style={styles.statsContainer}>
           <StatsCard 
-            value="N/A" 
+            value={profileData.performance?.tasksCompleted || '0'} 
             label="Completed" 
             icon="checkmark-done" 
             color="#10B981" 
           />
           <StatsCard 
-            value="N/A"  
-            label="Success Rate" 
+            value={`${profileData.performance?.onTimeCompletionRate || '0'}%`}  
+            label="On Time" 
             icon="trending-up" 
             color="#6366F1" 
           />
           <StatsCard 
-            value="N/A" 
+            value={`GHS ${profileData.hourlyRate || '0'}`} 
             label="Hourly Rate" 
             icon="cash" 
             color="#F59E0B" 
           />
         </View>
 
-        {/* Enhanced Profile Information */}
+        {/* Personal Information Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="person-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-          </View>
+          <SectionHeader 
+            title="Personal Information" 
+            section="personalInfo" 
+            icon="person-outline" 
+          />
           <View style={styles.sectionContent}>
             <ProfileField
               label="Full Name"
               value={profileData.name}
-              editable
+              editable={editingSections.personalInfo}
               onChange={(text) => setProfileData({ ...profileData, name: text })}
               placeholder="Enter your full name"
-              editing={editing}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
             />
             <ProfileField
               label="Email"
               value={profileData.email}
-              editable
+              editable={editingSections.personalInfo}
               onChange={(text) => setProfileData({ ...profileData, email: text })}
               placeholder="Enter your email"
-              editing={editing}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
             />
             <ProfileField
               label="Phone"
               value={profileData.phone}
-              editable
+              editable={editingSections.personalInfo}
               onChange={(text) => setProfileData({ ...profileData, phone: text })}
               placeholder="Enter your phone number"
-              editing={editing}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
               profileData={profileData}
             />
@@ -673,8 +866,8 @@ const TaskerProfileScreen = ({ navigation }) => {
               label="City"
               field="city"
               value={profileData.location?.city}
-              editable
-              editing={editing}
+              editable={editingSections.personalInfo}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
               profileData={profileData}
             />
@@ -682,26 +875,8 @@ const TaskerProfileScreen = ({ navigation }) => {
               label="Region"
               field="region"
               value={profileData.location?.region}
-              editable
-              editing={editing}
-              setProfileData={setProfileData}
-              profileData={profileData}
-            />
-            <LocationField
-              label="Town"
-              field="town"
-              value={profileData.location?.town}
-              editable
-              editing={editing}
-              setProfileData={setProfileData}
-              profileData={profileData}
-            />
-            <LocationField
-              label="Street"
-              field="street"
-              value={profileData.location?.street}
-              editable
-              editing={editing}
+              editable={editingSections.personalInfo}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
               profileData={profileData}
             />
@@ -709,29 +884,41 @@ const TaskerProfileScreen = ({ navigation }) => {
             <ProfileField
               label="Bio"
               value={profileData.Bio}
-              editable
+              editable={editingSections.personalInfo}
               onChange={(text) => setProfileData({ ...profileData, Bio: text })}
               multiline
               placeholder="Tell us about yourself and your skills..."
-              editing={editing}
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
+            />
+
+            <ProfileField
+              label="Hourly Rate (GHS)"
+              value={profileData.hourlyRate?.toString()}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ ...profileData, hourlyRate: parseFloat(text) || 0 })}
+              placeholder="Enter your hourly rate"
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              keyboardType="numeric"
             />
           </View>
         </View>
 
-        {/* Enhanced Skills Section */}
+        {/* Skills Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="construct-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Skills & Expertise</Text>
-          </View>
+          <SectionHeader 
+            title="Skills & Expertise" 
+            section="skills" 
+            icon="construct-outline" 
+          />
           
           <View style={styles.skillsContainer}>
             {profileData.skills && profileData.skills.length > 0 ? (
               profileData.skills.map((skill, index) => (
                 <View key={index} style={styles.skillTag}>
                   <Text style={styles.skillText}>{skill}</Text>
-                  {editing && (
+                  {editingSections.skills && (
                     <TouchableOpacity 
                       style={styles.removeSkillButton}
                       onPress={() => removeSkill(skill)}
@@ -746,7 +933,7 @@ const TaskerProfileScreen = ({ navigation }) => {
             )}
           </View>
           
-          {editing && (
+          {editingSections.skills && (
             <View style={styles.addSkillContainer}>
               <TextInput
                 style={styles.skillInput}
@@ -769,18 +956,11 @@ const TaskerProfileScreen = ({ navigation }) => {
 
         {/* Work Experience Section */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="briefcase-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Work Experience</Text>
-            {editing && (
-              <TouchableOpacity 
-                style={styles.addExperienceButton}
-                onPress={() => openExperienceModal()}
-              >
-                <Ionicons name="add" size={20} color="#6366F1" />
-              </TouchableOpacity>
-            )}
-          </View>
+          <SectionHeader 
+            title="Work Experience" 
+            section="workExperience" 
+            icon="briefcase-outline" 
+          />
           
           {profileData.workExperience && profileData.workExperience.length > 0 ? (
             <View style={styles.experienceList}>
@@ -789,7 +969,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                   <View style={styles.experienceContent}>
                     <View style={styles.experienceHeader}>
                       <Text style={styles.experienceJobTitle}>{experience.jobTitle}</Text>
-                      {editing && (
+                      {editingSections.workExperience && (
                         <View style={styles.experienceActions}>
                           <TouchableOpacity 
                             style={styles.experienceActionButton}
@@ -834,23 +1014,64 @@ const TaskerProfileScreen = ({ navigation }) => {
               <Text style={styles.emptyExperienceSubtext}>
                 Add your professional experience to showcase your expertise
               </Text>
-              {editing && (
-                <TouchableOpacity 
-                  style={styles.addFirstExperienceButton}
-                  onPress={() => openExperienceModal()}
-                >
-                  <Text style={styles.addFirstExperienceText}>Add First Experience</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
+
+          {editingSections.workExperience && (
+            <TouchableOpacity 
+              style={styles.addFirstExperienceButton}
+              onPress={() => openExperienceModal()}
+            >
+              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Text style={styles.addFirstExperienceText}>Add Experience</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Enhanced Availability Section */}
+        <View style={styles.section}>
+          <SectionHeader 
+            title="Availability" 
+            section="availability" 
+            icon="time-outline" 
+          />
+          
+          <TouchableOpacity 
+            style={styles.availabilityContainer}
+            onPress={() => setShowAvailabilityModal(true)}
+            disabled={updatingAvailability}
+          >
+            <View style={styles.availabilityInfo}>
+              <View style={[styles.availabilityBadge, { backgroundColor: getCurrentAvailability().color }]}>
+                <Ionicons name={getCurrentAvailability().icon} size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.availabilityTextContainer}>
+                <Text style={styles.availabilityStatus}>{getCurrentAvailability().label}</Text>
+                <Text style={styles.availabilityDescription}>
+                  {getAvailabilityDescription()}
+                </Text>
+                {profileData.availability?.currentTaskCount > 0 && (
+                  <Text style={styles.currentTasksText}>
+                    {profileData.availability.currentTaskCount} active task{profileData.availability.currentTaskCount !== 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+            </View>
+            {updatingAvailability ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Reviews & Ratings Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="star-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="star-outline" size={20} color="#6366F1" />
+              <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            </View>
             {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
               <TouchableOpacity 
                 style={styles.viewAllButton}
@@ -880,45 +1101,13 @@ const TaskerProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Enhanced Availability */}
+        {/* Notification Settings */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="time-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Availability</Text>
-          </View>
-          <View style={styles.availabilityContainer}>
-            <View style={styles.availabilityInfo}>
-              <Ionicons 
-                name={profileData.availability === 'Available' ? "checkmark-circle" : "close-circle"} 
-                size={24} 
-                color={profileData.availability === 'Available' ? "#10B981" : "#EF4444"} 
-              />
-              <View>
-                <Text style={styles.availabilityStatus}>{profileData.availability || 'Not Available'}</Text>
-                <Text style={styles.availabilityText}>
-                  {profileData.availability === 'Available' ? 'Ready for new tasks' : 'Not accepting new tasks'}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={profileData.availability === 'Available'}
-              onValueChange={(value) => setProfileData({
-                ...profileData,
-                availability: value ? 'Available' : 'Not Available'
-              })}
-              disabled={!editing}
-              trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-              thumbColor={profileData.availability === 'Available' ? '#4F46E5' : '#9CA3AF'}
-            />
-          </View>
-        </View>
-
-        {/* Enhanced Notification Settings */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="notifications-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Notifications</Text>
-          </View>
+          <SectionHeader 
+            title="Notifications" 
+            section="notifications" 
+            icon="notifications-outline" 
+          />
           
           <View style={styles.notificationList}>
             <View style={styles.notificationItem}>
@@ -955,11 +1144,13 @@ const TaskerProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Enhanced Account Actions */}
+        {/* Account Actions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="settings-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="settings-outline" size={20} color="#6366F1" />
+              <Text style={styles.sectionTitle}>Account</Text>
+            </View>
           </View>
           
           <View style={styles.accountActions}>
@@ -969,7 +1160,7 @@ const TaskerProfileScreen = ({ navigation }) => {
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton} onPress={() => Alert.alert('Payment Method', 'Payment Method Settings feature coming soon!')}>
+            <TouchableOpacity style={styles.accountButton} onPress={() => navigate("PaymentMethodScreen")}>
               <Ionicons name="card-outline" size={20} color="#6366F1" />
               <Text style={styles.accountButtonText}>Payment Methods</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
@@ -991,13 +1182,130 @@ const TaskerProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Enhanced Footer */}
+        {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             Member since {formatMemberSince()}
           </Text>
         </View>
       </Animated.ScrollView>
+
+      {/* Availability Modal */}
+      <Modal
+        visible={showAvailabilityModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAvailabilityModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Availability</Text>
+              <TouchableOpacity onPress={() => setShowAvailabilityModal(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm}>
+              <Text style={styles.modalSubtitle}>Select your current status:</Text>
+              
+              {AVAILABILITY_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.availabilityOption,
+                    profileData.availability?.status === option.value && styles.availabilityOptionSelected
+                  ]}
+                  onPress={() => {
+                    setProfileData({
+                      ...profileData,
+                      availability: {
+                        ...profileData.availability,
+                        status: option.value,
+                        manuallySet: true
+                      }
+                    });
+                  }}
+                >
+                  <View style={[styles.availabilityOptionIcon, { backgroundColor: option.color }]}>
+                    <Ionicons name={option.icon} size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.availabilityOptionText}>
+                    <Text style={styles.availabilityOptionLabel}>{option.label}</Text>
+                    <Text style={styles.availabilityOptionDescription}>{option.description}</Text>
+                  </View>
+                  {profileData.availability?.status === option.value && (
+                    <Ionicons name="checkmark" size={20} color="#10B981" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              {/* Next Available Date for Away Status */}
+              {profileData.availability?.status === 'away' && (
+                <View style={styles.nextAvailableContainer}>
+                  <Text style={styles.formLabel}>When will you be back?</Text>
+                  <TouchableOpacity 
+                    style={styles.dateInput}
+                    onPress={() => setShowNextAvailablePicker(true)}
+                  >
+                    <Text style={[
+                      styles.dateInputText, 
+                      !profileData.availability.nextAvailableAt && styles.placeholderText
+                    ]}>
+                      {profileData.availability.nextAvailableAt 
+                        ? `${formatDisplayDate(profileData.availability.nextAvailableAt)} at ${formatDisplayTime(profileData.availability.nextAvailableAt)}`
+                        : 'Select date and time'
+                      }
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Current Tasks Info */}
+              {profileData.availability?.currentTaskCount > 0 && (
+                <View style={styles.currentTasksContainer}>
+                  <Ionicons name="information-circle" size={20} color="#6366F1" />
+                  <Text style={styles.currentTasksInfo}>
+                    You have {profileData.availability.currentTaskCount} active task{profileData.availability.currentTaskCount !== 1 ? 's' : ''}. 
+                    Changing to 'Offline' won't affect current tasks.
+                  </Text>
+                </View>
+              )}
+
+              {showNextAvailablePicker && (
+                <DateTimePicker
+                  value={profileData.availability.nextAvailableAt ? new Date(profileData.availability.nextAvailableAt) : new Date()}
+                  mode="datetime"
+                  display="default"
+                  onChange={onNextAvailableChange}
+                  minimumDate={new Date()}
+                />
+              )}
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowAvailabilityModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.saveButton, updatingAvailability && styles.saveButtonDisabled]}
+                onPress={() => handleUpdateAvailability(profileData.availability.status)}
+                disabled={updatingAvailability}
+              >
+                {updatingAvailability ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Update Availability</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Work Experience Modal */}
       <Modal

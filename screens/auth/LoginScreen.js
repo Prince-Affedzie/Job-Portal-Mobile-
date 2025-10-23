@@ -370,7 +370,7 @@ const Login = ({ navigation }) => {
 
               {/* Options Row */}
               <View style={styles.optionsRow}>
-                <TouchableOpacity
+               {/*<TouchableOpacity
                   style={styles.rememberMe}
                   onPress={() => handleChange('rememberMe', !formData.rememberMe)}
                   disabled={status === 'loading'}
@@ -388,7 +388,7 @@ const Login = ({ navigation }) => {
                     </View>
                     <Text style={styles.rememberMeText}>Remember me</Text>
                   </View>
-                </TouchableOpacity>
+                </TouchableOpacity>*/}
                 <TouchableOpacity
                   onPress={() => navigate('ForgotPassword')}
                   disabled={status === 'loading'}

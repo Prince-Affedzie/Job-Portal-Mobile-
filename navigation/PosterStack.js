@@ -151,7 +151,7 @@ function PosterTabs() {
             ),
             tabBarBadge: unreadNotifications.length > 0 ? unreadNotifications.length : undefined,
           }}
-          listeners={({ navigation }) => ({
+          /*listeners={({ navigation }) => ({
             tabPress: (e) => {
               // Reset to top of notifications when tab is pressed
               navigation.reset({
@@ -159,7 +159,7 @@ function PosterTabs() {
                 routes: [{ name: 'Notifications' }],
               });
             },
-          })}
+          })}*/
         />
 
         <Tab.Screen

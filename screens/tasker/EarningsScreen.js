@@ -364,7 +364,7 @@ const EarningScreen = ({ navigation }) => {
     />
     
     <StatCard
-      title="Pending Tasks"
+      title="On-Pending Tasks"
       value={earningsStats.pendingTasks}
       subtitle="In progress / escrow"
       icon="time"

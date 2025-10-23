@@ -32,3 +32,9 @@ export const modifyProfile = (formData) =>
       },
     });
 
+
+export const updateAvailability = (data)=>API.patch("/api/h1/v2/update_availability",data)
+export const addPaymentMethod = (data)=>API.post("/api/h1/v2/add_payment_method",data)
+export const updatePaymentMethod = (methodId,data)=>API.put(`/api/h1/v2/update_payment_method/${methodId}`,data)
+export const removePaymentMethod = (methodId)=>API.delete(`/api/h1/v2/delete_payment_method/${methodId}`)
+

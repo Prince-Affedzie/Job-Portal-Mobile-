@@ -391,49 +391,115 @@ const SubmissionsScreen = () => {
   };
 
   // File Item Component
-  const FileItem = ({ file, submissionStatus }) => {
-    const [isLoading, setIsLoading] = useState(false);
-    
-    const handleFilePress = async () => {
-      setIsLoading(true);
-      try {
-        await openFile(file, submissionStatus);
-      } catch (error) {
-        console.error('Error handling file press:', error);
-      } finally {
-        setIsLoading(false);
+  // File Item Component with Preview
+const FileItem = ({ file, submissionStatus }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [fileUrl, setFileUrl] = useState(null);
+  const [isImage, setIsImage] = useState(false);
+  const [isVideo, setIsVideo] = useState(false);
+
+  // Determine file type and fetch URL on mount
+  useEffect(() => {
+    const checkFileType = () => {
+      const fileName = file.fileKey.toLowerCase();
+      const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
+      const videoRegex = /\.(mp4|webm|mov|avi|wmv|mkv)$/i;
+      
+      setIsImage(imageRegex.test(fileName));
+      setIsVideo(videoRegex.test(fileName));
+    };
+
+    checkFileType();
+  }, [file.fileKey]);
+
+  // Fetch file URL for preview (thumbnail only)
+  useEffect(() => {
+    const fetchPreviewUrl = async () => {
+      if (isImage || isVideo) {
+        try {
+          const url = await getFileUrl(file.fileKey, submissionStatus);
+          setFileUrl(url);
+        } catch (error) {
+          console.error('Error fetching preview URL:', error);
+        }
       }
     };
 
-    return (
-      <TouchableOpacity 
-        style={styles.fileItem}
-        onPress={handleFilePress}
-        disabled={isLoading || openingFile === file.fileKey}
-      >
-        <Ionicons 
-          name={getFileTypeIcon(file.fileKey)} 
-          size={20} 
-          color="#6366F1" 
-        />
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName} numberOfLines={1}>
-            {file.fileKey.split('/').pop()}
-          </Text>
-          <Text style={styles.fileType}>
-            {getFileTypeIcon(file.fileKey).replace('-outline', '')}
-          </Text>
-        </View>
-        <View style={styles.previewButton}>
-          {(isLoading || openingFile === file.fileKey) ? (
-            <ActivityIndicator size="small" color="#6366F1" />
-          ) : (
-            <Ionicons name="eye-outline" size={18} color="#6366F1" />
-          )}
-        </View>
-      </TouchableOpacity>
-    );
+    fetchPreviewUrl();
+  }, [file.fileKey, submissionStatus, isImage, isVideo]);
+
+  const handleFilePress = async () => {
+    // Always open the file using the original function
+    setIsLoading(true);
+    try {
+      await openFile(file, submissionStatus);
+    } catch (error) {
+      console.error('Error handling file press:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  return (
+    <TouchableOpacity 
+      style={styles.fileItem}
+      onPress={handleFilePress}
+      disabled={isLoading || openingFile === file.fileKey}
+    >
+      {/* File Icon or Preview Thumbnail */}
+      {(isImage || isVideo) && fileUrl ? (
+  <View style={styles.previewThumbnail}>
+    {isImage ? (
+      <Image 
+        source={{ uri: fileUrl }} 
+        style={styles.thumbnailImage}
+        resizeMode="cover"
+      />
+    ) : (
+      <View style={styles.videoThumbnail}>
+        <Image 
+          source={{ uri: fileUrl }} 
+          style={styles.thumbnailImage}
+          resizeMode="cover"
+        />
+        <View style={styles.playIconContainer}>
+          <Ionicons name="play-circle" size={24} color="#FFFFFF" />
+        </View>
+      </View>
+    )}
+  </View>
+) : (
+  <Ionicons 
+    name={getFileTypeIcon(file.fileKey)} 
+    size={20} 
+    color="#6366F1" 
+  />
+)}
+      
+      <View style={styles.fileInfo}>
+        <Text style={styles.fileName} numberOfLines={1}>
+          {file.fileKey.split('/').pop()}
+        </Text>
+        <Text style={styles.fileType}>
+          {getFileTypeIcon(file.fileKey).replace('-outline', '')}
+          {(isImage || isVideo) && ' • Tap to open'}
+        </Text>
+      </View>
+      
+      <View style={styles.previewButton}>
+        {(isLoading || openingFile === file.fileKey) ? (
+          <ActivityIndicator size="small" color="#6366F1" />
+        ) : (
+          <Ionicons 
+            name="open-outline" 
+            size={18} 
+            color="#6366F1" 
+          />
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
   if (loading) {
     return (
@@ -712,7 +778,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#374151',
     marginBottom: 12,
   },
@@ -735,7 +801,7 @@ const styles = StyleSheet.create({
   },
   submissionNumber: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#1E293B',
     flex: 1,
   },
@@ -809,7 +875,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#374151',
     marginBottom: 4,
   },
@@ -829,7 +895,7 @@ const styles = StyleSheet.create({
   },
   messageLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#374151',
   },
   messageBox: {
@@ -875,7 +941,7 @@ const styles = StyleSheet.create({
   },
   filesLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#374151',
     marginBottom: 12,
   },
@@ -911,6 +977,144 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#EEF2FF',
   },
+   previewThumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+
+  // Preview Modal Styles
+  previewModal: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    zIndex: 1000,
+    justifyContent: 'space-between',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  previewTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  previewContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: 500,
+    maxHeight: 500,
+  },
+  videoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  videoMessage: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  playButton: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  playButtonText: {
+    color: '#6366F1',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  previewActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#6366F1',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: '#6B7280',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    gap: 12,
+  },
+  playIconContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Optional: slight overlay for better visibility
+  },
+
 });
 
 export default SubmissionsScreen;

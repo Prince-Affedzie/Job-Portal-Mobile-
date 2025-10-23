@@ -507,7 +507,7 @@ export const styles = StyleSheet.create({
   },
   subsectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#1E293B',
     marginBottom: 12,
   },
@@ -1169,4 +1169,34 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1E293B',
   },
+
+  // Add these styles to your existing styles file
+requirementsSection: {
+  marginBottom: 24,
+},
+requirementsList: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 12,
+  padding: 16,
+  marginTop: 8,
+},
+requirementItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginBottom: 12,
+  paddingVertical: 4,
+},
+requirementBullet: {
+  width: 20,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 2,
+},
+requirementText: {
+  fontSize: 14,
+  color: '#475569',
+  flex: 1,
+  lineHeight: 20,
+  fontWeight: '500',
+},
 });

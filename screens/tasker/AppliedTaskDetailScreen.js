@@ -220,6 +220,14 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const hasTaskerMarkedDone = task?.markedDoneByTasker === true;
   const canMarkAsDone = isAssignedToUser && !isTaskCompleted && !hasTaskerMarkedDone;
 
+  // NEW: Get requirements function
+  const getRequirements = () => {
+    if (!task || !task.requirements || task.requirements.length === 0) {
+      return ['Good communication skills', 'Reliable and punctual', 'Attention to detail', 'Quality work delivery'];
+    }
+    return task.requirements;
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -244,6 +252,8 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
       </SafeAreaView>
     );
   }
+
+  const requirements = getRequirements();
 
   const TabButton = ({ title, icon, isActive, onPress, badge }) => (
     <TouchableOpacity
@@ -314,6 +324,16 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
     <View style={[styles.safetyItem, { backgroundColor: color + '20', borderColor: color + '40' }]}>
       <Ionicons name={icon} size={16} color={color} />
       <Text style={[styles.safetyText, { color }]}>{text}</Text>
+    </View>
+  );
+
+  // NEW: Requirement Item Component
+  const RequirementItem = ({ requirement, index }) => (
+    <View style={styles.requirementItem}>
+      <View style={styles.requirementBullet}>
+        <Ionicons name="ellipse" size={8} color="#10B981" />
+      </View>
+      <Text style={styles.requirementText}>{requirement}</Text>
     </View>
   );
 
@@ -464,7 +484,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
             icon="checkmark-done-outline"
             isActive={activeTab === 'requirements'}
             onPress={() => setActiveTab('requirements')}
-            badge={task.skillsRequired?.length || null}
+            badge={task.requirements?.length || task.skillsRequired?.length || null}
           />
         </View>
 
@@ -627,6 +647,20 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
               <View style={styles.sectionHeader}>
                 <Ionicons name="checkmark-done" size={22} color="#6366F1" />
                 <Text style={styles.sectionTitle}>Task Requirements</Text>
+              </View>
+
+              {/* NEW: Requirements Section */}
+              <View style={styles.requirementsSection}>
+                <Text style={styles.subsectionTitle}>Task Requirements & Deliverables</Text>
+                <View style={styles.requirementsList}>
+                  {requirements.map((requirement, index) => (
+                    <RequirementItem 
+                      key={index} 
+                      requirement={requirement} 
+                      index={index} 
+                    />
+                  ))}
+                </View>
               </View>
 
               {/* Enhanced Skills Section */}

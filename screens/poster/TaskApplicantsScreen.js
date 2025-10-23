@@ -291,6 +291,75 @@ export default function ApplicantsScreen({ route }) {
     });
 
   // Rest of your component rendering remains the same...
+
+  const renderEmptyState = () => {
+  const isFixedBid = biddingType === 'fixed';
+  const emptyTitle = isFixedBid ? "No Applicants Yet" : "No Bids Yet";
+  const emptyDescription = isFixedBid 
+    ? "No one has applied to your task yet. Share your task to get more visibility and attract qualified taskers."
+    : "No bids have been submitted for your task yet. Taskers are reviewing your requirements and will submit their bids soon.";
+  const emptyIcon = isFixedBid ? "people-outline" : "pricetags-outline";
+
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIllustration}>
+        <Ionicons name={emptyIcon} size={48} color="#9CA3AF" />
+      </View>
+      
+      <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+      <Text style={styles.emptyDescription}>{emptyDescription}</Text>
+      
+      <TouchableOpacity 
+        style={styles.shareButton}
+        onPress={() => {
+          // Implement share functionality
+          Alert.alert(
+            "Share Task",
+            "Share this task with potential taskers to get more applications.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { 
+                text: "Share", 
+                onPress: () => {
+                  // Add your share logic here
+                  console.log("Share task:", taskId);
+                }
+              }
+            ]
+          );
+        }}
+      >
+        <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.shareButtonText}>Share Task</Text>
+      </TouchableOpacity>
+      
+      {/* Additional Tips */}
+      <View style={styles.tipsContainer}>
+        <Text style={styles.tipsTitle}>Tips to attract more {isFixedBid ? 'applicants' : 'bids'}:</Text>
+        <View style={styles.tipItem}>
+          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Text style={styles.tipText}>Ensure your task description is clear and detailed</Text>
+        </View>
+        <View style={styles.tipItem}>
+          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Text style={styles.tipText}>Set a competitive budget for your task</Text>
+        </View>
+        <View style={styles.tipItem}>
+          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Text style={styles.tipText}>Add specific requirements and skills needed</Text>
+        </View>
+        {!isFixedBid && (
+          <View style={styles.tipItem}>
+            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+            <Text style={styles.tipText}>Consider setting a realistic timeline for completion</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+
   const renderApplicantCard = ({ item: applicant }) => (
     <View style={styles.applicantCard}>
       {/* Applicant Header */}
@@ -1224,4 +1293,90 @@ const styles = StyleSheet.create({
     backgroundColor: '#9CA3AF',
     opacity: 0.6,
   },
+  emptyState: {
+  alignItems: 'center',
+  padding: 40,
+  backgroundColor: '#FFFFFF',
+  borderRadius: 12,
+  marginHorizontal: 16,
+  marginTop: 20,
+  marginBottom: 20,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 4,
+  elevation: 2,
+},
+emptyIllustration: {
+  width: 120,
+  height: 120,
+  borderRadius: 60,
+  backgroundColor: '#F8FAFC',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 24,
+  borderWidth: 2,
+  borderColor: '#F1F5F9',
+},
+emptyTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#1E293B',
+  marginBottom: 12,
+  textAlign: 'center',
+},
+emptyDescription: {
+  fontSize: 16,
+  color: '#64748B',
+  textAlign: 'center',
+  marginBottom: 32,
+  lineHeight: 22,
+},
+shareButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#6366F1',
+  paddingHorizontal: 24,
+  paddingVertical: 14,
+  borderRadius: 12,
+  gap: 8,
+  marginBottom: 32,
+  shadowColor: '#6366F1',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 4,
+},
+shareButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '600',
+},
+tipsContainer: {
+  width: '100%',
+  backgroundColor: '#F8FAFC',
+  padding: 20,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#F1F5F9',
+},
+tipsTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginBottom: 16,
+  textAlign: 'center',
+},
+tipItem: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginBottom: 12,
+  gap: 8,
+},
+tipText: {
+  flex: 1,
+  fontSize: 14,
+  color: '#475569',
+  lineHeight: 20,
+},
 });

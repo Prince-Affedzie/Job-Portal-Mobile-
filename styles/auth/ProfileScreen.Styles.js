@@ -548,6 +548,7 @@ export const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+    marginBottom:24,
     gap: 12,
   },
   cancelButton: {
@@ -597,4 +598,203 @@ dateInputText: {
 disabledText: {
   color: '#9CA3AF',
 },
+availabilityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  availabilityInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  availabilityBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  availabilityTextContainer: {
+    flex: 1,
+  },
+  availabilityStatus: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  availabilityDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  currentTasksText: {
+    fontSize: 12,
+    color: '#6366F1',
+    fontWeight: '500',
+  },
+
+  // Availability Modal Styles
+  availabilityOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  availabilityOptionSelected: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#6366F1',
+  },
+  availabilityOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  availabilityOptionText: {
+    flex: 1,
+  },
+  availabilityOptionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  availabilityOptionDescription: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  nextAvailableContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  currentTasksContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  currentTasksInfo: {
+    flex: 1,
+    fontSize: 14,
+    color: '#3730A3',
+    marginLeft: 8,
+    lineHeight: 18,
+  },
+
+  // Modal Styles (enhanced for availability)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  modalForm: {
+    padding: 20,
+  },
+  sectionEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  sectionEditButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6366F1',
+  },
+
+
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
+    marginRight: 2,
+  },
+  sectionActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionCancelButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  sectionCancelButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  sectionSaveButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#6366F1',
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  sectionSaveButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+
+  
 });

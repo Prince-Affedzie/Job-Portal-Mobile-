@@ -80,6 +80,7 @@ const EditTaskScreen = ({ route, navigation }) => {
     deadline: new Date(),
     locationType: 'remote',
     skillsRequired: [],
+    requirements: [], // NEW: Requirements array
     address: {
       region: '',
       city: '',
@@ -90,6 +91,7 @@ const EditTaskScreen = ({ route, navigation }) => {
   });
 
   const [currentSkill, setCurrentSkill] = useState('');
+  const [currentRequirement, setCurrentRequirement] = useState(''); // NEW: Current requirement input
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,6 +107,7 @@ const EditTaskScreen = ({ route, navigation }) => {
         deadline: initialTask.deadline ? new Date(initialTask.deadline) : new Date(),
         locationType: initialTask.locationType || 'remote',
         skillsRequired: initialTask.skillsRequired || [],
+        requirements: initialTask.requirements || [], // NEW: Initialize requirements
         address: initialTask.address || {
           region: '',
           city: '',
@@ -182,14 +185,31 @@ const EditTaskScreen = ({ route, navigation }) => {
     }));
   };
 
+  // NEW: Add requirement function
+  const addRequirement = () => {
+    if (currentRequirement.trim() && !task.requirements.includes(currentRequirement.trim())) {
+      setTask(prev => ({
+        ...prev,
+        requirements: [...prev.requirements, currentRequirement.trim()]
+      }));
+      setCurrentRequirement('');
+    }
+  };
+
+  // NEW: Remove requirement function
+  const removeRequirement = (requirementToRemove) => {
+    setTask(prev => ({
+      ...prev,
+      requirements: prev.requirements.filter(req => req !== requirementToRemove)
+    }));
+  };
+
   const onDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
     if (selectedDate) {
       setTask(prev => ({ ...prev, deadline: selectedDate }));
     }
   };
-
-  
 
   const SectionHeader = ({ title, icon }) => (
     <View style={styles.sectionHeader}>
@@ -270,6 +290,84 @@ const EditTaskScreen = ({ route, navigation }) => {
               </View>
             </View>
           </View>
+        </View>
+
+        {/* Skills Section */}
+        <View style={styles.sectionCard}>
+          <SectionHeader title="Required Skills" icon="construct-outline" />
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Skills Needed</Text>
+            <View style={styles.skillInputContainer}>
+              <TextInput
+                style={[styles.textInput, styles.skillInput]}
+                value={currentSkill}
+                onChangeText={setCurrentSkill}
+                placeholder="Add a required skill"
+                onSubmitEditing={addSkill}
+              />
+              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {task.skillsRequired.length > 0 && (
+            <View style={styles.skillsContainer}>
+              {task.skillsRequired.map((skill, index) => (
+                <View key={index} style={styles.skillTag}>
+                  <Text style={styles.skillText}>{skill}</Text>
+                  <TouchableOpacity 
+                    style={styles.removeSkillButton}
+                    onPress={() => removeSkill(skill)}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* NEW: Requirements Section */}
+        <View style={styles.sectionCard}>
+          <SectionHeader title="Task Requirements" icon="list-outline" />
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Requirements & Deliverables</Text>
+            <View style={styles.skillInputContainer}>
+              <TextInput
+                style={[styles.textInput, styles.skillInput]}
+                value={currentRequirement}
+                onChangeText={setCurrentRequirement}
+                placeholder="Add a requirement (e.g., Responsive design, Source files included)"
+                onSubmitEditing={addRequirement}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.addSkillButton} onPress={addRequirement}>
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.skillHint}>
+              Press Enter or the + button to add requirements
+            </Text>
+          </View>
+
+          {task.requirements.length > 0 && (
+            <View style={styles.skillsContainer}>
+              {task.requirements.map((requirement, index) => (
+                <View key={index} style={[styles.skillTag]}>
+                  <Text style={[styles.skillText]}>{requirement}</Text>
+                  <TouchableOpacity 
+                    style={styles.removeSkillButton}
+                    onPress={() => removeRequirement(requirement)}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Budget & Timeline Section */}
@@ -412,43 +510,7 @@ const EditTaskScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Skills & Requirements Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader title="Skills & Requirements" icon="construct-outline" />
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Required Skills</Text>
-            <View style={styles.skillInputContainer}>
-              <TextInput
-                style={[styles.textInput, styles.skillInput]}
-                value={currentSkill}
-                onChangeText={setCurrentSkill}
-                placeholder="Add a required skill"
-                onSubmitEditing={addSkill}
-              />
-              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {task.skillsRequired.length > 0 && (
-            <View style={styles.skillsContainer}>
-              {task.skillsRequired.map((skill, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                  <TouchableOpacity 
-                    style={styles.removeSkillButton}
-                    onPress={() => removeSkill(skill)}
-                  >
-                    <Ionicons name="close" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-
-        </View>
+        
 
         {/* Submit Button */}
         <TouchableOpacity
@@ -508,7 +570,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#1E293B',
   },
   inputContainer: {
@@ -619,6 +681,11 @@ const styles = StyleSheet.create({
   skillInput: {
     flex: 1,
   },
+  skillHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
   addSkillButton: {
     backgroundColor: '#6366F1',
     width: 44,
@@ -641,11 +708,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     gap: 6,
+    maxWidth: '100%', // Prevent overflow
+   flexShrink: 1, // Allow shrinking if needed
+  },
+  requirementTag: {
+    backgroundColor: '#F0FDF4',
   },
   skillText: {
-    fontSize: 12,
-    color: '#3730A3',
-    fontWeight: '500',
+  fontSize: 12,
+  color: '#1E293B',
+  fontWeight: '500',
+  flexShrink: 1, // Allow text to shrink
+  flexWrap: 'wrap', // Allow text wrapping
+  },
+  requirementText: {
+    color: '#166534',
   },
   removeSkillButton: {
     padding: 2,

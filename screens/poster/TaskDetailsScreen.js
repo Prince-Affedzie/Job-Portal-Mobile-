@@ -172,6 +172,14 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
     return moment(date).format("MMM DD, YYYY [at] h:mm A");
   };
 
+  // NEW: Get requirements function
+  const getRequirements = () => {
+    if (!task || !task.requirements || task.requirements.length === 0) {
+      return ['Good communication skills', 'Reliable and punctual', 'Attention to detail', 'Quality work delivery'];
+    }
+    return task.requirements;
+  };
+
   const hasApplicants = task?.applicants && task.applicants.length > 0;
   const isAssigned = task?.assignedTo && task.status !== 'Open' && task.status !== 'Pending';
   const isTaskCompleted = task?.status?.toLowerCase() === 'completed';
@@ -216,6 +224,8 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
       </SafeAreaView>
     );
   }
+
+  const requirements = getRequirements();
 
   // Enhanced Components
   const TabButton = ({ title, icon, isActive, onPress, badge }) => (
@@ -280,6 +290,16 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           </Text>
         )}
       </View>
+    </View>
+  );
+
+  // NEW: Requirement Item Component
+  const RequirementItem = ({ requirement, index }) => (
+    <View style={styles.requirementItem}>
+      <View style={styles.requirementBullet}>
+        <Ionicons name="ellipse" size={8} color="#10B981" />
+      </View>
+      <Text style={styles.requirementText}>{requirement}</Text>
     </View>
   );
 
@@ -407,7 +427,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               icon="checkmark-done-outline"
               isActive={activeTab === 'requirements'}
               onPress={() => setActiveTab('requirements')}
-              badge={task.skillsRequired?.length || null}
+              badge={task.requirements?.length || task.skillsRequired?.length || null}
             />
           </View>
 
@@ -551,6 +571,21 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.sectionTitle}>Task Requirements</Text>
                 </View>
 
+                {/* NEW: Requirements Section */}
+                <View style={styles.requirementsSection}>
+                  <Text style={styles.subsectionTitle}>Task Requirements & Deliverables</Text>
+                  <View style={styles.requirementsList}>
+                    {requirements.map((requirement, index) => (
+                      <RequirementItem 
+                        key={index} 
+                        requirement={requirement} 
+                        index={index} 
+                      />
+                    ))}
+                  </View>
+                </View>
+
+                {/* Enhanced Skills Section */}
                 {task.skillsRequired && task.skillsRequired.length > 0 && (
                   <View style={styles.skillsSection}>
                     <Text style={styles.subsectionTitle}>Required Skills</Text>
@@ -565,6 +600,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   </View>
                 )}
 
+                {/* Enhanced Verification Requirements */}
                 {task.verificationRequired && (
                   <View style={styles.verificationSection}>
                     <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
@@ -1070,6 +1106,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1E293B',
+  },
+
+  // NEW: Requirements Styles
+  requirementsSection: {
+    marginBottom: 24,
+  },
+  requirementsList: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingVertical: 4,
+  },
+  requirementBullet: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  requirementText: {
+    fontSize: 14,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 20,
+    fontWeight: '500',
   },
 
   // Enhanced Info Grid

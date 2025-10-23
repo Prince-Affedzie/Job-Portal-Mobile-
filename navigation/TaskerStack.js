@@ -15,6 +15,7 @@ import { NotificationContext } from "../context/NotificationContext";
 import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 import HelpSupportScreen from "../screens/tasker/SupportScreen"
 import EarningScreen from "../screens/tasker/EarningsScreen";
+import PaymentMethodScreen from '../screens/tasker/PaymentMethodScreen'
 import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
@@ -35,6 +36,7 @@ function TaskerStackNavigator() {
       <Stack.Screen name="EarningScreen" component={EarningScreen} />
       <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
       <Stack.Screen name="SupportScreen" component={HelpSupportScreen} />
+      <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}

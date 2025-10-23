@@ -243,12 +243,14 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="checkmark-circle-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>What We're Looking For</Text>
+              <Text style={styles.sectionTitle}>Task Requirements</Text>
             </View>
             <View style={styles.requirementsList}>
               {requirements.map((req, index) => (
                 <View key={index} style={styles.requirementItem}>
-                  <Ionicons name="checkmark" size={16} color="#10B981" />
+                  <View style={styles.requirementBullet}>
+                    <Ionicons name="ellipse" size={8} color="#10B981" />
+                  </View>
                   <Text style={styles.requirementText}>{req}</Text>
                 </View>
               ))}
@@ -259,7 +261,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="build-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Recommended Skills</Text>
+              <Text style={styles.sectionTitle}>Required Skills</Text>
             </View>
             <View style={styles.skillsContainer}>
               {skills.map((skill, index) => (
@@ -531,7 +533,7 @@ export const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#1E293B',
   },
   description: {
@@ -540,20 +542,35 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  // Requirements
+  // Requirements - UPDATED STYLES
   requirementsList: {
-    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
   },
   requirementItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    marginBottom: 12,
+    paddingVertical: 4,
+  },
+  requirementBullet: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
   },
   requirementText: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#475569',
     flex: 1,
     lineHeight: 20,
+    fontWeight: '500',
   },
 
   // Skills

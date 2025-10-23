@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
- SafeAreaView,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -13,6 +12,7 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -82,6 +82,7 @@ const CreateTaskScreen = ({ navigation }) => {
     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default: 7 days from now
     locationType: 'remote',
     skillsRequired: [],
+    requirements: [], // NEW: Requirements array
     address: {
       region: '',
       city: '',
@@ -91,6 +92,7 @@ const CreateTaskScreen = ({ navigation }) => {
   });
 
   const [currentSkill, setCurrentSkill] = useState('');
+  const [currentRequirement, setCurrentRequirement] = useState(''); // NEW: Current requirement input
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -184,6 +186,25 @@ const CreateTaskScreen = ({ navigation }) => {
     setTask(prev => ({
       ...prev,
       skillsRequired: prev.skillsRequired.filter(skill => skill !== skillToRemove)
+    }));
+  };
+
+  // NEW: Add requirement function
+  const addRequirement = () => {
+    if (currentRequirement.trim() && !task.requirements.includes(currentRequirement.trim())) {
+      setTask(prev => ({
+        ...prev,
+        requirements: [...prev.requirements, currentRequirement.trim()]
+      }));
+      setCurrentRequirement('');
+    }
+  };
+
+  // NEW: Remove requirement function
+  const removeRequirement = (requirementToRemove) => {
+    setTask(prev => ({
+      ...prev,
+      requirements: prev.requirements.filter(req => req !== requirementToRemove)
     }));
   };
 
@@ -283,6 +304,107 @@ const CreateTaskScreen = ({ navigation }) => {
                 </Picker>
               </View>
             </View>
+          </View>
+        </View>
+
+
+        {/* Skills & Requirements Section */}
+        <View style={styles.sectionCard}>
+          <SectionHeader 
+            title="Required Skills" 
+            icon="construct-outline"
+            description="What skills are needed to complete this task?"
+          />
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Skills Needed</Text>
+            <View style={styles.skillInputContainer}>
+              <TextInput
+                style={[styles.textInput, styles.skillInput]}
+                value={currentSkill}
+                onChangeText={setCurrentSkill}
+                placeholder="Add a required skill (e.g., Web Design, Photography)"
+                onSubmitEditing={addSkill}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.skillHint}>
+              Press Enter or the + button to add skills
+            </Text>
+          </View>
+
+          {task.skillsRequired.length > 0 && (
+            <View style={styles.skillsContainer}>
+              {task.skillsRequired.map((skill, index) => (
+                <View key={index} style={styles.skillTag}>
+                  <Text style={styles.skillText}>{skill}</Text>
+                  <TouchableOpacity 
+                    style={styles.removeSkillButton}
+                    onPress={() => removeSkill(skill)}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* NEW: Requirements Section */}
+        <View style={styles.sectionCard}>
+          <SectionHeader 
+            title="Task Requirements" 
+            icon="list-outline"
+            description="List specific requirements and deliverables for this task"
+          />
+          
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Requirements & Deliverables</Text>
+            <View style={styles.skillInputContainer}>
+              <TextInput
+                style={[styles.textInput, styles.skillInput]}
+                value={currentRequirement}
+                onChangeText={setCurrentRequirement}
+                placeholder="Add a requirement (e.g., Responsive design, Source files included)"
+                onSubmitEditing={addRequirement}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.addSkillButton} onPress={addRequirement}>
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.skillHint}>
+              Press Enter or the + button to add requirements
+            </Text>
+          </View>
+
+          {task.requirements.length > 0 && (
+            <View style={styles.skillsContainer}>
+              {task.requirements.map((requirement, index) => (
+                <View key={index} style={[styles.skillTag]}>
+                  <Text style={[styles.skillText]}>{requirement}</Text>
+                  <TouchableOpacity 
+                    style={styles.removeSkillButton}
+                    onPress={() => removeRequirement(requirement)}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.requirementsTips}>
+            <Text style={styles.requirementsTipsTitle}>💡 Tips for Good Requirements:</Text>
+            <Text style={styles.requirementsTipsText}>
+              • Be specific about what needs to be delivered{'\n'}
+              • Include technical specifications if applicable{'\n'}
+              • Mention file formats, sizes, or other details{'\n'}
+              • Set clear expectations for quality standards
+            </Text>
           </View>
         </View>
 
@@ -512,50 +634,7 @@ const CreateTaskScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Skills & Requirements Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Skills & Requirements" 
-            icon="construct-outline"
-            description="What skills are needed to complete this task?"
-          />
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Required Skills</Text>
-            <View style={styles.skillInputContainer}>
-              <TextInput
-                style={[styles.textInput, styles.skillInput]}
-                value={currentSkill}
-                onChangeText={setCurrentSkill}
-                placeholder="Add a required skill (e.g., Web Design, Photography)"
-                onSubmitEditing={addSkill}
-                returnKeyType="done"
-              />
-              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
-                <Ionicons name="add" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.skillHint}>
-              Press Enter or the + button to add skills
-            </Text>
-          </View>
-
-          {task.skillsRequired.length > 0 && (
-            <View style={styles.skillsContainer}>
-              {task.skillsRequired.map((skill, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                  <TouchableOpacity 
-                    style={styles.removeSkillButton}
-                    onPress={() => removeSkill(skill)}
-                  >
-                    <Ionicons name="close" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        
 
         {/* Submit Button */}
         <TouchableOpacity
@@ -593,10 +672,11 @@ const CreateTaskScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#2D325D',
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#FFFFFF'
   },
   scrollContent: {
     padding: 16,
@@ -624,7 +704,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#1E293B',
   },
   sectionDescription: {
@@ -764,26 +844,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  skillTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 6,
-  },
-  skillText: {
-    fontSize: 12,
-    color: '#3730A3',
-    fontWeight: '500',
-  },
+ skillsContainer: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginBottom: 16,
+},
+skillTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#EEF2FF',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 16,
+  gap: 6,
+  maxWidth: '100%', // Prevent overflow
+  flexShrink: 1, // Allow shrinking if needed
+},
+requirementTag: {
+  backgroundColor: '#F0FDF4',
+},
+skillText: {
+  fontSize: 12,
+  color: '#1E293B',
+  fontWeight: '500',
+  flexShrink: 1, // Allow text to shrink
+  flexWrap: 'wrap', // Allow text wrapping
+},
+  
   removeSkillButton: {
     padding: 2,
   },
@@ -823,6 +911,26 @@ const styles = StyleSheet.create({
   budgetTipsText: {
     fontSize: 12,
     color: '#92400E',
+    lineHeight: 16,
+  },
+  // NEW: Requirements tips styles
+  requirementsTips: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#16A34A',
+  },
+  requirementsTipsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
+    marginBottom: 4,
+  },
+  requirementsTipsText: {
+    fontSize: 12,
+    color: '#166534',
     lineHeight: 16,
   },
   submitButton: {

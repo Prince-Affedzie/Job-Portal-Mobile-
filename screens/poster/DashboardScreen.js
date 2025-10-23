@@ -1,5 +1,4 @@
-import { View, Text,SafeAreaView,ScrollView, StyleSheet, Dimensions, TouchableOpacity, RefreshControl ,ActivityIndicator} from 'react-native'
-
+import { View, Text, SafeAreaView, ScrollView, StyleSheet, Dimensions, TouchableOpacity, RefreshControl } from 'react-native'
 import React, { useMemo, useState, useContext, useEffect } from 'react'
 import { LinearGradient } from 'expo-linear-gradient'
 import Ionicons from '@expo/vector-icons/Ionicons'
@@ -13,10 +12,9 @@ const { width } = Dimensions.get('window')
 
 export default function DashboardScreen() {
     const { user } = useContext(AuthContext)
-    const { postedTasks, loading, loadPostedTasks,payments, fetchPayments } = useContext(PosterContext)
+    const { postedTasks, loading, loadPostedTasks, payments, fetchPayments } = useContext(PosterContext)
     const [refreshing, setRefreshing] = useState(false)
 
-    // Refresh function
     const onRefresh = async () => {
         setRefreshing(true)
         await loadPostedTasks(user.id)
@@ -25,190 +23,219 @@ export default function DashboardScreen() {
 
     useEffect(() => {
         loadPostedTasks()
-         fetchPayments()
+        fetchPayments()
     }, [])
 
-    // Enhanced statistics calculation
+    // TRUTHFUL Statistics - Only what poster actually needs to act on
     const dashboardStats = useMemo(() => {
         if (!postedTasks || postedTasks.length === 0) {
             return {
                 totalTasks: 0,
-                completedTasks: 0,
-                activeTasks: 0,
-                inProgressTasks: 0,
-                reviewTasks: 0,
-                assignedTasks: 0,
+                requiresMyAction: 0,
+                awaitingMyReview: 0,
+                inProgress: 0,
+                completedThisWeek: 0,
                 totalSpent: 0,
-                successRate: 0,
-                monthlySpending: 0,
-                urgentTasks: 0,
-                avgTaskValue: 0
+                inEscrow: 0
             }
         }
 
         const totalTasks = postedTasks.length
-        const completedTasks = postedTasks.filter(task => task.status === 'Completed').length
-        const activeTasks = postedTasks.filter(task => ['Open', 'Pending'].includes(task.status)).length
-        const inProgressTasks = postedTasks.filter(task => task.status === 'In-progress').length
-        const reviewTasks = postedTasks.filter(task => task.status === 'Review').length
-        const assignedTasks = postedTasks.filter(task => task.status === 'Assigned').length
         
-        // Calculate urgent tasks (deadline within 2 days)
-        const urgentTasks = postedTasks.filter(task => {
-            if (!task.deadline) return false
-            const deadline = new Date(task.deadline)
-            const now = new Date()
-            const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
-            return daysUntilDeadline <= 2 && !['Completed', 'Closed'].includes(task.status)
+        // WHAT ACTUALLY REQUIRES POSTER'S ATTENTION:
+        const requiresMyAction = postedTasks.filter(task => 
+            task.status === 'Review' || // Needs to review submission
+            (task.status === 'Assigned' && task.assignmentAccepted) // Tasker is working, poster can monitor
+        ).length
+
+        const awaitingMyReview = postedTasks.filter(task => 
+            task.status === 'Review'
+        ).length
+
+        const inProgress = postedTasks.filter(task => 
+            task.status === 'In-progress' || 
+            (task.status === 'Assigned' && task.assignmentAccepted)
+        ).length
+
+        const completedThisWeek = postedTasks.filter(task => {
+            if (task.status !== 'Completed') return false
+            const completionDate = new Date(task.updatedAt || task.createdAt)
+            const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            return completionDate > oneWeekAgo
         }).length
 
         const totalSpent = payments
+            .filter(payment => payment.status === 'completed')
+            .reduce((sum, payment) => sum + (payment.amount || 0), 0)
+
+        const inEscrow = payments
             .filter(payment => payment.status === 'in_escrow')
             .reduce((sum, payment) => sum + (payment.amount || 0), 0)
 
-        const monthlySpending = payments
-            .filter(payment => {
-                if (payment.status !== 'in_escrow') return false
-                const completionDate = new Date(payment.updatedAt || payment.createdAt)
-                const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-                return completionDate > thirtyDaysAgo
-            })
-            .reduce((sum, payment) => sum + (payment.amount || 0), 0)
-
-        const successRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
-        const avgTaskValue = completedTasks > 0 ? Math.round(totalSpent / completedTasks) : 0
-
         return {
             totalTasks,
-            completedTasks,
-            activeTasks,
-            inProgressTasks,
-            reviewTasks,
-            assignedTasks,
+            requiresMyAction,
+            awaitingMyReview,
+            inProgress,
+            completedThisWeek,
             totalSpent,
-            monthlySpending,
-            successRate,
-            urgentTasks,
-            avgTaskValue
+            inEscrow
         }
+    }, [postedTasks, payments])
+
+    // ACTUAL PRIORITY ITEMS - Only what poster needs to DO
+    const priorityActions = useMemo(() => {
+        if (!postedTasks) return []
+        
+        const actions = []
+
+        // 1. Tasks waiting for review (MOST IMPORTANT - poster must act)
+        postedTasks.forEach(task => {
+            if (task.status === 'Review') {
+                actions.push({
+                    id: task._id + '_review',
+                    type: 'review',
+                    title: 'Review Submission',
+                    taskTitle: task.title,
+                    taskId: task._id,
+                    priority: 'high',
+                    description: 'Awaiting your approval',
+                    icon: 'document-text-outline',
+                    color: '#EF4444',
+                    timestamp: task.updatedAt
+                })
+            }
+        })
+
+        // 2. Tasks with approaching deadlines (monitoring, not action)
+        postedTasks.forEach(task => {
+            if (task.deadline && !['Completed', 'Closed'].includes(task.status)) {
+                const deadline = new Date(task.deadline)
+                const now = new Date()
+                const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
+                
+                if (daysUntilDeadline <= 2) {
+                    actions.push({
+                        id: task._id + '_deadline',
+                        type: 'deadline',
+                        title: 'Deadline Approaching',
+                        taskTitle: task.title,
+                        taskId: task._id,
+                        priority: daysUntilDeadline === 1 ? 'high' : 'medium',
+                        description: `${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'} left`,
+                        icon: 'calendar-outline',
+                        color: '#F59E0B',
+                        timestamp: task.deadline
+                    })
+                }
+            }
+        })
+
+        // 3. Recently assigned tasks (just for info)
+        postedTasks.forEach(task => {
+            if (task.status === 'Assigned' && !task.assignmentAccepted) {
+                actions.push({
+                    id: task._id + '_assigned',
+                    type: 'assigned',
+                    title: 'Task Assigned',
+                    taskTitle: task.title,
+                    taskId: task._id,
+                    priority: 'low',
+                    description: 'Waiting for tasker acceptance',
+                    icon: 'person-outline',
+                    color: '#6366F1',
+                    timestamp: task.updatedAt
+                })
+            }
+        })
+
+        return actions
+            .sort((a, b) => {
+                // Sort by priority: high > medium > low, then by timestamp
+                const priorityOrder = { high: 3, medium: 2, low: 1 }
+                return priorityOrder[b.priority] - priorityOrder[a.priority] || 
+                       new Date(b.timestamp) - new Date(a.timestamp)
+            })
+            .slice(0, 5) // Limit to 5 most important
     }, [postedTasks])
 
-    // Navigation handler for quick actions
-    const handleQuickActionPress = (action) => {
-        if (action.navigation) {
-            if (action.navigation.navigator) {
-                // Nested navigation: Navigate to tab -> then to screen within that stack
-                navigate(action.navigation.navigator, {
-                    screen: action.navigation.screen,
-                    params: action.navigation.params
-                });
-            } else {
-                // Direct screen navigation (same navigator)
-                navigate(action.navigation.screen, action.navigation.params);
-            }
-        } else {
-            // Fallback to direct navigation (for backward compatibility)
-            navigate(action.screen);
-        }
-    }
-
-    // Quick actions with nested navigation support
+    // CLEAR Navigation - Each button goes to the RIGHT place
     const quickActions = [
         {
-            id: 1,
+            id: 'post-task',
             title: 'Post New Task',
             icon: 'add-circle-outline',
-            color: ['#1A1F3B', '#2D325D'],
+            color: ['#6366F1', '#4F46E5'],
             description: 'Create a new task',
-            navigation: {
-                screen: 'CreateTask' // Screen inside the PostedTasksStack
-            }
-        },
-        /*{
-            id: 2,
-            title: 'Review Work',
-            icon: 'document-text-outline',
-            color: ['#059669', '#10B981'],
-            description: 'Check submissions',
-            navigation: {
-                navigator: 'PostedTasks', // Tab navigator name
-                screen: 'PostedTasksList' // Navigate to tasks list for now (Submissions screen doesn't exist)
-            }
-        },*/
-        {
-            id: 3,
-            title: 'Messages',
-            icon: 'chatbubble-ellipses-outline',
-            color: ['#7C3AED', '#8B5CF6'],
-            description: 'Chat with taskers',
-            navigation: {
-                screen: 'Chat' // Direct screen navigation (if it exists in root)
-            }
+            screen: 'CreateTask'
         },
         {
-            id: 4,
+            id: 'my-tasks',
             title: 'My Tasks',
             icon: 'briefcase-outline',
-            color: ['#DC2626', '#EF4444'],
-            description: 'View all tasks',
-            navigation: {
-                screen: 'PostedTasks' // Initial screen of PostedTasksStack
-            }
+            color: ['#10B981', '#059669'],
+            description: 'View all your tasks',
+            screen: 'PostedTasks'
         },
         {
-            id: 5,
+            id: 'review',
+            title: 'Review Work',
+            icon: 'document-text-outline',
+            color: ['#F59E0B', '#D97706'],
+            description: `${dashboardStats.awaitingMyReview} to review`,
+            screen: 'PostedTasks',
+            params: { filter: 'review' }
+        },
+        {
+            id: 'payments',
             title: 'Payments',
-            icon: 'wallet',
-            color: ['#F59E0B', '#EF4444'],
-            description: 'View all payments',
-            navigation: {
-                screen: 'Payments' // Initial screen of PostedTasksStack
-            }
+            icon: 'wallet-outline',
+            color: ['#8B5CF6', '#7C3AED'],
+            description: `GHS ${dashboardStats.inEscrow} in escrow`,
+            screen: 'Payments'
         }
     ]
 
-    // Priority tasks that need attention
-    const priorityTasks = useMemo(() => {
-        if (!postedTasks) return []
-        
-        return postedTasks
-            .filter(task => {
-                // Tasks that need immediate attention
-                if (task.status === 'Review') return true
-                if (task.status === 'Assigned' && !task.assignmentAccepted) return true
-                
-                // Urgent deadlines
-                if (task.deadline) {
-                    const deadline = new Date(task.deadline)
-                    const now = new Date()
-                    const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24))
-                    return daysUntilDeadline <= 2 && !['Completed', 'Closed'].includes(task.status)
-                }
-                return false
-            })
-            .slice(0, 3)
-    }, [postedTasks])
-
-    const getPriorityIcon = (task) => {
-        if (task.status === 'Review') return { icon: 'alert-circle', color: '#F59E0B' }
-        if (!task.assignmentAccepted && task.status === 'Assigned') return { icon: 'time-outline', color: '#6366F1' }
-        return { icon: 'flag-outline', color: '#EF4444' }
+    const handleQuickActionPress = (action) => {
+        if (action.params) {
+            navigate(action.screen, action.params)
+        } else {
+            navigate(action.screen)
+        }
     }
 
-    const getPriorityText = (task) => {
-        if (task.status === 'Review') return 'Needs Review'
-        if (!task.assignmentAccepted && task.status === 'Assigned') return 'Pending Acceptance'
-        return 'Urgent Deadline'
+    const handlePriorityActionPress = (action) => {
+        // Each priority item goes to the RIGHT screen with the RIGHT context
+        switch (action.type) {
+            case 'review':
+                navigate('ClientTaskDetail', { 
+                    taskId: action.taskId,
+                    focus: 'submissions'
+                })
+                break
+            case 'deadline':
+            case 'assigned':
+                navigate('ClientTaskDetail', { 
+                    taskId: action.taskId 
+                })
+                break
+            default:
+                navigate('PostedTasks')
+        }
     }
 
-    // Navigation handler for task details with nested navigation
-    const handleTaskDetailPress = (taskId) => {
-       navigate('ClientTaskDetail', { taskId: taskId })
+    const getPriorityIcon = (priority) => {
+        switch (priority) {
+            case 'high': return { icon: 'alert-circle', color: '#EF4444' }
+            case 'medium': return { icon: 'time-outline', color: '#F59E0B' }
+            case 'low': return { icon: 'information-circle', color: '#6366F1' }
+            default: return { icon: 'help-circle', color: '#6B7280' }
+        }
     }
 
     if (loading && !refreshing) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
+            <SafeAreaView style={styles.container}>
                 <Header title="Dashboard" />
                 <LoadingIndicator text='Loading your Dashboard'/>
             </SafeAreaView>
@@ -221,85 +248,108 @@ export default function DashboardScreen() {
             <ScrollView 
                 style={styles.scrollView}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh}
+                        colors={['#6366F1']}
+                    />
                 }
                 showsVerticalScrollIndicator={false}
             >
-                {/* Welcome Section */}
+                {/* TRUTHFUL Welcome Section */}
                 <View style={styles.welcomeSection}>
-                    <View style={styles.welcomeContent}>
-                        <View>
-                            <Text style={styles.welcomeText}>Welcome back, {user?.name || "Client"}!<Text> 👋</Text></Text>
-                            <Text style={styles.subtitle}>
-                                {dashboardStats.totalTasks === 0 
-                                    ? "Ready to post your first task?" 
-                                    : `You have ${dashboardStats.activeTasks} active tasks and ${dashboardStats.urgentTasks} need attention`
-                                }
-                            </Text>
+                    <LinearGradient
+                        colors={['#1A1F3B', '#2D325D', '#4A4F8C']}
+                        style={styles.welcomeGradient}
+                    >
+                        <View style={styles.welcomeHeader}>
+                            <View>
+                                <Text style={styles.welcomeGreeting}>
+                                    Hello, {user?.name || "Client"}!
+                                </Text>
+                                <Text style={styles.welcomeSubtitle}>
+                                    {dashboardStats.requiresMyAction > 0 
+                                        ? `${dashboardStats.requiresMyAction} tasks need your attention`
+                                        : "All tasks are running smoothly"
+                                    }
+                                </Text>
+                            </View>
                         </View>
-                    </View>
+                        
+                        {/* CLEAR Quick Stats */}
+                        <View style={styles.quickStats}>
+                            <View style={styles.quickStat}>
+                                <Text style={styles.quickStatValue}>{dashboardStats.totalTasks}</Text>
+                                <Text style={styles.quickStatLabel}>Total Tasks</Text>
+                            </View>
+                            <View />
+                            <View style={styles.quickStat}>
+                                <Text style={styles.quickStatValue}>{dashboardStats.requiresMyAction}</Text>
+                                <Text style={styles.quickStatLabel}>Action Needed</Text>
+                            </View>
+                            <View  />
+                            <View style={styles.quickStat}>
+                                <Text style={styles.quickStatValue}>{dashboardStats.inProgress}</Text>
+                                <Text style={styles.quickStatLabel}>In Progress</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
                 </View>
 
-                {/* Key Metrics Grid */}
+                {/* ACTION-ORIENTED Metrics */}
                 <View style={styles.metricsSection}>
                     <View style={styles.metricsGrid}>
+                        
                         <TouchableOpacity 
-                            style={[styles.metricCard, styles.primaryCard]}
-                            onPress={() => navigate('PostedTasks')}
+                            style={[styles.metricCard, styles.actionCard1]}
+                            onPress={() => navigate('PostedTasks', { filter: 'review' })}
                         >
-                            <View style={styles.metricIcon}>
-                                <Ionicons name="briefcase-outline" size={24} color="#6366F1" />
+                            <View style={[styles.metricIcon, { backgroundColor: '#FEF2F2' }]}>
+                                <Ionicons name="document-text-outline" size={24} color="#EF4444" />
                             </View>
-                            <Text style={styles.metricValue}>{dashboardStats.totalTasks}</Text>
-                            <Text style={styles.metricLabel}>Total Tasks</Text>
-                            <Text style={styles.metricTrend}>
-                                {dashboardStats.activeTasks} active • {dashboardStats.completedTasks} completed
-                            </Text>
+                            <Text style={styles.metricValue}>{dashboardStats.awaitingMyReview}</Text>
+                            <Text style={styles.metricLabel}>Awaiting your Review</Text>
+                            <Text style={styles.metricSubtitle}>Needs your action</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={[styles.metricCard, styles.progressCard]}
+                            onPress={() => navigate('PostedTasks', { filter: 'in-progress' })}
+                        >
+                            <View style={[styles.metricIcon, { backgroundColor: '#EFF6FF' }]}>
+                                <Ionicons name="play-circle-outline" size={24} color="#3B82F6" />
+                            </View>
+                            <Text style={styles.metricValue}>{dashboardStats.inProgress}</Text>
+                            <Text style={styles.metricLabel}>In Progress</Text>
+                            <Text style={styles.metricSubtitle}>Being worked on</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
                             style={[styles.metricCard, styles.successCard]}
-                            onPress={() => navigate('PostedTasks')}
                         >
-                            <View style={styles.metricIcon}>
+                            <View style={[styles.metricIcon, { backgroundColor: '#F0FDF4' }]}>
                                 <Ionicons name="checkmark-done" size={24} color="#10B981" />
                             </View>
-                            <Text style={styles.metricValue}>{dashboardStats.successRate}%</Text>
-                            <Text style={styles.metricLabel}>Success Rate</Text>
-                            <Text style={styles.metricTrend}>
-                                {dashboardStats.completedTasks} completed successfully
-                            </Text>
+                            <Text style={styles.metricValue}>{dashboardStats.completedThisWeek}</Text>
+                            <Text style={styles.metricLabel}>Completed</Text>
+                            <Text style={styles.metricSubtitle}>This week</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity 
-                            style={[styles.metricCard, styles.warningCard]}
+                            style={[styles.metricCard, styles.financeCard]}
+                            onPress={() => navigate('Payments')}
                         >
-                            <View style={styles.metricIcon}>
-                                <Ionicons name="alert-circle" size={24} color="#F59E0B" />
+                            <View style={[styles.metricIcon, { backgroundColor: '#F8FAFC' }]}>
+                                <Ionicons name="wallet-outline" size={24} color="#6B7280" />
                             </View>
-                            <Text style={styles.metricValue}>{dashboardStats.urgentTasks}</Text>
-                            <Text style={styles.metricLabel}>Need Attention</Text>
-                            <Text style={styles.metricTrend}>
-                                {dashboardStats.reviewTasks} to review
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={[styles.metricCard, styles.infoCard]}
-                        >
-                            <View style={styles.metricIcon}>
-                                <Ionicons name="cash-outline" size={24} color="#3B82F6" />
-                            </View>
-                            <Text style={styles.metricValue}>GHS {dashboardStats.monthlySpending}</Text>
-                            <Text style={styles.metricLabel}>This Month</Text>
-                            <Text style={styles.metricTrend}>
-                                GHS {dashboardStats.totalSpent} total spent
-                            </Text>
+                            <Text style={styles.metricValue}>GHS {dashboardStats.inEscrow}</Text>
+                            <Text style={styles.metricLabel}>In Escrow</Text>
+                            <Text style={styles.metricSubtitle}>Funds held</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {/* Quick Actions */}
+                {/* CLEAR Quick Actions */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Quick Actions</Text>
                     <View style={styles.actionsGrid}>
@@ -312,8 +362,6 @@ export default function DashboardScreen() {
                                 <LinearGradient
                                     colors={action.color}
                                     style={styles.actionIcon}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
                                 >
                                     <Ionicons name={action.icon} size={24} color="#fff" />
                                 </LinearGradient>
@@ -321,47 +369,43 @@ export default function DashboardScreen() {
                                     <Text style={styles.actionText}>{action.title}</Text>
                                     <Text style={styles.actionDescription}>{action.description}</Text>
                                 </View>
-                                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                             </TouchableOpacity>
                         ))}
                     </View>
                 </View>
 
-                {/* Priority Tasks */}
-                {priorityTasks.length > 0 && (
+                {/* TRUTHFUL Priority Actions - Only what poster NEEDS to do */}
+                {priorityActions.length > 0 && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Priority Tasks</Text>
-                            <TouchableOpacity onPress={() => navigate('PostedTasks')}>
-                                <Text style={styles.seeAllText}>View All</Text>
-                            </TouchableOpacity>
+                            <Text style={styles.sectionTitle}>Priority Actions</Text>
+                            <Text style={styles.sectionSubtitle}>
+                                {priorityActions.filter(a => a.priority === 'high').length} require immediate attention
+                            </Text>
                         </View>
                         <View style={styles.priorityList}>
-                            {priorityTasks.map((task) => {
-                                const priority = getPriorityIcon(task)
+                            {priorityActions.map((action) => {
+                                const priorityIcon = getPriorityIcon(action.priority)
                                 return (
                                     <TouchableOpacity 
-                                        key={task._id}
-                                        style={styles.priorityItem}
-                                        onPress={() => handleTaskDetailPress(task._id)}
+                                        key={action.id}
+                                        style={[
+                                            styles.priorityItem,
+                                            action.priority === 'high' && styles.priorityItemHigh
+                                        ]}
+                                        onPress={() => handlePriorityActionPress(action)}
                                     >
-                                        <View style={[styles.priorityIcon, { backgroundColor: priority.color + '20' }]}>
-                                            <Ionicons name={priority.icon} size={16} color={priority.color} />
+                                        <View style={[styles.priorityIcon, { backgroundColor: priorityIcon.color + '20' }]}>
+                                            <Ionicons name={priorityIcon.icon} size={16} color={priorityIcon.color} />
                                         </View>
                                         <View style={styles.priorityContent}>
-                                            <Text style={styles.priorityTitle} numberOfLines={1}>
-                                                {task.title}
+                                            <Text style={styles.priorityTitle}>{action.title}</Text>
+                                            <Text style={styles.priorityTask} numberOfLines={1}>
+                                                {action.taskTitle}
                                             </Text>
-                                            <Text style={styles.priorityType} numberOfLines={1}>
-                                                {getPriorityText(task)}
-                                            </Text>
+                                            <Text style={styles.priorityDescription}>{action.description}</Text>
                                         </View>
-                                        <View style={styles.priorityMeta}>
-                                            <Text style={styles.priorityBudget}>GHS {task.budget}</Text>
-                                            <Text style={styles.priorityTime}>
-                                                {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}
-                                            </Text>
-                                        </View>
+                                        <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                                     </TouchableOpacity>
                                 )
                             })}
@@ -369,60 +413,7 @@ export default function DashboardScreen() {
                     </View>
                 )}
 
-                {/* Recent Activity */}
-                <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Recent Activity</Text>
-                        <TouchableOpacity onPress={() => navigate('PostedTasks')}>
-                            <Text style={styles.seeAllText}>View All</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.activityList}>
-                        {postedTasks && postedTasks.slice(0, 4).map((task) => (
-                            <TouchableOpacity 
-                                key={task._id}
-                                style={styles.activityItem}
-                                onPress={() => handleTaskDetailPress(task._id)}
-                            >
-                                <View style={[
-                                    styles.activityStatus,
-                                    { backgroundColor: 
-                                        task.status === 'Completed' ? '#10B98120' :
-                                        task.status === 'In-progress' ? '#6366F120' :
-                                        task.status === 'Review' ? '#F59E0B20' : '#6B728020'
-                                    }
-                                ]}>
-                                    <Ionicons 
-                                        name={
-                                            task.status === 'Completed' ? 'checkmark-circle' :
-                                            task.status === 'In-progress' ? 'play-circle' :
-                                            task.status === 'Review' ? 'alert-circle' : 'time-outline'
-                                        } 
-                                        size={16} 
-                                        color={
-                                            task.status === 'Completed' ? '#10B981' :
-                                            task.status === 'In-progress' ? '#6366F1' :
-                                            task.status === 'Review' ? '#F59E0B' : '#6B7280'
-                                        } 
-                                    />
-                                </View>
-                                <View style={styles.activityContent}>
-                                    <Text style={styles.activityTitle} numberOfLines={1}>
-                                        {task.title}
-                                    </Text>
-                                    <Text style={styles.activityMeta}>
-                                        {task.category} • GHS {task.budget}
-                                    </Text>
-                                </View>
-                                <Text style={styles.activityTime}>
-                                    {new Date(task.updatedAt).toLocaleDateString()}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Empty State for New Users */}
+                {/* HONEST Empty State */}
                 {dashboardStats.totalTasks === 0 && (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIllustration}>
@@ -430,15 +421,28 @@ export default function DashboardScreen() {
                         </View>
                         <Text style={styles.emptyTitle}>Ready to get started?</Text>
                         <Text style={styles.emptyDescription}>
-                            Post your first task and find skilled taskers to help you get things done
+                            Post your first task and find skilled professionals to help you get things done
                         </Text>
                         <TouchableOpacity 
                             style={styles.primaryButton}
-                            onPress={() => handleQuickActionPress(quickActions[0])} // Use the first quick action (Post New Task)
+                            onPress={() => navigate('CreateTask')}
                         >
                             <Ionicons name="add" size={20} color="#FFFFFF" />
                             <Text style={styles.primaryButtonText}>Post Your First Task</Text>
                         </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Everything running smoothly state */}
+                {dashboardStats.totalTasks > 0 && priorityActions.length === 0 && (
+                    <View style={styles.emptyState}>
+                        <View style={styles.emptyIllustration}>
+                            <Ionicons name="checkmark-circle" size={60} color="#10B981" />
+                        </View>
+                        <Text style={styles.emptyTitle}>All caught up!</Text>
+                        <Text style={styles.emptyDescription}>
+                            All your tasks are progressing smoothly. No immediate actions needed.
+                        </Text>
                     </View>
                 )}
             </ScrollView>
@@ -446,7 +450,6 @@ export default function DashboardScreen() {
     )
 }
 
-// Your existing styles remain the same...
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -455,58 +458,54 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
-    loadingContainer: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    loadingContent: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loadingText: {
-        marginTop: 12,
-        fontSize: 16,
-        color: '#6B7280',
-    },
+    
     welcomeSection: {
-        padding: 20,
-        backgroundColor: '#4F46E5',
-        marginHorizontal:10,
-        borderRadius:20,
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 28,
+        overflow: 'hidden',
     },
-    welcomeContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+    welcomeGradient: {
+        padding: 24,
     },
-    welcomeText: {
+    welcomeHeader: {
+        marginBottom: 20,
+    },
+    welcomeGreeting: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#FFFF',
-        marginBottom: 4,
+        color: '#FFFFFF',
+        marginBottom: 8,
     },
-    subtitle: {
+    welcomeSubtitle: {
         fontSize: 16,
-        color: '#FFFF',
-        lineHeight: 22,
+        color: '#E0E7FF',
     },
-    avatar: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: '#6366F1',
-        justifyContent: 'center',
+    quickStats: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        padding: 16,
+    },
+    quickStat: {
+        flex: 1,
         alignItems: 'center',
     },
-    avatarText: {
+    quickStatValue: {
+        fontSize: 20,
+        fontWeight: '700',
         color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '600',
+        marginBottom: 4,
+    },
+    quickStatLabel: {
+        fontSize: 12,
+        color: '#E0E7FF',
+    },
+    quickStatDivider: {
+        width: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     metricsSection: {
-        padding: 20,
-        paddingBottom:0,
+        padding: 16,
     },
     metricsGrid: {
         flexDirection: 'row',
@@ -514,44 +513,43 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     metricCard: {
-    flex: 1,
-    minWidth: (width - 52) / 2,
-    backgroundColor: '#FFFFFF',
-    padding: 3, 
-    borderRadius: 12, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 }, 
-    shadowOpacity: 0.04, 
-    shadowRadius: 6, 
-    elevation: 1, 
-},
-primaryCard: {
-    borderLeftWidth: 3, 
-    borderLeftColor: '#6366F1',
-},
-successCard: {
-    borderLeftWidth: 3, 
-    borderLeftColor: '#10B981',
-},
-warningCard: {
-    borderLeftWidth: 3, 
-    borderLeftColor: '#F59E0B',
-},
-infoCard: {
-    borderLeftWidth: 3, 
-    borderLeftColor: '#3B82F6',
-},
+        flex: 1,
+        minWidth: (width - 52) / 2,
+        backgroundColor: '#FFFFFF',
+        padding: 16,
+        borderRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    actionCard1: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#EF4444',
+    },
+    progressCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#3B82F6',
+    },
+    successCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+    },
+    financeCard: {
+        borderLeftWidth: 4,
+        borderLeftColor: '#6B7280',
+    },
     metricIcon: {
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
     },
     metricValue: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: '700',
         color: '#1F2937',
         marginBottom: 4,
@@ -559,33 +557,30 @@ infoCard: {
     metricLabel: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#6B7280',
-        marginBottom: 4,
+        color: '#374151',
+        marginBottom: 2,
     },
-    metricTrend: {
+    metricSubtitle: {
         fontSize: 12,
-        color: '#9CA3AF',
+        color: '#6B7280',
     },
     section: {
-        padding: 20,
+        padding: 16,
         backgroundColor: '#FFFFFF',
         marginTop: 8,
     },
     sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         marginBottom: 16,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1F2937',
+        marginBottom: 4,
     },
-    seeAllText: {
+    sectionSubtitle: {
         fontSize: 14,
-        color: '#6366F1',
-        fontWeight: '600',
+        color: '#6B7280',
     },
     actionsGrid: {
         gap: 12,
@@ -629,8 +624,12 @@ infoCard: {
         backgroundColor: '#F8FAFC',
         padding: 16,
         borderRadius: 12,
-        borderLeftWidth: 4,
-        borderLeftColor: '#EF4444',
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    priorityItemHigh: {
+        borderColor: '#FECACA',
+        backgroundColor: '#FEF2F2',
     },
     priorityIcon: {
         width: 32,
@@ -649,71 +648,27 @@ infoCard: {
         color: '#1F2937',
         marginBottom: 2,
     },
-    priorityType: {
-        fontSize: 12,
-        color: '#EF4444',
-        fontWeight: '500',
-    },
-    priorityMeta: {
-        alignItems: 'flex-end',
-    },
-    priorityBudget: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1F2937',
+    priorityTask: {
+        fontSize: 13,
+        color: '#374151',
         marginBottom: 2,
     },
-    priorityTime: {
+    priorityDescription: {
         fontSize: 12,
         color: '#6B7280',
-    },
-    activityList: {
-        gap: 12,
-    },
-    activityItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 12,
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-    },
-    activityStatus: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    activityContent: {
-        flex: 1,
-    },
-    activityTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1F2937',
-        marginBottom: 2,
-    },
-    activityMeta: {
-        fontSize: 12,
-        color: '#6B7280',
-    },
-    activityTime: {
-        fontSize: 12,
-        color: '#9CA3AF',
     },
     emptyState: {
         alignItems: 'center',
         padding: 40,
         backgroundColor: '#FFFFFF',
-        margin: 20,
+        margin: 16,
         borderRadius: 16,
     },
     emptyIllustration: {
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#EEF2FF',
+        backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 20,
@@ -747,3 +702,4 @@ infoCard: {
         fontWeight: '600',
     },
 })
+
