@@ -23,12 +23,27 @@ import ReportForm from '../../component/common/reportForm';
 import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal'
 import { AuthContext } from '../../context/AuthContext';
 import {getMiniTaskInfo,acceptMiniTaskAssignment,rejectMiniTaskAssignment,markTaskAsDoneTasker} from '../../api/miniTaskApi'
+import {startOrGetChatRoom} from '../../api/chatApi'
 import { navigate } from '../../services/navigationService';
 import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
 
 const { width } = Dimensions.get('window');
+
+const formatFullAddress = (address) => {
+  if (!address || (!address.region && !address.city && !address.suburb)) {
+    return "Remote";
+  }
+  
+  const parts = [
+    address.region,
+    address.city, 
+    address.suburb
+  ].filter(part => part && part.trim() !== '');
+  
+  return parts.join(', ');
+};
 
 const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
@@ -521,7 +536,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                     title="Location"
                     value={task.locationType}
                     color="#6366F1"
-                    subtitle={task.address?.city || 'Not specified'}
+                    subtitle={formatFullAddress(task.address) || 'Not specified'}
                   />
                   <InfoCard
                     icon="briefcase-outline"
@@ -795,7 +810,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                   }}
                 >
                   <Ionicons name="document-text" size={20} color="#FFFFFF" />
-                  <Text style={styles.fabActionText}>View Submissions</Text>
+                  <Text style={styles.fabActionText}>Submissions</Text>
                 </TouchableOpacity>
               </Animated.View>
 

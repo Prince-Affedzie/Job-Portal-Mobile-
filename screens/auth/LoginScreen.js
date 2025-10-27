@@ -423,7 +423,7 @@ const Login = ({ navigation }) => {
                     ) : (
                       <View style={styles.buttonContent}>
                         <Text style={styles.loginButtonText}>Sign In</Text>
-                        <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+                        {/*<Ionicons name="arrow-forward" size={20} color="#FFFFFF" />*/}
                       </View>
                     )}
                   </LinearGradient>

@@ -5,6 +5,7 @@ import BasicInfoScreen from '../screens/taskerOnboarding/BasicInfoScreen';
 import LocationScreen from '../screens/taskerOnboarding/LocationScreen';
 import SkillsScreen from '../screens/taskerOnboarding/SkillsScreen';
 import ProfileImageScreen from '../screens/taskerOnboarding/ProfileImageScreen';
+import IdCardScreen from '../screens/taskerOnboarding/IdCardScreen';
 import ReviewScreen from '../screens/taskerOnboarding/ReviewScreen';
 import OnboardingHeader from '../component/tasker/OnboardingHeader';
 import { AuthContext } from '../context/AuthContext';
@@ -70,6 +71,11 @@ const TaskerOnboardingStack = () => {
         name="ProfileImage" 
         component={ProfileImageScreen}
         options={{ title: 'Profile Photo' }}
+      />
+       <Stack.Screen 
+        name="IdCard" 
+        component={IdCardScreen}
+        options={{ title: 'Identification Card' }}
       />
       <Stack.Screen 
         name="Review" 

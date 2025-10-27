@@ -22,17 +22,19 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 
 const { width: screenWidth } = Dimensions.get('window');
 
-const ProfileImageScreen = () => {
+const IdCardScreen = () => {
   const { 
-    profileImageUri, 
-    updateProfileImage, 
+    idCard, 
+    updateIdCard, 
     goToNextStep, 
     goToPreviousStep,
+    errors,
+    clearErrors
   } = useTaskerOnboarding();
   
   const navigation = useNavigation();
 
-  const [image, setImage] = useState(profileImageUri || null);
+  const [image, setImage] = useState(idCard?.uri || null);
   const [isUploading, setIsUploading] = useState(false);
   const [showOptions, setShowOptions] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
@@ -44,7 +46,7 @@ const ProfileImageScreen = () => {
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required', 
-          'We need camera access to take photos. Please enable this in your device settings.',
+          'We need camera access to take photos of your ID card. Please enable this in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => ImagePicker.requestCameraPermissionsAsync() }
@@ -57,7 +59,7 @@ const ProfileImageScreen = () => {
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required', 
-          'We need access to your photo library to select images. Please enable this in your device settings.',
+          'We need access to your photo library to select ID card images. Please enable this in your device settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => ImagePicker.requestMediaLibraryPermissionsAsync() }
@@ -80,8 +82,8 @@ const ProfileImageScreen = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        aspect: [1, 1],
-        quality: 0.8,
+        aspect: [3, 2], // ID card aspect ratio
+        quality: 0.9, // Higher quality for document clarity
         allowsMultipleSelection: false,
       });
 
@@ -104,9 +106,9 @@ const ProfileImageScreen = () => {
       setIsUploading(true);
 
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
+        allowsEditing: false,
+        aspect: [3, 2], // ID card aspect ratio
+        quality: 0.9, // Higher quality for document clarity
       });
 
       if (!result.canceled) {
@@ -132,9 +134,9 @@ const ProfileImageScreen = () => {
               height: cropRegion.height,
             },
           },
-          { resize: { width: 500, height: 500 } },
+          { resize: { width: 800, height: 533 } }, // Higher resolution for ID card
         ],
-        { compress: 0.8, format: SaveFormat.JPEG }
+        { compress: 0.9, format: SaveFormat.JPEG }
       );
       
       return manipResult;
@@ -143,19 +145,35 @@ const ProfileImageScreen = () => {
     }
   };
 
-  const autoCropToSquare = async (uri) => {
+  const autoCropToDocument = async (uri) => {
     try {
       return new Promise((resolve, reject) => {
         Image.getSize(uri, (width, height) => {
-          const size = Math.min(width, height);
-          const offsetX = (width - size) / 2;
-          const offsetY = (height - size) / 2;
+          // Maintain document aspect ratio (3:2)
+          const targetAspect = 3/2;
+          const currentAspect = width / height;
+          
+          let cropWidth, cropHeight, offsetX, offsetY;
+          
+          if (currentAspect > targetAspect) {
+            // Image is wider than target, crop width
+            cropHeight = height;
+            cropWidth = cropHeight * targetAspect;
+            offsetX = (width - cropWidth) / 2;
+            offsetY = 0;
+          } else {
+            // Image is taller than target, crop height
+            cropWidth = width;
+            cropHeight = cropWidth / targetAspect;
+            offsetX = 0;
+            offsetY = (height - cropHeight) / 2;
+          }
           
           cropImage(uri, {
             x: offsetX,
             y: offsetY,
-            width: size,
-            height: size,
+            width: cropWidth,
+            height: cropHeight,
           })
           .then(resolve)
           .catch(reject);
@@ -170,17 +188,22 @@ const ProfileImageScreen = () => {
     try {
       setIsUploading(true);
       
+      // Clear any previous errors
+      clearErrors();
+      
       const imageData = {
         uri: imageAsset.uri,
         width: imageAsset.width,
         height: imageAsset.height,
+        type: imageAsset.type || 'image/jpeg',
+        name: 'id-card.jpg'
       };
 
       setImage(imageAsset.uri);
-      updateProfileImage(imageData);
+      updateIdCard(imageData);
       
     } catch (error) {
-      Alert.alert('Upload Failed', 'Something went wrong while processing your image. Please try again.');
+      Alert.alert('Upload Failed', 'Something went wrong while processing your ID card image. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -191,20 +214,22 @@ const ProfileImageScreen = () => {
       setIsUploading(true);
       setShowCropInterface(false);
       
-      const croppedImage = await autoCropToSquare(imageToCrop);
+      const croppedImage = await autoCropToDocument(imageToCrop);
       
       const imageData = {
         uri: croppedImage.uri,
         width: croppedImage.width,
         height: croppedImage.height,
+        type: 'image/jpeg',
+        name: 'id-card.jpg'
       };
 
       setImage(croppedImage.uri);
-      updateProfileImage(imageData);
+      updateIdCard(imageData);
       setImageToCrop(null);
       
     } catch (error) {
-      Alert.alert('Error', 'Failed to crop image. Please try again.');
+      Alert.alert('Error', 'Failed to crop ID card image. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -219,9 +244,9 @@ const ProfileImageScreen = () => {
     >
       <SafeAreaView style={styles.cropContainer}>
         <View style={styles.cropHeader}>
-          <Text style={styles.cropTitle}>Crop Your Photo</Text>
+          <Text style={styles.cropTitle}>Crop Your ID Card</Text>
           <Text style={styles.cropSubtitle}>
-            We'll automatically crop your photo to a perfect square for your profile
+            Ensure your ID card fits within the frame and all details are clearly visible
           </Text>
         </View>
 
@@ -232,9 +257,9 @@ const ProfileImageScreen = () => {
             resizeMode="contain"
           />
           <View style={styles.cropOverlay}>
-            <View style={styles.cropCircle} />
+            <View style={styles.cropDocumentFrame} />
             <Text style={styles.cropGuideText}>
-              Your face should be centered within the circle
+              Make sure all four corners of your ID card are visible
             </Text>
           </View>
         </View>
@@ -247,7 +272,7 @@ const ProfileImageScreen = () => {
               setImageToCrop(null);
             }}
             accessibilityLabel="Cancel cropping"
-            accessibilityHint="Discard the current photo and return to the profile image screen"
+            accessibilityHint="Discard the current ID card photo and return to the ID card screen"
           >
             <Text style={styles.cropCancelText}>Cancel</Text>
           </TouchableOpacity>
@@ -256,8 +281,8 @@ const ProfileImageScreen = () => {
             style={styles.cropConfirmButton}
             onPress={handleCustomCropComplete}
             disabled={isUploading}
-            accessibilityLabel="Use this photo"
-            accessibilityHint="Confirm and save the cropped photo as your profile image"
+            accessibilityLabel="Use this ID card photo"
+            accessibilityHint="Confirm and save the cropped ID card photo"
           >
             {isUploading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -275,8 +300,8 @@ const ProfileImageScreen = () => {
 
   const removeImage = () => {
     Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove your profile photo?',
+      'Remove ID Card',
+      'Are you sure you want to remove your ID card photo? This is required for verification.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -284,7 +309,7 @@ const ProfileImageScreen = () => {
           style: 'destructive',
           onPress: () => {
             setImage(null);
-            updateProfileImage({ uri: '', image: null });
+            updateIdCard({ uri: '', image: null });
           }
         },
       ]
@@ -292,31 +317,24 @@ const ProfileImageScreen = () => {
   };
 
   const handleContinue = () => {
+    if (!image) {
+      Alert.alert(
+        'ID Card Required',
+        'Please upload your ID card photo to continue with verification.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     if (goToNextStep()) {
-      if (goToNextStep()) {
-      navigation.navigate('IdCard');
-  };
+      
+      navigation.navigate('Review'); 
     }
   };
 
   const handleBack = () => {
     goToPreviousStep();
     navigation.goBack();
-  };
-
-  const handleSkip = () => {
-    Alert.alert(
-      'Skip Profile Photo?',
-      'Profiles with professional photos receive 3x more responses from clients. You can always add one later.',
-      [
-        { text: 'Go Back', style: 'cancel' },
-        { 
-          text: 'Skip for Now', 
-          style: 'default',
-          onPress: handleContinue
-        },
-      ]
-    );
   };
 
   const PhotoOptionsModal = () => (
@@ -333,40 +351,63 @@ const ProfileImageScreen = () => {
       >
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Choose Profile Photo</Text>
+            <Text style={styles.modalTitle}>Upload ID Card</Text>
+            <Text style={styles.modalSubtitle}>
+              Take a clear photo of your government-issued ID card
+            </Text>
           </View>
           
           <TouchableOpacity 
             style={styles.modalOption}
             onPress={takePhotoWithCamera}
-            accessibilityLabel="Take photo"
-            accessibilityHint="Open the camera to take a new profile photo"
+            accessibilityLabel="Take photo of ID card"
+            accessibilityHint="Open the camera to take a photo of your ID card"
           >
             <Ionicons name="camera" size={24} color="#007AFF" />
             <View style={styles.optionTextContainer}>
               <Text style={styles.optionTitle}>Take Photo</Text>
-              <Text style={styles.optionDescription}>Use your camera</Text>
+              <Text style={styles.optionDescription}>Use your camera to capture ID card</Text>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.modalOption}
             onPress={pickImageFromGallery}
-            accessibilityLabel="Choose from library"
-            accessibilityHint="Select an existing photo from your photo library"
+            accessibilityLabel="Choose ID card from library"
+            accessibilityHint="Select an existing photo of your ID card from your photo library"
           >
             <Ionicons name="images" size={24} color="#007AFF" />
             <View style={styles.optionTextContainer}>
               <Text style={styles.optionTitle}>Choose from Library</Text>
-              <Text style={styles.optionDescription}>Select an existing photo</Text>
+              <Text style={styles.optionDescription}>Select existing ID card photo</Text>
             </View>
           </TouchableOpacity>
+
+          <View style={styles.requirementsSection}>
+            <Text style={styles.requirementsTitle}>Photo Requirements:</Text>
+            <View style={styles.requirementItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+              <Text style={styles.requirementText}>Government-issued ID card</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+              <Text style={styles.requirementText}>Clear and legible text</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+              <Text style={styles.requirementText}>All four corners visible</Text>
+            </View>
+            <View style={styles.requirementItem}>
+              <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+              <Text style={styles.requirementText}>Good lighting, no glare</Text>
+            </View>
+          </View>
 
           <TouchableOpacity 
             style={styles.modalCancel}
             onPress={() => setShowOptions(false)}
-            accessibilityLabel="Cancel photo selection"
-            accessibilityHint="Close the photo selection options"
+            accessibilityLabel="Cancel ID card selection"
+            accessibilityHint="Close the ID card selection options"
           >
             <Text style={styles.modalCancelText}>Cancel</Text>
           </TouchableOpacity>
@@ -385,15 +426,23 @@ const ProfileImageScreen = () => {
       >
         <View style={styles.header}>
           <Text style={styles.title}>
-            {image ? 'Looking great!' : 'Add your photo'}
+            {image ? 'ID Card Uploaded!' : 'Verify Your Identity'}
           </Text>
           <Text style={styles.subtitle}>
             {image 
-              ? 'Your professional photo is ready. This helps clients trust and connect with you.'
-              : 'A professional photo helps you stand out and build trust with potential clients.'
+              ? 'Your ID card has been successfully uploaded for verification.'
+              : 'Upload a clear photo of your government-issued ID card for verification purposes. This helps ensure safety and trust in our community.'
             }
           </Text>
         </View>
+
+        {/* Error Message */}
+        {errors.idCard && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="warning" size={20} color="#FF3B30" />
+            <Text style={styles.errorText}>{errors.idCard}</Text>
+          </View>
+        )}
 
         <View style={styles.previewSection}>
           <View style={styles.imageWrapper}>
@@ -403,13 +452,13 @@ const ProfileImageScreen = () => {
             ]}>
               {image ? (
                 <>
-                  <Image source={{ uri: image }} style={styles.profileImage} />
+                  <Image source={{ uri: image }} style={styles.idCardImage} />
                   <TouchableOpacity 
                     style={styles.editButton}
                     onPress={() => setShowOptions(true)}
                     activeOpacity={0.8}
-                    accessibilityLabel="Edit profile photo"
-                    accessibilityHint="Open options to change or take a new profile photo"
+                    accessibilityLabel="Edit ID card photo"
+                    accessibilityHint="Open options to change or take a new ID card photo"
                   >
                     <Ionicons name="camera" size={16} color="#FFFFFF" />
                   </TouchableOpacity>
@@ -417,9 +466,12 @@ const ProfileImageScreen = () => {
               ) : (
                 <View style={styles.placeholder}>
                   <View style={styles.placeholderIcon}>
-                    <Ionicons name="person" size={48} color="#8A8D91" />
+                    <Ionicons name="card" size={48} color="#8A8D91" />
                   </View>
-                  <Text style={styles.placeholderText}>No photo selected</Text>
+                  <Text style={styles.placeholderText}>No ID card uploaded</Text>
+                  <Text style={styles.placeholderSubtext}>
+                    Required for verification
+                  </Text>
                 </View>
               )}
               
@@ -427,7 +479,7 @@ const ProfileImageScreen = () => {
                 <View style={styles.loadingOverlay}>
                   <View style={styles.loadingContent}>
                     <ActivityIndicator size="large" color="#1877F2" />
-                    <Text style={styles.loadingText}>Processing image...</Text>
+                    <Text style={styles.loadingText}>Processing ID card...</Text>
                   </View>
                 </View>
               )}
@@ -436,7 +488,7 @@ const ProfileImageScreen = () => {
             {image && (
               <View style={styles.successIndicator}>
                 <Ionicons name="checkmark-circle" size={20} color="#42B883" />
-                <Text style={styles.successText}>Photo uploaded successfully</Text>
+                <Text style={styles.successText}>ID card uploaded successfully</Text>
               </View>
             )}
           </View>
@@ -448,11 +500,11 @@ const ProfileImageScreen = () => {
                 onPress={() => setShowOptions(true)}
                 activeOpacity={0.8}
                 disabled={isUploading}
-                accessibilityLabel="Add profile photo"
-                accessibilityHint="Open options to take or select a profile photo"
+                accessibilityLabel="Upload ID card"
+                accessibilityHint="Open options to take or select an ID card photo"
               >
                 <Ionicons name="camera" size={20} color="#FFFFFF" />
-                <Text style={styles.primaryActionText}>Add Photo</Text>
+                <Text style={styles.primaryActionText}>Upload ID Card</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -463,8 +515,8 @@ const ProfileImageScreen = () => {
                 style={styles.changePhotoButton}
                 onPress={() => setShowOptions(true)}
                 activeOpacity={0.7}
-                accessibilityLabel="Change profile photo"
-                accessibilityHint="Open options to select a different photo"
+                accessibilityLabel="Change ID card photo"
+                accessibilityHint="Open options to select a different ID card photo"
               >
                 <Ionicons name="camera-outline" size={18} color="#1877F2" />
                 <Text style={styles.changePhotoText}>Change Photo</Text>
@@ -474,14 +526,25 @@ const ProfileImageScreen = () => {
                 style={styles.removePhotoButton}
                 onPress={removeImage}
                 activeOpacity={0.7}
-                accessibilityLabel="Remove profile photo"
-                accessibilityHint="Remove the current profile photo"
+                accessibilityLabel="Remove ID card photo"
+                accessibilityHint="Remove the current ID card photo"
               >
                 <Ionicons name="trash-outline" size={18} color="#E41E3F" />
                 <Text style={styles.removePhotoText}>Remove</Text>
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Security Notice */}
+          <View style={styles.securityNotice}>
+            <Ionicons name="shield-checkmark" size={20} color="#34C759" />
+            <View style={styles.securityTextContainer}>
+              <Text style={styles.securityTitle}>Your Security Matters</Text>
+              <Text style={styles.securityDescription}>
+                Your ID card information is encrypted and stored securely. We only use it for verification purposes and never share it with third parties.
+              </Text>
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -497,18 +560,29 @@ const ProfileImageScreen = () => {
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
 
-        {image && (
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={handleContinue}
-            activeOpacity={0.8}
-            accessibilityLabel="Continue to review"
-            accessibilityHint="Proceed to the review step with the selected profile photo"
-          >
-            <Text style={styles.continueButtonText}>Continue</Text>
-            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[
+            styles.continueButton,
+            !image && styles.continueButtonDisabled
+          ]}
+          onPress={handleContinue}
+          activeOpacity={0.8}
+          disabled={!image}
+          accessibilityLabel={image ? "Continue to next step" : "Upload ID card to continue"}
+          accessibilityHint={image ? "Proceed to the next step with the uploaded ID card" : "ID card upload is required to continue"}
+        >
+          <Text style={[
+            styles.continueButtonText,
+            !image && styles.continueButtonTextDisabled
+          ]}>
+            Continue
+          </Text>
+          <Ionicons 
+            name="chevron-forward" 
+            size={20} 
+            color={image ? "#FFFFFF" : "#A0A4A8"} 
+          />
+        </TouchableOpacity>
       </View>
 
       <PhotoOptionsModal />
@@ -526,7 +600,7 @@ const styles = {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: hp('20%'), // Increased padding to ensure content is not cut off
+    paddingBottom: hp('20%'),
   },
   header: {
     padding: wp('5%'),
@@ -545,6 +619,25 @@ const styles = {
     textAlign: 'center',
     lineHeight: wp('5.5%'),
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: wp('4%'),
+    paddingVertical: hp('1.5%'),
+    marginHorizontal: wp('5%'),
+    marginTop: hp('1%'),
+    borderRadius: wp('2%'),
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  errorText: {
+    marginLeft: wp('2%'),
+    fontSize: wp('3.5%'),
+    color: '#D32F2F',
+    fontWeight: '500',
+    flex: 1,
+  },
   previewSection: {
     paddingHorizontal: wp('5%'),
     paddingVertical: hp('4%'),
@@ -553,23 +646,25 @@ const styles = {
     alignItems: 'center',
   },
   imageContainer: {
-    width: wp('50%'),
-    height: wp('50%'),
-    borderRadius: wp('25%'),
+    width: wp('70%'),
+    height: wp('46.67%'), // 3:2 aspect ratio
+    borderRadius: wp('4%'),
     backgroundColor: '#F0F2F5',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    borderWidth: 4,
+    borderWidth: 2,
     borderColor: '#E4E6EA',
+    borderStyle: 'dashed',
   },
   imageContainerWithPhoto: {
     borderColor: '#1877F2',
+    borderStyle: 'solid',
   },
-  profileImage: {
+  idCardImage: {
     width: '100%',
     height: '100%',
-    borderRadius: wp('24%'),
+    borderRadius: wp('3%'),
   },
   editButton: {
     position: 'absolute',
@@ -586,6 +681,7 @@ const styles = {
   },
   placeholder: {
     alignItems: 'center',
+    padding: wp('5%'),
   },
   placeholderIcon: {
     marginBottom: hp('1%'),
@@ -594,6 +690,13 @@ const styles = {
     fontSize: wp('4%'),
     color: '#8A8D91',
     fontWeight: '500',
+    textAlign: 'center',
+  },
+  placeholderSubtext: {
+    fontSize: wp('3%'),
+    color: '#A0A4A8',
+    textAlign: 'center',
+    marginTop: hp('0.5%'),
   },
   loadingOverlay: {
     position: 'absolute',
@@ -602,7 +705,7 @@ const styles = {
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: wp('24%'),
+    borderRadius: wp('3%'),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -641,7 +744,7 @@ const styles = {
     paddingHorizontal: wp('7.5%'),
     paddingVertical: hp('2%'),
     borderRadius: wp('6%'),
-    minWidth: wp('40%'),
+    minWidth: wp('50%'),
     justifyContent: 'center',
   },
   primaryActionText: {
@@ -684,13 +787,38 @@ const styles = {
     color: '#E41E3F',
     fontWeight: '500',
   },
+  securityNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: hp('4%'),
+    padding: wp('4%'),
+    backgroundColor: '#F0F9FF',
+    borderRadius: wp('3%'),
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  securityTextContainer: {
+    flex: 1,
+    marginLeft: wp('3%'),
+  },
+  securityTitle: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#0369A1',
+    marginBottom: hp('0.5%'),
+  },
+  securityDescription: {
+    fontSize: wp('3.2%'),
+    color: '#64748B',
+    lineHeight: wp('4.2%'),
+  },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: wp('5%'),
     paddingVertical: hp('2%'),
-    paddingBottom: Platform.OS === 'ios' ? hp('6%') : hp('8%'), // Extra padding for system UI
+    paddingBottom: Platform.OS === 'ios' ? hp('6%') : hp('8%'),
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#E4E6EA',
@@ -726,27 +854,17 @@ const styles = {
     minWidth: wp('30%'),
     justifyContent: 'center',
   },
+  continueButtonDisabled: {
+    backgroundColor: '#F0F2F5',
+  },
   continueButtonText: {
     marginRight: wp('1%'),
     fontSize: wp('4%'),
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  skipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: wp('4%'),
-    paddingVertical: hp('1.5%'),
-    borderRadius: wp('5%'),
-    minWidth: wp('30%'),
-    justifyContent: 'center',
-    backgroundColor: '#F0F2F5',
-  },
-  skipButtonText: {
-    marginRight: wp('1%'),
-    fontSize: wp('4%'),
-    color: '#65676B',
-    fontWeight: '500',
+  continueButtonTextDisabled: {
+    color: '#A0A4A8',
   },
   modalOverlay: {
     flex: 1,
@@ -770,6 +888,12 @@ const styles = {
     fontWeight: '600',
     color: '#1C1E21',
   },
+  modalSubtitle: {
+    fontSize: wp('3.5%'),
+    color: '#65676B',
+    textAlign: 'center',
+    marginTop: hp('0.5%'),
+  },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -792,6 +916,30 @@ const styles = {
     fontSize: wp('3.5%'),
     color: '#65676B',
   },
+  requirementsSection: {
+    paddingHorizontal: wp('5%'),
+    paddingVertical: hp('2%'),
+    backgroundColor: '#F8F9FA',
+    marginHorizontal: wp('5%'),
+    marginTop: hp('2%'),
+    borderRadius: wp('3%'),
+  },
+  requirementsTitle: {
+    fontSize: wp('3.8%'),
+    fontWeight: '600',
+    color: '#1C1E21',
+    marginBottom: hp('1%'),
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: hp('0.5%'),
+  },
+  requirementText: {
+    marginLeft: wp('2%'),
+    fontSize: wp('3.2%'),
+    color: '#65676B',
+  },
   modalCancel: {
     alignItems: 'center',
     paddingVertical: hp('2%'),
@@ -807,9 +955,6 @@ const styles = {
     backgroundColor: '#000000',
   },
   cropHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: wp('5%'),
     paddingVertical: hp('2%'),
     backgroundColor: 'rgba(0,0,0,0.9)',
@@ -847,10 +992,10 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cropCircle: {
-    width: wp('60%'),
-    height: wp('60%'),
-    borderRadius: wp('30%'),
+  cropDocumentFrame: {
+    width: wp('70%'),
+    height: wp('46.67%'), // 3:2 aspect ratio
+    borderRadius: wp('2%'),
     borderWidth: 2,
     borderColor: '#FFFFFF',
     backgroundColor: 'transparent',
@@ -903,4 +1048,4 @@ const styles = {
   },
 };
 
-export default ProfileImageScreen;
+export default IdCardScreen;

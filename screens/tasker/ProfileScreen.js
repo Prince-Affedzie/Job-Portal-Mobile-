@@ -862,6 +862,24 @@ const TaskerProfileScreen = ({ navigation }) => {
             />
             
             {/* Location Fields */}
+             <LocationField
+              label="Street"
+              field="street"
+              value={profileData.location?.street}
+              editable={editingSections.personalInfo}
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
+             <LocationField
+              label="Town"
+              field="town"
+              value={profileData.location?.town}
+              editable={editingSections.personalInfo}
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              profileData={profileData}
+            />
             <LocationField
               label="City"
               field="city"
@@ -892,16 +910,6 @@ const TaskerProfileScreen = ({ navigation }) => {
               setProfileData={setProfileData}
             />
 
-            <ProfileField
-              label="Hourly Rate (GHS)"
-              value={profileData.hourlyRate?.toString()}
-              editable={editingSections.personalInfo}
-              onChange={(text) => setProfileData({ ...profileData, hourlyRate: parseFloat(text) || 0 })}
-              placeholder="Enter your hourly rate"
-              editing={editingSections.personalInfo}
-              setProfileData={setProfileData}
-              keyboardType="numeric"
-            />
           </View>
         </View>
 

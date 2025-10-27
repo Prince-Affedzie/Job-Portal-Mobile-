@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import {  getMiniTasks, getYourAppliedMiniTasks } from "../api/miniTaskApi";
+import {getTasksNearby, getMiniTasks, getYourAppliedMiniTasks } from "../api/miniTaskApi";
 import {applyToMiniTask,bidOnMiniTask} from "../api/miniTaskApi";
 import { AuthContext } from "./AuthContext";
 import {viewAllEarnings} from "../api/paymentApi"
@@ -10,6 +10,7 @@ export const TaskerProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
   const [availableTasks, setAvailableTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
+  const [tasksNearby,setTaskNearby] = useState([])
   const [loading, setLoading] = useState(false);
   const [earnings,setEarnings] = useState([])
 
@@ -21,6 +22,20 @@ export const TaskerProvider = ({ children }) => {
     try {
       const res = await getMiniTasks(params);
       setAvailableTasks(res.data || []);
+    } catch (err) {
+      console.log("Failed to fetch available tasks:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadNearbyTasks = async () => {
+    
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await getTasksNearby();
+      setTaskNearby(res.data || []);
     } catch (err) {
       console.log("Failed to fetch available tasks:", err);
     } finally {
@@ -80,6 +95,7 @@ export const TaskerProvider = ({ children }) => {
   useEffect(() => {
     if (user?.role === "tasker") {
       loadAvailableTasks();
+      loadNearbyTasks();
       loadMyTasks();
       getAllEarnings();
     }
@@ -89,9 +105,11 @@ export const TaskerProvider = ({ children }) => {
     <TaskerContext.Provider
       value={{
         availableTasks,
+        tasksNearby,
         myTasks,
         loading,
         loadAvailableTasks,
+        loadNearbyTasks,
         loadMyTasks,
         applyTask,
         bidOnTask,

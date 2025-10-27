@@ -358,9 +358,9 @@ const MyApplicationsScreen = () => {
         
         <View style={styles.statusRow}>
           <StatusBadge status={item.status} />
-          <TouchableOpacity style={styles.viewButton}>
+          {/*<TouchableOpacity style={styles.viewButton}>
             <Ionicons name="arrow-forward" size={14} color="#4F46E5" />
-          </TouchableOpacity>
+          </TouchableOpacity>*/}
         </View>
       </View>
     </TouchableOpacity>

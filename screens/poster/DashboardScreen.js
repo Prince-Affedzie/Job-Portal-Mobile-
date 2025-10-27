@@ -261,7 +261,9 @@ export default function DashboardScreen() {
                     <LinearGradient
                         colors={['#1A1F3B', '#2D325D', '#4A4F8C']}
                         style={styles.welcomeGradient}
-                    >
+                         start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                      >
                         <View style={styles.welcomeHeader}>
                             <View>
                                 <Text style={styles.welcomeGreeting}>
@@ -460,7 +462,7 @@ const styles = StyleSheet.create({
     },
     
     welcomeSection: {
-        marginHorizontal: 16,
+        marginHorizontal: 8,
         marginTop: 16,
         borderRadius: 28,
         overflow: 'hidden',

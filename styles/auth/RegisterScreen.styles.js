@@ -228,7 +228,7 @@ roleOptionInner: {
   gap: 8,
 },
   signupButton: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#764ba2",
     borderRadius: 8,
     height: 48,
     justifyContent: "center",

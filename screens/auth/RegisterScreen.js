@@ -460,7 +460,7 @@ const RegisterScreen = ({ navigation }) => {
                 <View style={styles.roleContainer}>
                   <RoleOption
                     icon="search-outline"
-                    title="Looking for Work"
+                    title="Become a Tasker"
                     value="job_seeker"
                     selected={formData.role === "job_seeker"}
                     handleChange={handleChange}
@@ -479,6 +479,7 @@ const RegisterScreen = ({ navigation }) => {
 
               {/* Submit Button */}
               <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+                
                 <TouchableOpacity
                   style={[
                     styles.signupButton,

@@ -14,6 +14,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   BackHandler,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -23,9 +25,21 @@ import Toast from 'react-native-toast-message';
 import { fetchRoomMessages, handleChatFiles, fetchRoomInfo } from '../../api/chatApi';
 import { sendFileToS3 } from '../../api/commonApi';
 
-// Reusable Components
-const MessageBubble = ({ message, isMyMessage, onReply, currentUser, messageRef }) => {
+const { width, height } = Dimensions.get('window');
+
+// Enhanced Message Bubble Component
+const MessageBubble = ({ message, isMyMessage, onReply, currentUser, messageRef, isLastInGroup }) => {
+  const [bubbleAnim] = useState(new Animated.Value(0));
   const isSeen = message.seenBy.length > 1 && isMyMessage;
+
+  useEffect(() => {
+    Animated.spring(bubbleAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const openMedia = async () => {
     if (!message.mediaUrl) return;
@@ -42,31 +56,59 @@ const MessageBubble = ({ message, isMyMessage, onReply, currentUser, messageRef 
   };
 
   return (
-    <TouchableOpacity
-      style={[styles.messageContainer, isMyMessage ? styles.myMessage : styles.theirMessage]}
-      onLongPress={() => onReply(message)}
+    <Animated.View
+      style={[
+        styles.messageContainer,
+        isMyMessage ? styles.myMessage : styles.theirMessage,
+        {
+          transform: [
+            { scale: bubbleAnim },
+            { translateY: bubbleAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [20, 0]
+            })}
+          ],
+          opacity: bubbleAnim
+        }
+      ]}
       ref={messageRef}
     >
-      <View style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.theirBubble]}>
+      <TouchableOpacity
+        style={[styles.messageBubble, isMyMessage ? styles.myBubble : styles.theirBubble]}
+        onLongPress={() => onReply(message)}
+        activeOpacity={0.9}
+        delayLongPress={200}
+      >
         {message.replyTo && (
           <View style={styles.replyContainer}>
-            <Text style={styles.replyText}>
-              Replying to: {message.replyTo.text?.substring(0, 30) || 'Media'}...
+            <Ionicons name="return-up-back" size={14} color="#6B7280" />
+            <Text style={styles.replyText} numberOfLines={1}>
+              {message.replyTo.text?.substring(0, 25) || 'Media'}...
             </Text>
           </View>
         )}
+        
         {message.text && (
           <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.theirMessageText]}>
             {message.text}
           </Text>
         )}
+        
         {message.mediaUrl && (
-          <TouchableOpacity onPress={openMedia}>
-            <Image source={{ uri: message.mediaUrl }} style={styles.media} />
+          <TouchableOpacity onPress={openMedia} style={styles.mediaContainer}>
+            <Image 
+              source={{ uri: message.mediaUrl }} 
+              style={styles.media} 
+              resizeMode="cover"
+            />
+            <View style={styles.mediaOverlay}>
+              <Ionicons name="expand" size={20} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
         )}
+        
         <View style={styles.messageFooter}>
-          <Text style={styles.messageTime}>
+          <Text style={[styles.messageTime, isMyMessage ? styles.myMessageTime : styles.theirMessageTime]}>
             {new Date(message.createdAt).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -76,95 +118,213 @@ const MessageBubble = ({ message, isMyMessage, onReply, currentUser, messageRef 
             <Ionicons
               name={isSeen ? 'checkmark-done' : 'checkmark'}
               size={14}
-              color={isSeen ? '#6366F1' : '#9CA3AF'}
+              color={isSeen ? '#10B981' : '#9CA3AF'}
               style={styles.seenIcon}
             />
           )}
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
-const TypingIndicator = () => (
-  <View style={styles.typingContainer}>
-    <View style={styles.theirBubble}>
+// Enhanced Typing Indicator
+const TypingIndicator = () => {
+  const [dotAnim] = useState(new Animated.Value(0));
+  
+  useEffect(() => {
+    const animateDots = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(dotAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dotAnim, {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+    
+    animateDots();
+  }, []);
+
+  const dot1Opacity = dotAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.3, 1, 0.3, 0.3]
+  });
+
+  const dot2Opacity = dotAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.3, 0.3, 1, 0.3]
+  });
+
+  const dot3Opacity = dotAnim.interpolate({
+    inputRange: [0, 0.33, 0.66, 1],
+    outputRange: [0.3, 0.3, 0.3, 1]
+  });
+
+  return (
+    <View style={styles.typingContainer}>
+      <View style={styles.typingBubble}>
+        <Animated.View style={[styles.typingDot, { opacity: dot1Opacity }]} />
+        <Animated.View style={[styles.typingDot, { opacity: dot2Opacity }]} />
+        <Animated.View style={[styles.typingDot, { opacity: dot3Opacity }]} />
+      </View>
       <Text style={styles.typingText}>Typing...</Text>
     </View>
-  </View>
-);
+  );
+};
 
+// Enhanced File Preview
 const FilePreview = ({ file, onClear }) => (
   <View style={styles.filePreview}>
-    <Text style={styles.filePreviewText} numberOfLines={1}>
-      {file.name || 'Selected File'}
-    </Text>
-    <TouchableOpacity onPress={onClear} accessibilityLabel="Clear selected file">
-      <Ionicons name="close" size={20} color="#EF4444" />
+    <View style={styles.filePreviewContent}>
+      <Ionicons name="document" size={24} color="#6366F1" />
+      <View style={styles.fileInfo}>
+        <Text style={styles.fileName} numberOfLines={1}>
+          {file.name || 'Selected File'}
+        </Text>
+        <Text style={styles.fileSize}>
+          {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : 'Size unknown'}
+        </Text>
+      </View>
+    </View>
+    <TouchableOpacity 
+      onPress={onClear} 
+      style={styles.clearButton}
+      accessibilityLabel="Clear selected file"
+    >
+      <Ionicons name="close-circle" size={24} color="#EF4444" />
     </TouchableOpacity>
   </View>
 );
 
+// Enhanced Reply Preview
 const ReplyPreview = ({ replyTo, onClear }) => (
   <View style={styles.replyPreview}>
-    <Text style={styles.replyPreviewText} numberOfLines={1}>
-      Replying to: {replyTo.text?.substring(0, 30) || 'Media'}...
-    </Text>
-    <TouchableOpacity onPress={onClear} accessibilityLabel="Clear reply">
-      <Ionicons name="close" size={20} color="#EF4444" />
+    <View style={styles.replyPreviewContent}>
+      <Ionicons name="return-up-back" size={20} color="#6366F1" />
+      <View style={styles.replyInfo}>
+        <Text style={styles.replyLabel}>Replying to</Text>
+        <Text style={styles.replyText} numberOfLines={1}>
+          {replyTo.text?.substring(0, 40) || 'Media'}...
+        </Text>
+      </View>
+    </View>
+    <TouchableOpacity 
+      onPress={onClear} 
+      style={styles.clearButton}
+      accessibilityLabel="Clear reply"
+    >
+      <Ionicons name="close-circle" size={24} color="#EF4444" />
     </TouchableOpacity>
   </View>
 );
 
+// Enhanced File Upload Progress
 const FileUploadProgress = ({ fileData, onCancel }) => (
   <View style={styles.fileUploadProgress}>
-    <Text style={styles.fileUploadText} numberOfLines={1}>{fileData.name}</Text>
-    <Progress.Bar progress={fileData.progress / 100} width={200} color="#6366F1" />
-    {fileData.status === 'failed' && (
-      <Text style={styles.fileUploadError}>Upload failed</Text>
-    )}
-    <TouchableOpacity onPress={onCancel} accessibilityLabel="Cancel file upload">
-      <Ionicons name="close" size={20} color="#EF4444" />
+    <View style={styles.uploadContent}>
+      <Ionicons 
+        name={fileData.status === 'failed' ? 'warning' : 'document'} 
+        size={20} 
+        color={fileData.status === 'failed' ? '#EF4444' : '#6366F1'} 
+      />
+      <View style={styles.uploadInfo}>
+        <Text style={styles.uploadFileName} numberOfLines={1}>
+          {fileData.name}
+        </Text>
+        <Progress.Bar 
+          progress={fileData.progress / 100} 
+          width={width - 120} 
+          height={6}
+          color={fileData.status === 'failed' ? '#EF4444' : '#6366F1'}
+          unfilledColor="#F3F4F6"
+          borderWidth={0}
+        />
+        <Text style={styles.uploadStatus}>
+          {fileData.status === 'failed' ? 'Upload failed' : `${fileData.progress}% uploaded`}
+        </Text>
+      </View>
+    </View>
+    <TouchableOpacity 
+      onPress={onCancel} 
+      style={styles.cancelButton}
+      accessibilityLabel="Cancel file upload"
+    >
+      <Ionicons name="close" size={20} color="#6B7280" />
     </TouchableOpacity>
   </View>
 );
 
-const MessageInput = ({ text, setText, handleSend, handleTyping, triggerFileInput, disabled, hasFile, isUploading }) => (
-  <View style={styles.inputContainer}>
-    <TouchableOpacity
-      style={styles.attachButton}
-      onPress={triggerFileInput}
-      disabled={isUploading}
-      accessibilityLabel="Attach file"
-    >
-      <Ionicons name="attach" size={24} color={isUploading ? '#9CA3AF' : '#6B7280'} />
-    </TouchableOpacity>
-    <TextInput
-      style={styles.textInput}
-      value={text}
-      onChangeText={(value) => {
-        setText(value);
-        handleTyping();
-      }}
-      placeholder="Type a message..."
-      multiline
-      maxLength={500}
-      editable={!disabled}
-    />
-    <TouchableOpacity
-      style={[styles.sendButton, (disabled || (!text.trim() && !hasFile)) && styles.sendButtonDisabled]}
-      onPress={handleSend}
-      disabled={disabled || (!text.trim() && !hasFile)}
-      accessibilityLabel="Send message"
-    >
-      {disabled ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
-      ) : (
-        <Ionicons name="send" size={20} color="#FFFFFF" />
-      )}
-    </TouchableOpacity>
-  </View>
-);
+// Enhanced Message Input
+const MessageInput = ({ 
+  text, 
+  setText, 
+  handleSend, 
+  handleTyping, 
+  triggerFileInput, 
+  disabled, 
+  hasFile, 
+  isUploading 
+}) => {
+  const [inputHeight, setInputHeight] = useState(40);
+
+  return (
+    <View style={styles.inputContainer}>
+      <TouchableOpacity
+        style={[styles.attachButton, isUploading && styles.attachButtonDisabled]}
+        onPress={triggerFileInput}
+        disabled={isUploading}
+        accessibilityLabel="Attach file"
+      >
+        <Ionicons 
+          name="attach" 
+          size={24} 
+          color={isUploading ? '#D1D5DB' : '#6366F1'} 
+        />
+      </TouchableOpacity>
+      
+      <TextInput
+        style={[styles.textInput, { height: Math.min(100, inputHeight) }]}
+        value={text}
+        onChangeText={setText}
+        onContentSizeChange={(e) => setInputHeight(e.nativeEvent.contentSize.height)}
+        placeholder="Type a message..."
+        placeholderTextColor="#9CA3AF"
+        multiline
+        maxLength={1000}
+        editable={!disabled}
+        onFocus={handleTyping}
+      />
+      
+      <TouchableOpacity
+        style={[
+          styles.sendButton,
+          (disabled || (!text.trim() && !hasFile)) && styles.sendButtonDisabled
+        ]}
+        onPress={handleSend}
+        disabled={disabled || (!text.trim() && !hasFile)}
+        accessibilityLabel="Send message"
+      >
+        {disabled ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Ionicons 
+            name="send" 
+            size={20} 
+            color="#FFFFFF" 
+          />
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
   const [messages, setMessages] = useState([]);
@@ -191,8 +351,8 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
   const messageRefs = useRef({});
   const fetchLockRef = useRef(false);
   const lastScrollOffset = useRef(0);
+  const headerAnim = useRef(new Animated.Value(0)).current;
 
- 
   // Validate props
   if (!room || !currentUser || !socket) {
     return (
@@ -307,57 +467,10 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
     []
   );
 
-  // Scroll to last read message
-  const scrollToLastReadMessage = useCallback(() => {
-    if (lastReadMessageId && messageRefs.current[lastReadMessageId]) {
-      const index = messages.findIndex(msg => msg._id === lastReadMessageId);
-      if (index !== -1) {
-        flatListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.5 });
-        setInitialScrollSet(true);
-      }
-    } else if (messages.length > 0 && !initialScrollSet) {
-      scrollToBottom(false);
-      setInitialScrollSet(true);
-    }
-  }, [lastReadMessageId, messages, initialScrollSet, scrollToBottom]);
-
-  // Find last read message
-  const findLastReadMessage = useCallback(
-    (messageList) => {
-      for (let i = messageList.length - 1; i >= 0; i--) {
-        const msg = messageList[i];
-        if (msg.seenBy.includes(currentUser._id) && msg.sender._id !== currentUser._id) {
-          return msg._id;
-        }
-      }
-      return null;
-    },
-    [currentUser._id]
-  );
-
-  // Identify unread messages
-  const identifyUnreadMessages = useCallback(
-    (messageList) => {
-      return messageList.filter(msg => !msg.seenBy.includes(currentUser._id) && msg.sender._id !== currentUser._id);
-    },
-    [currentUser._id]
-  );
-
-  // Update message in state
-  const updateMessageInState = useCallback(
-    (messageId, updatedFields) => {
-      setMessages(prev =>
-        prev.map(msg => (msg._id === messageId ? { ...msg, ...updatedFields } : msg))
-      );
-    },
-    []
-  );
-
   // Load messages with pagination
   const fetchMessages = useCallback(
     async (cursor = null, append = false) => {
       if (fetchLockRef.current || (append && !hasMoreMessages)) {
-        
         return;
       }
       fetchLockRef.current = true;
@@ -374,8 +487,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
           setIsLoading(true);
         }
 
-        
-
         const response = await fetchRoomMessages(room._id, cursor);
         if (response.status === 200) {
           const { messages: newMessages, nextCursor, hasMore } = response.data;
@@ -388,12 +499,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
               updatedMessages = [...uniqueNewMessages, ...prev];
             } else {
               updatedMessages = newMessages;
-              if (isInitialLoad) {
-                const lastRead = findLastReadMessage(newMessages);
-                const unread = identifyUnreadMessages(newMessages);
-                setLastReadMessageId(lastRead);
-                setUnreadMessages(unread);
-              }
             }
             return updatedMessages;
           });
@@ -401,25 +506,9 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
           setNextCursor(nextCursor);
           setHasMoreMessages(hasMore);
 
-          if (!isInitialLoad || checkIfAtBottom({ nativeEvent: { contentOffset: { y: 0 }, contentSize: { height: 0 }, layoutMeasurement: { height: 0 } } })) {
-            newMessages.forEach(msg => {
-              if (!msg.seenBy.includes(currentUser._id) && msg.sender._id !== currentUser._id) {
-                socket.emit('markAsSeen', { messageId: msg._id, userId: currentUser._id });
-              }
-            });
+          if (!append) {
+            setTimeout(() => scrollToBottom(false), 100);
           }
-
-          if (append && newMessages.length > 0 && flatListRef.current) {
-            const newContentHeight = flatListRef.current._listRef._scrollRef._contentSize?.height || 0;
-            const heightDifference = newContentHeight - previousContentHeight;
-            flatListRef.current.scrollToOffset({
-              offset: lastScrollOffset.current + heightDifference,
-              animated: false,
-            });
-          }
-        } else {
-          console.error('Fetch failed with status:', response.status);
-          Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to load messages' });
         }
       } catch (error) {
         console.error('Failed to load messages:', error);
@@ -431,10 +520,9 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
         if (!append) {
           setIsInitialLoad(false);
         }
-        
       }
     },
-    [ findLastReadMessage, identifyUnreadMessages, checkIfAtBottom]
+    [room._id,  scrollToBottom]
   );
 
   // Handle scroll
@@ -445,18 +533,27 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
 
       setIsAtBottom(checkIfAtBottom(event));
 
+      // Show/hide header shadow based on scroll
+      const scrollY = event.nativeEvent.contentOffset.y;
+      if (scrollY > 10) {
+        Animated.timing(headerAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      } else {
+        Animated.timing(headerAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: false,
+        }).start();
+      }
+
       if (offsetY < 100 && hasMoreMessages && !isFetchingMore && nextCursor) {
         fetchMessages(nextCursor, true);
       }
-
-      if (checkIfAtBottom(event) && unreadMessages.length > 0) {
-        unreadMessages.forEach(msg => {
-          socket.emit('markAsSeen', { messageId: msg._id, userId: currentUser._id });
-        });
-        setUnreadMessages([]);
-      }
     },
-    [hasMoreMessages, isFetchingMore, nextCursor, fetchMessages, unreadMessages, currentUser._id, checkIfAtBottom]
+    [hasMoreMessages, isFetchingMore, nextCursor, fetchMessages, checkIfAtBottom, headerAnim]
   );
 
   // Fetch room info
@@ -471,7 +568,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
         }
       } catch (error) {
         console.error('Failed to fetch room info:', error);
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to fetch room info' });
       }
     };
     getRoomInfo();
@@ -499,13 +595,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
     };
   }, [room._id, socket, fetchMessages]);
 
-  // Handle initial scroll
-  useEffect(() => {
-    if (!isLoading && messages.length > 0 && !initialScrollSet) {
-      scrollToLastReadMessage();
-    }
-  }, [isLoading, messages.length, initialScrollSet, scrollToLastReadMessage]);
-
   // Socket events
   useEffect(() => {
     if (!socket) return;
@@ -516,7 +605,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
           const messageExists = prev.some(msg => msg._id === newMsg._id);
           if (messageExists) return prev;
 
-          // Replace temp message if it exists
           const tempIndex = prev.findIndex(
             msg => msg.isTemp && msg.text === newMsg.text && msg.sender._id === newMsg.sender._id
           );
@@ -557,44 +645,26 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
       if (userId !== currentUser._id) setIsTyping(false);
     };
 
-    const handleMessageDeleted = ({ messageId }) => {
-      updateMessageInState(messageId, { deleted: true });
-    };
-
-    const handleMessageSendError = ({ tempId, error }) => {
-      setMessages(prev => prev.filter(msg => msg._id !== tempId));
-      Toast.show({ type: 'error', text1: 'Error', text2: error || 'Failed to send message' });
-      setIsSending(false);
-    };
-
     socket.on('receiveMessage', handleReceiveMessage);
     socket.on('messageSeen', handleMessageSeen);
     socket.on('userTyping', handleUserTyping);
     socket.on('userStopTyping', handleUserStopTyping);
-    socket.on('messageDeleted', handleMessageDeleted);
-    socket.on('messageSendError', handleMessageSendError);
 
     return () => {
       socket.off('receiveMessage', handleReceiveMessage);
       socket.off('messageSeen', handleMessageSeen);
       socket.off('userTyping', handleUserTyping);
       socket.off('userStopTyping', handleUserStopTyping);
-      socket.off('messageDeleted', handleMessageDeleted);
-      socket.off('messageSendError', handleMessageSendError);
     };
-  }, [socket, room._id, currentUser._id, isAtBottom, updateMessageInState]);
+  }, [socket, room._id, currentUser._id, isAtBottom, scrollToBottom]);
 
   // File picker
   const triggerFileInput = useCallback(async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-      console.log('DocumentPicker result:', result);
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedFile = result.assets[0];
         setFile(selectedFile);
-        Toast.show({ type: 'success', text1: 'File Selected', text2: `Selected "${selectedFile.name}"` });
-      } else {
-        Toast.show({ type: 'info', text1: 'No File Selected', text2: 'File selection was canceled' });
       }
     } catch (error) {
       console.error('File picker error:', error);
@@ -646,7 +716,6 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
       console.error('Failed to send message:', error);
       setMessages(prev => prev.filter(msg => msg._id !== tempId));
       Toast.show({ type: 'error', text1: 'Error', text2: 'Failed to send message' });
-      setIsSending(false);
     } finally {
       setIsSending(false);
     }
@@ -695,17 +764,41 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
     [isFetchingMore]
   );
 
+  const headerShadow = headerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 8]
+  });
+
+  const headerBorder = headerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.5]
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Chat Header */}
-      <View style={styles.chatHeader}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack} accessibilityLabel="Go back">
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+      {/* Enhanced Chat Header */}
+      <Animated.View 
+        style={[
+          styles.chatHeader,
+          {
+            shadowOpacity: headerAnim,
+            shadowRadius: headerShadow,
+            borderBottomWidth: headerBorder,
+          }
+        ]}
+      >
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={onBack} 
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={24} color="#1F2937" />
         </TouchableOpacity>
+        
         <View style={styles.chatUserInfo}>
           <View style={styles.chatAvatar}>
             {otherParticipant?.profileImage ? (
@@ -717,8 +810,11 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
                 </Text>
               </View>
             )}
-            {onlineUserIds?.includes(otherParticipant?._id) && <View style={styles.chatOnlineIndicator} />}
+            {onlineUserIds?.includes(otherParticipant?._id) && (
+              <View style={styles.chatOnlineIndicator} />
+            )}
           </View>
+          
           <View style={styles.chatUserDetails}>
             <Text style={styles.chatUserName} numberOfLines={1}>
               {otherParticipant?.name || 'Unknown User'}
@@ -728,7 +824,19 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
             </Text>
           </View>
         </View>
-      </View>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="call" size={20} color="#6366F1" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="videocam" size={20} color="#6366F1" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="ellipsis-vertical" size={20} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       {/* Messages List */}
       {isLoading ? (
@@ -741,15 +849,15 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
           <FlatList
             ref={flatListRef}
             data={messages}
-            renderItem={({ item }) => (
+            renderItem={({ item, index }) => (
               <MessageBubble
                 key={item._id}
                 message={item}
                 isMyMessage={isMyMessage(item)}
                 onReply={handleReply}
                 currentUser={currentUser}
-                socket={socket}
                 messageRef={el => (messageRefs.current[item._id] = el)}
+                isLastInGroup={index === messages.length - 1}
               />
             )}
             keyExtractor={item => item._id}
@@ -763,22 +871,32 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
             ListHeaderComponent={renderHeader}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+                <View style={styles.emptyStateIcon}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={64} color="#E5E7EB" />
+                </View>
                 <Text style={styles.emptyStateText}>No messages yet</Text>
-                <Text style={styles.emptyStateSubtext}>Start the conversation</Text>
+                <Text style={styles.emptyStateSubtext}>
+                  Send a message to start the conversation
+                </Text>
               </View>
             }
           />
+          
           {unreadMessages.length > 0 && !isAtBottom && (
-            <View style={styles.jumpToBottomButton}>
-              <TouchableOpacity onPress={scrollToLatestMessages} accessibilityLabel="Jump to latest messages">
+            <TouchableOpacity 
+              style={styles.jumpToBottomButton}
+              onPress={scrollToLatestMessages}
+              accessibilityLabel="Jump to latest messages"
+            >
+              <View style={styles.jumpToBottomContent}>
                 <Text style={styles.jumpToBottomText}>
                   {unreadMessages.length} new message{unreadMessages.length > 1 ? 's' : ''}
                 </Text>
-                <Ionicons name="arrow-down-circle" size={40} color="#6366F1" />
-              </TouchableOpacity>
-            </View>
+                <Ionicons name="arrow-down" size={16} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
           )}
+          
           {Array.from(uploadingFiles.entries()).map(([fileId, fileData]) => (
             <FileUploadProgress
               key={fileId}
@@ -786,6 +904,7 @@ const ChatWindow = ({ room, socket, currentUser, onlineUserIds, onBack }) => {
               onCancel={() => removeFileFromUploads(fileId)}
             />
           ))}
+          
           {isTyping && <TypingIndicator />}
         </>
       )}
@@ -819,15 +938,22 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    marginTop:12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
+    borderBottomColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0,
+    elevation: 0,
+    zIndex: 10,
   },
   backButton: {
     padding: 8,
-    marginRight: 12,
+    marginRight: 8,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
   },
   chatUserInfo: {
     flex: 1,
@@ -839,30 +965,35 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
   chatOnlineIndicator: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     backgroundColor: '#10B981',
     borderWidth: 2,
     borderColor: '#FFFFFF',
@@ -871,45 +1002,53 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   chatUserName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     color: '#1F2937',
     marginBottom: 2,
   },
   chatJobTitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#6366F1',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   headerButton: {
-    padding: 8,
-    marginLeft: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: '#6B7280',
+    color: '#64748B',
+    fontWeight: '500',
   },
   errorText: {
     fontSize: 16,
     color: '#EF4444',
     textAlign: 'center',
+    marginTop: 20,
   },
   messagesContent: {
-    padding: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   messageContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   myMessage: {
     alignItems: 'flex-end',
@@ -919,20 +1058,28 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   myBubble: {
     backgroundColor: '#6366F1',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 8,
   },
   theirBubble: {
-    backgroundColor: '#F3F4F6',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#F8FAFC',
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
+    fontWeight: '400',
   },
   myMessageText: {
     color: '#FFFFFF',
@@ -943,11 +1090,17 @@ const styles = StyleSheet.create({
   messageFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   messageTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  myMessageTime: {
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  theirMessageTime: {
+    color: '#94A3B8',
   },
   seenIcon: {
     marginLeft: 4,
@@ -956,148 +1109,263 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
-    marginTop: 60,
+    marginTop: height * 0.2,
+  },
+  emptyStateIcon: {
+    marginBottom: 16,
   },
   emptyStateText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#6B7280',
-    marginTop: 16,
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyStateSubtext: {
     fontSize: 14,
     color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   attachButton: {
-    padding: 8,
-    marginRight: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  attachButtonDisabled: {
+    backgroundColor: '#F3F4F6',
   },
   textInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    maxHeight: 100,
+    paddingVertical: 12,
     fontSize: 16,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
+    color: '#1F2937',
+    fontWeight: '400',
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 12,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   loadingMoreContainer: {
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   loadingMoreText: {
-    marginTop: 8,
+    marginTop: 12,
     fontSize: 14,
-    color: '#6B7280',
+    color: '#64748B',
+    fontWeight: '500',
   },
   jumpToBottomButton: {
     position: 'absolute',
-    bottom: 80,
-    right: 16,
-    zIndex: 10,
+    bottom: 100,
+    alignSelf: 'center',
+    backgroundColor: '#6366F1',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  jumpToBottomContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   jumpToBottomText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    color: '#6366F1',
-    marginBottom: 4,
+    fontWeight: '600',
   },
   filePreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    zIndex: 10,
   },
-  filePreviewText: {
+  filePreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    gap: 12,
+  },
+  fileInfo: {
+    flex: 1,
+  },
+  fileName: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#1F2937',
+    marginBottom: 2,
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  clearButton: {
+    padding: 4,
   },
   replyPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F0F9FF',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
-    zIndex: 10,
+    borderTopColor: '#BAE6FD',
   },
-  replyPreviewText: {
+  replyPreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    gap: 12,
+  },
+  replyInfo: {
+    flex: 1,
+  },
+  replyLabel: {
+    fontSize: 12,
+    color: '#0369A1',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  replyText: {
     fontSize: 14,
     color: '#1F2937',
-    fontStyle: 'italic',
+    fontWeight: '500',
   },
   fileUploadProgress: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    marginVertical: 8,
-    marginHorizontal: 16,
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
-  fileUploadText: {
+  uploadContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    gap: 12,
+  },
+  uploadInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  uploadFileName: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#1F2937',
   },
-  fileUploadError: {
+  uploadStatus: {
     fontSize: 12,
-    color: '#EF4444',
-    marginRight: 8,
+    color: '#6B7280',
+  },
+  cancelButton: {
+    padding: 4,
   },
   typingContainer: {
-    marginBottom: 16,
-    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 12,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366F1',
   },
   typingText: {
     fontSize: 14,
     color: '#6B7280',
-    fontStyle: 'italic',
+    fontWeight: '500',
   },
   replyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     padding: 8,
-    backgroundColor: '#E5E7EB',
     borderRadius: 8,
     marginBottom: 8,
+    gap: 6,
   },
   replyText: {
     fontSize: 12,
-    color: '#1F2937',
-    fontStyle: 'italic',
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+    flex: 1,
+  },
+  mediaContainer: {
+    position: 'relative',
+    marginTop: 8,
   },
   media: {
     width: 200,
-    height: 250,
-    borderRadius: 8,
-    marginTop: 8,
+    height: 150,
+    borderRadius: 12,
+  },
+  mediaOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

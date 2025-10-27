@@ -22,6 +22,7 @@ export const completeProfile = (data) =>
   });
 
 export const uploadProfileImage = (data) => API.post("/api/user/upload-profile-image",data);
+export const uploadIdCard = (data)=>API.post("/api/user/upload-id-card",data)
 
 export const addPortfolio = (data) => API.post("/api/user/upload_portfolio", data);
 

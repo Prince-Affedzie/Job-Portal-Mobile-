@@ -63,6 +63,7 @@ export const raiseDispute = (reportForm) =>
 
 export const applyToMiniTask =(Id)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`)
 export const bidOnMiniTask =(Id,bidData)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`,bidData)
+export const getTasksNearby = ()=>API.get('/api/h1/v2/get_nearby_tasks')
 
 //MarkTaskAsDone 
 export const markTaskAsDoneTasker = (Id)=>API.put(`/api/h1/v2/mark_task_as_done/tasker/${Id}`)

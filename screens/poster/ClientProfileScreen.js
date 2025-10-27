@@ -908,6 +908,16 @@ const styles = StyleSheet.create({
   accountActions: {
     gap: 4,
   },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
+    marginRight: 2,
+  },
   accountButton: {
     flexDirection: 'row',
     alignItems: 'center',

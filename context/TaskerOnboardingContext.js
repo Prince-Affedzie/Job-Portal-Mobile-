@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useReducer } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { completeProfile, fetchUser, uploadProfileImage } from '../api/authApi';
+import { completeProfile, fetchUser, uploadProfileImage, uploadIdCard } from '../api/authApi';
 import { sendFileToS3 } from '../api/commonApi';
 import { AuthContext } from './AuthContext';
 
@@ -30,9 +30,18 @@ const initialState = {
     name: ''
   },
   
+  // Step 5: ID Card
+  idCard: {
+    uri: '',
+    type: '',
+    name: '',
+    front: '', // For front side of ID
+    back: ''  // For back side of ID (optional based on your requirements)
+  },
+  
   // Onboarding progress
   currentStep: 1,
-  totalSteps: 5,
+  totalSteps: 6, // Updated from 5 to 6
   isSubmitting: false,
   
   // Validation errors
@@ -45,6 +54,7 @@ const ACTION_TYPES = {
   UPDATE_LOCATION: 'UPDATE_LOCATION',
   UPDATE_SKILLS: 'UPDATE_SKILLS',
   UPDATE_PROFILE_IMAGE: 'UPDATE_PROFILE_IMAGE',
+  UPDATE_ID_CARD: 'UPDATE_ID_CARD',
   SET_CURRENT_STEP: 'SET_CURRENT_STEP',
   SET_ERRORS: 'SET_ERRORS',
   CLEAR_ERRORS: 'CLEAR_ERRORS',
@@ -59,8 +69,8 @@ const onboardingReducer = (state, action) => {
     case ACTION_TYPES.UPDATE_BASIC_INFO:
       return {
         ...state,
-        bio: action.payload.bio || state.bio,
-        phone: action.payload.phone || state.phone,
+        bio: action.payload.bio !== undefined ? action.payload.bio : state.bio,
+        phone: action.payload.phone !== undefined ? action.payload.phone : state.phone,
         errors: {
           ...state.errors,
           bio: null,
@@ -78,7 +88,9 @@ const onboardingReducer = (state, action) => {
         errors: {
           ...state.errors,
           region: null,
-          city: null
+          city: null,
+          town: null,
+          street: null
         }
       };
 
@@ -93,7 +105,6 @@ const onboardingReducer = (state, action) => {
       };
 
     case ACTION_TYPES.UPDATE_PROFILE_IMAGE:
-      // FIXED: Consistent image structure
       return {
         ...state,
         profileImage: {
@@ -109,6 +120,19 @@ const onboardingReducer = (state, action) => {
         }
       };
 
+    case ACTION_TYPES.UPDATE_ID_CARD:
+      return {
+        ...state,
+        idCard: {
+          ...state.idCard,
+          ...action.payload
+        },
+        errors: {
+          ...state.errors,
+          idCard: null
+        }
+      };
+
     case ACTION_TYPES.SET_CURRENT_STEP:
       return {
         ...state,
@@ -118,10 +142,7 @@ const onboardingReducer = (state, action) => {
     case ACTION_TYPES.SET_ERRORS:
       return {
         ...state,
-        errors: {
-          ...state.errors,
-          ...action.payload
-        }
+        errors: action.payload // Replace errors entirely, don't merge
       };
 
     case ACTION_TYPES.CLEAR_ERRORS:
@@ -208,10 +229,10 @@ export const TaskerOnboardingProvider = ({ children }) => {
   };
 
   // Upload image to S3
-  const uploadImageToS3 = async (imageData) => {
+  const uploadImageToS3 = async (imageData, isIdCard = false) => {
     try {
       // Extract file info from imageData
-      const filename = imageData.name || 'profile.jpg';
+      const filename = imageData.name || (isIdCard ? 'id-card.jpg' : 'profile.jpg');
       const type = imageData.type || 'image/jpeg';
       
       // Create file object
@@ -221,8 +242,9 @@ export const TaskerOnboardingProvider = ({ children }) => {
         type: type,
       };
 
-      // Get pre-signed URL from backend
-      const res = await uploadProfileImage({ 
+      // Get pre-signed URL from backend - use appropriate API based on file type
+      const uploadFunction = isIdCard ? uploadIdCard : uploadProfileImage;
+      const res = await uploadFunction({ 
         filename: file.name, 
         contentType: file.type 
       });
@@ -244,7 +266,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
       
     } catch (error) {
       console.error('Image upload error:', error);
-      throw new Error('Failed to upload image');
+      throw new Error(`Failed to upload ${isIdCard ? 'ID card' : 'image'}`);
     }
   };
 
@@ -268,8 +290,8 @@ export const TaskerOnboardingProvider = ({ children }) => {
     // FIXED: Ensure consistent image data structure
     const processedImageData = {
       uri: imageData.uri,
-      type: imageData.mime || 'image/jpeg',
-      name: 'profile.jpg',
+      type: imageData.mime || imageData.type || 'image/jpeg',
+      name: imageData.name || 'profile.jpg',
       width: imageData.width,
       height: imageData.height
     };
@@ -278,6 +300,25 @@ export const TaskerOnboardingProvider = ({ children }) => {
     saveProgress({ 
       ...state, 
       profileImage: processedImageData, 
+      currentStep: state.currentStep 
+    });
+  };
+
+  const updateIdCard = (idCardData) => {
+    const processedIdCardData = {
+      uri: idCardData.uri,
+      type: idCardData.mime || idCardData.type || 'image/jpeg',
+      name: idCardData.name || 'id-card.jpg',
+      width: idCardData.width,
+      height: idCardData.height,
+      front: idCardData.front || '',
+      back: idCardData.back || ''
+    };
+    
+    dispatch({ type: ACTION_TYPES.UPDATE_ID_CARD, payload: processedIdCardData });
+    saveProgress({ 
+      ...state, 
+      idCard: processedIdCardData, 
       currentStep: state.currentStep 
     });
   };
@@ -303,76 +344,94 @@ export const TaskerOnboardingProvider = ({ children }) => {
     clearProgress();
   };
 
-  // Validation functions
-  const validateStep = (step) => {
+  // Validation functions - FIXED VERSION
+  const validateStep = (step, currentState = state) => {
     const errors = {};
 
     switch (step) {
       case 1: // Basic Info
-        if (!state.bio.trim()) {
+        if (!currentState.bio || !currentState.bio.trim()) {
           errors.bio = 'Professional summary is required';
-        } else if (state.bio.length < 10) {
+        } else if (currentState.bio.trim().length < 10) {
           errors.bio = 'Please provide a more detailed professional summary (min. 10 characters)';
-        } else if (state.bio.length > 500) {
+        } else if (currentState.bio.trim().length > 500) {
           errors.bio = 'Professional summary must be less than 500 characters';
         }
 
-        if (!state.phone.trim()) {
+        if (!currentState.phone || !currentState.phone.trim()) {
           errors.phone = 'Phone number is required';
-        } else if (!/^\d{10,12}$/.test(state.phone.replace(/[^0-9]/g, ''))) {
+        } else if (!/^\d{10,12}$/.test(currentState.phone.replace(/[^0-9]/g, ''))) {
           errors.phone = 'Please enter a valid phone number';
         }
         break;
 
       case 2: // Location
-        if (!state.location.region) {
+        if (!currentState.location.region || !currentState.location.region.trim()) {
           errors.region = 'Region is required';
         }
-        if (!state.location.city.trim()) {
+        if (!currentState.location.city || !currentState.location.city.trim()) {
           errors.city = 'City is required';
         }
         break;
 
       case 3: // Skills
-        if (state.skills.length === 0) {
+        if (!currentState.skills || currentState.skills.length === 0) {
           errors.skills = 'Please select at least one skill';
         }
         break;
 
-      case 4: // Profile Image (optional, so no validation)
+      case 4: // Profile Image (optional, so no validation needed)
+        // No validation required for optional profile image
+        break;
+
+      case 5: // ID Card
+        if (!currentState.idCard || !currentState.idCard.uri) {
+          errors.idCard = 'ID card photo is required for verification';
+        }
+        break;
+
+      default:
         break;
     }
 
-    if (Object.keys(errors).length > 0) {
-      setErrors(errors);
-      return false;
-    }
-
-    clearErrors();
-    return true;
+    return errors;
   };
 
-  // Navigation helpers
+  // FIXED: Navigation helpers - proper error handling
   const goToNextStep = () => {
-    // Validate synchronously first
-    const errors = validateStep(state.currentStep);
+    // Clear any existing errors first
+    dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
     
-    if (Object.keys(errors).length > 0) {
-      // If there are errors, set them and prevent navigation
-      setErrors(errors);
+    // Validate current step with current state
+    //const validationErrors = validateStep(state.currentStep, state);
+    
+    // Check if there are any validation errors
+   /* if (Object.keys(validationErrors).length > 0) {
+      // Set errors and prevent navigation
+      dispatch({ type: ACTION_TYPES.SET_ERRORS, payload: validationErrors });
+      console.log('Validation failed for step', state.currentStep, ':', validationErrors);
       return false;
-    } else {
-      // If no errors, clear any existing errors and proceed
-      clearErrors();
-      const nextStep = state.currentStep + 1;
-      setCurrentStep(nextStep);
+    }*/
+    
+    // No errors - proceed to next step
+    const nextStep = state.currentStep + 1;
+    if (nextStep <= state.totalSteps) {
+      dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: nextStep });
+      saveProgress({ ...state, currentStep: nextStep, errors: {} });
+      console.log('Moving to step', nextStep);
       return true;
     }
+    
+    return false;
   };
 
   const goToPreviousStep = () => {
     if (state.currentStep > 1) {
-      setCurrentStep(state.currentStep - 1);
+      // Clear errors when going back
+      dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
+      const prevStep = state.currentStep - 1;
+      dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: prevStep });
+      saveProgress({ ...state, currentStep: prevStep, errors: {} });
       return true;
     }
     return false;
@@ -380,24 +439,28 @@ export const TaskerOnboardingProvider = ({ children }) => {
 
   const goToStep = (step) => {
     if (step >= 1 && step <= state.totalSteps) {
-      setCurrentStep(step);
+      // Clear errors when jumping to a step
+      dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
+      dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: step });
+      saveProgress({ ...state, currentStep: step, errors: {} });
       return true;
     }
     return false;
   };
 
-  // UPDATED: submitOnboarding function with S3 upload
+  // UPDATED: submitOnboarding function with ID card upload
   const submitOnboarding = async () => {
     try {
       setSubmitting(true);
       
       let profileImageUrl = '';
+      let idCardUrl = '';
       
       // Upload profile image to S3 if it exists
       if (state.profileImage && state.profileImage.uri) {
         console.log('Uploading profile image to S3...');
         try {
-          profileImageUrl = await uploadImageToS3(state.profileImage);
+          profileImageUrl = await uploadImageToS3(state.profileImage, false);
           console.log('Profile image uploaded successfully:', profileImageUrl);
         } catch (uploadError) {
           console.error('Failed to upload profile image:', uploadError);
@@ -407,7 +470,21 @@ export const TaskerOnboardingProvider = ({ children }) => {
         console.log('No profile image to upload');
       }
       
-      // Prepare data for API - now using regular object instead of FormData
+      // Upload ID card to S3 if it exists
+      if (state.idCard && state.idCard.uri) {
+        console.log('Uploading ID card to S3...');
+        try {
+          idCardUrl = await uploadImageToS3(state.idCard, true);
+          console.log('ID card uploaded successfully:', idCardUrl);
+        } catch (uploadError) {
+          console.error('Failed to upload ID card:', uploadError);
+          throw new Error('Failed to upload ID card. Please try again.');
+        }
+      } else {
+        console.log('No ID card to upload');
+      }
+      
+      // Prepare data for API
       const requestData = {
         Bio: state.bio,
         phone: state.phone,
@@ -425,6 +502,11 @@ export const TaskerOnboardingProvider = ({ children }) => {
         requestData.profileImage = profileImageUrl;
       }
       
+      // Add ID card URL if it was uploaded
+      if (idCardUrl) {
+        requestData.idCard = idCardUrl;
+      }
+      
       // Log request data for debugging
       console.log('Request data being sent:', {
         bio: state.bio,
@@ -432,10 +514,12 @@ export const TaskerOnboardingProvider = ({ children }) => {
         location: state.location,
         skills: state.skills,
         hasProfileImage: !!profileImageUrl,
-        profileImageUrl: profileImageUrl
+        profileImageUrl: profileImageUrl,
+        hasIdCard: !!idCardUrl,
+        idCardUrl: idCardUrl
       });
       
-      // Send the data to complete profile (now as JSON, not FormData)
+      // Send the data to complete profile
       const response = await completeProfile(requestData);
       
       // After Onboarding Process is Complete, we fetch the User and set it
@@ -468,6 +552,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
     updateLocation,
     updateSkills,
     updateProfileImage,
+    updateIdCard,
     setCurrentStep,
     setErrors,
     clearErrors,
@@ -491,7 +576,6 @@ export const TaskerOnboardingProvider = ({ children }) => {
   );
 };
 
-// Custom hook for using the onboarding context
 export const useTaskerOnboarding = () => {
   const context = useContext(TaskerOnboardingContext);
   if (!context) {
