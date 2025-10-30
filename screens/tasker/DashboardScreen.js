@@ -539,7 +539,7 @@ const TaskerDashboard = () => {
               subtitle="Applications accepted"
               icon="checkmark-circle"
               color="#6366F1"
-              gradient={['#E0E7FF', '#C7D2FE']}
+              gradient={['#EEF2FF', '#F0F4FF']}
               onPress={() => navigate('MyTasks')}
               delay={300}
             />

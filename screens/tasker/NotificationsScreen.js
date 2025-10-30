@@ -411,7 +411,14 @@ const NotificationsScreen = ({ navigation }) => {
 
   if (loading) {
     return (
+      <View style={styles.container}>
+         <Header 
+          title="Notifications" 
+           rightComponent={renderHeaderActions()}
+           showProfile={false}
+        />
       <LoadingIndicator text='Loading Notifications'/>
+      </View>
     );
   }
 

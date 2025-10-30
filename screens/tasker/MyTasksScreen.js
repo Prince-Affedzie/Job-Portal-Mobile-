@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient'
 import { navigate } from '../../services/navigationService';
 import { TaskerContext } from '../../context/TaskerContext';
 import { getYourAppliedMiniTasks } from '../../api/miniTaskApi';
@@ -26,7 +27,7 @@ import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
-// Separate Search Component for the screen
+// Search Component
 const SearchBar = ({
   activeTab,
   initialQuery = '',
@@ -38,7 +39,6 @@ const SearchBar = ({
   const [localQuery, setLocalQuery] = React.useState(initialQuery);
   const searchInputRef = React.useRef(null);
 
-  // Sync localQuery with initialQuery when it changes from parent
   React.useEffect(() => {
     setLocalQuery(initialQuery);
   }, [initialQuery]);
@@ -51,56 +51,43 @@ const SearchBar = ({
   const handleClearSearch = () => {
     setLocalQuery('');
     onSearch?.('');
-    searchInputRef.current?.focus();
   };
 
   return (
     <View style={styles.searchBarContainer}>
       <View style={styles.searchInputWrapper}>
-        <Ionicons name="search-outline" size={20} color="#6B7280" style={styles.searchIcon} />
+        <Ionicons name="search-outline" size={20} color="#9CA3AF" style={styles.searchIcon} />
         <TextInput
           ref={searchInputRef}
           style={styles.searchInput}
           placeholder={`Search ${activeTab}...`}
+          placeholderTextColor="#9CA3AF"
           value={localQuery}
           onChangeText={setLocalQuery}
           returnKeyType="search"
-          blurOnSubmit={false}
           onSubmitEditing={handleSearch}
         />
         {localQuery ? (
           <TouchableOpacity onPress={handleClearSearch} style={styles.clearSearchButton}>
-            <Ionicons name="close-circle" size={20} color="#6B7280" />
+            <Ionicons name="close-circle" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         ) : null}
       </View>
 
-      <View style={styles.filterButtonsContainer}>
-        <TouchableOpacity 
-          style={[
-            styles.searchButton,
-            localQuery.trim() && styles.searchButtonActive
-          ]} 
-          onPress={handleSearch}
-          disabled={!localQuery.trim()}
-        >
-          <Ionicons 
-            name="search" 
-            size={18} 
-            color={localQuery.trim() ? "#FFFFFF" : "#6B7280"} 
-          />
-        </TouchableOpacity>
-
-        {hasActiveFilters && (
-          <TouchableOpacity style={styles.activeFiltersBadge} onPress={onClearFilters}>
-            <Ionicons name="funnel" size={16} color="#FFFFFF" />
-            <Text style={styles.activeFiltersText}>Filtered</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.filterButton} onPress={onOpenFilter}>
-          <Ionicons name="options-outline" size={20} color="#6B7280" />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity 
+        style={[
+          styles.filterButton,
+          hasActiveFilters && styles.filterButtonActive
+        ]} 
+        onPress={onOpenFilter}
+      >
+        <Ionicons 
+          name="options-outline" 
+          size={22} 
+          color={hasActiveFilters ? "#FFFFFF" : "#6B7280"} 
+        />
+        {hasActiveFilters && <View style={styles.filterDot} />}
+      </TouchableOpacity>
     </View>
   );
 };
@@ -118,7 +105,6 @@ const MyApplicationsScreen = () => {
   const [sortBy, setSortBy] = useState('newest');
   const insets = useSafeAreaInsets();
 
-  // Status options for filtering
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending' },
@@ -129,7 +115,6 @@ const MyApplicationsScreen = () => {
     { value: 'review', label: 'Under Review' }
   ];
 
-  // Category options
   const categoryOptions = [
     { value: 'all', label: 'All Categories' },
     { value: 'Home Services', label: 'Home Services' },
@@ -142,7 +127,6 @@ const MyApplicationsScreen = () => {
     { value: 'Others', label: 'Others' }
   ];
 
-  // Sort options
   const sortOptions = [
     { value: 'newest', label: 'Newest First' },
     { value: 'oldest', label: 'Oldest First' },
@@ -175,50 +159,32 @@ const MyApplicationsScreen = () => {
     loadData();
   };
 
-  // Handle search submission
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
   }, []);
 
   // Calculate statistics
   const calculateStats = () => {
-    const totalApplications = applications.length;
-    const totalBids = bids.length;
+    const data = activeTab === 'applications' ? applications : bids;
+    const total = data.length;
     
-    const acceptedApplications = applications.filter(app => 
-      app.status?.toLowerCase() === 'accepted' || app.status?.toLowerCase() === 'completed'
-    ).length;
+    const accepted = activeTab === 'applications' 
+      ? applications.filter(app => 
+          app.status?.toLowerCase() === 'assigned' || 
+          app.status?.toLowerCase() === 'completed' ||
+          app.status?.toLowerCase() === 'in-progress'
+        ).length
+      : bids.filter(bid => bid.bid.status?.toLowerCase() === 'accepted').length;
     
-    const acceptedBids = bids.filter(bid => 
-      bid.bid.status?.toLowerCase() === 'accepted'
-    ).length;
+    const pending = activeTab === 'applications'
+      ? applications.filter(app => 
+          app.status?.toLowerCase() === 'open' 
+        ).length
+      : bids.filter(bid => bid.bid.status?.toLowerCase() === 'pending').length;
 
-    const pendingApplications = applications.filter(app => 
-      app.status?.toLowerCase() === 'pending' || app.status?.toLowerCase() === 'review'
-    ).length;
+    const successRate = total > 0 ? Math.round((accepted / total) * 100) : 0;
 
-    const pendingBids = bids.filter(bid => 
-      bid.bid.status?.toLowerCase() === 'pending'
-    ).length;
-
-    const successRateApplications = totalApplications > 0 
-      ? Math.round((acceptedApplications / totalApplications) * 100) 
-      : 0;
-
-    const successRateBids = totalBids > 0 
-      ? Math.round((acceptedBids / totalBids) * 100) 
-      : 0;
-
-    return {
-      totalApplications,
-      totalBids,
-      acceptedApplications,
-      acceptedBids,
-      pendingApplications,
-      pendingBids,
-      successRateApplications,
-      successRateBids
-    };
+    return { total, accepted, pending, successRate };
   };
 
   const stats = calculateStats();
@@ -227,7 +193,6 @@ const MyApplicationsScreen = () => {
   const getFilteredData = () => {
     let data = activeTab === 'applications' ? applications : bids;
     
-    // Apply search filter
     if (searchQuery.trim()) {
       data = data.filter(item => {
         const searchableText = activeTab === 'applications' 
@@ -238,7 +203,6 @@ const MyApplicationsScreen = () => {
       });
     }
 
-    // Apply status filter
     if (selectedStatus !== 'all') {
       data = data.filter(item => {
         const status = activeTab === 'applications' ? item.status : item.bid.status;
@@ -248,7 +212,6 @@ const MyApplicationsScreen = () => {
       });
     }
 
-    // Apply category filter
     if (selectedCategory !== 'all') {
       data = data.filter(item => {
         const category = activeTab === 'applications' ? item.category : item.task.category;
@@ -256,7 +219,6 @@ const MyApplicationsScreen = () => {
       });
     }
 
-    // Apply sorting
     data = [...data].sort((a, b) => {
       switch (sortBy) {
         case 'newest':
@@ -300,68 +262,48 @@ const MyApplicationsScreen = () => {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigate('AppliedTaskDetails', { taskId: item._id })}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
       <View style={styles.cardHeader}>
         <View style={styles.taskInfo}>
           <Text style={styles.taskTitle} numberOfLines={2}>
             {item.title}
           </Text>
-          <View style={styles.employerRow}>
-            <View style={styles.employerContainer}>
-              <View style={styles.employerAvatar}>
-                <Text style={styles.employerInitial}>
-                  {(item.employer?.name || 'U')[0].toUpperCase()}
+          <View style={styles.employerInfo}>
+            <Text style={styles.employerName} numberOfLines={1}>
+              {item.employer?.name || 'Unknown Employer'}
+            </Text>
+            {item.employer?.rating && (
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Text style={styles.ratingText}>
+                  {parseFloat(item.employer.rating).toFixed(1)}
                 </Text>
               </View>
-              <View>
-                <Text style={styles.employerName}>
-                  {item.employer?.name || 'Unknown Employer'}
-                </Text>
-                {item.employer?.rating && (
-                  <View style={styles.rating}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.ratingText}>
-                      {parseFloat(item.employer.rating).toFixed(1)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            )}
           </View>
         </View>
         
-        <View style={styles.budgetContainer}>
-          <Text style={styles.budgetLabel}>Budget</Text>
-          <Text style={styles.budget}>₵{item.budget || '0'}</Text>
+        <View style={styles.budgetBadge}>
+          <Text style={styles.budgetAmount}>₵{item.budget || '0'}</Text>
         </View>
       </View>
 
-      <View style={styles.cardContent}>
-        <Text style={styles.description} numberOfLines={3}>
-          {item.description || 'No description provided'}
-        </Text>
-      </View>
+      <Text style={styles.description} numberOfLines={2}>
+        {item.description || 'No description provided'}
+      </Text>
 
       <View style={styles.cardFooter}>
-        <View style={styles.metaInfo}>
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
-            <Text style={styles.metaText}>
-              Applied {formatDate(item.appliedAt)}
-            </Text>
-          </View>
-          <View style={styles.categoryTag}>
+        <View style={styles.metaRow}>
+          <View style={styles.categoryPill}>
             <Text style={styles.categoryText}>{item.category || 'General'}</Text>
           </View>
+          <Text style={styles.timeText}>
+            {formatDate(item.appliedAt)}
+          </Text>
         </View>
         
-        <View style={styles.statusRow}>
-          <StatusBadge status={item.status} />
-          {/*<TouchableOpacity style={styles.viewButton}>
-            <Ionicons name="arrow-forward" size={14} color="#4F46E5" />
-          </TouchableOpacity>*/}
-        </View>
+        <StatusBadge status={item.status} />
       </View>
     </TouchableOpacity>
   );
@@ -370,73 +312,50 @@ const MyApplicationsScreen = () => {
     <TouchableOpacity
       style={styles.card}
       onPress={() => navigate('AppliedTaskDetails', { taskId: item.task._id })}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
       <View style={styles.cardHeader}>
         <View style={styles.taskInfo}>
           <Text style={styles.taskTitle} numberOfLines={2}>
             {item.task.title}
           </Text>
-          <View style={styles.employerRow}>
-            <View style={styles.employerContainer}>
-              <View style={styles.employerAvatar}>
-                <Text style={styles.employerInitial}>
-                  {(item.task.employer?.name || 'U')[0].toUpperCase()}
+          <View style={styles.employerInfo}>
+            <Text style={styles.employerName} numberOfLines={1}>
+              {item.task.employer?.name || 'Unknown Employer'}
+            </Text>
+            {item.task.employer?.rating && (
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={11} color="#F59E0B" />
+                <Text style={styles.ratingText}>
+                  {parseFloat(item.task.employer.rating).toFixed(1)}
                 </Text>
               </View>
-              <View>
-                <Text style={styles.employerName}>
-                  {item.task.employer?.name || 'Unknown Employer'}
-                </Text>
-                {item.task.employer?.rating && (
-                  <View style={styles.rating}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.ratingText}>
-                      {parseFloat(item.task.employer.rating).toFixed(1)}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            )}
           </View>
         </View>
         
-        <View style={styles.budgetContainer}>
-          <Text style={styles.budgetLabel}>Your Bid</Text>
+        <View style={[styles.budgetBadge, styles.bidBadge]}>
           <Text style={styles.bidAmount}>₵{item.bid.amount}</Text>
         </View>
       </View>
 
-      <View style={styles.bidMessage}>
-        <Text style={styles.bidMessageText} numberOfLines={3}>
+      <View style={styles.bidMessageBox}>
+        <Text style={styles.bidMessageText} numberOfLines={2}>
           {item.bid.message || 'No message provided'}
         </Text>
       </View>
 
       <View style={styles.cardFooter}>
-        <View style={styles.metaInfo}>
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={14} color="#6B7280" />
-            <Text style={styles.metaText}>
-              Bid placed {formatDate(item.bid.createdAt)}
-            </Text>
+        <View style={styles.metaRow}>
+          <View style={styles.categoryPill}>
+            <Text style={styles.categoryText}>{item.task.category || 'General'}</Text>
           </View>
-          {item.bid.timeline && (
-            <View style={styles.metaItem}>
-              <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-              <Text style={styles.metaText}>{item.bid.timeline}</Text>
-            </View>
-          )}
+          <Text style={styles.timeText}>
+            {formatDate(item.bid.createdAt)}
+          </Text>
         </View>
         
-        <View style={styles.statusRow}>
-          <BidStatusBadge status={item.bid.status} />
-          {item.bid.status === 'accepted' && (
-            <TouchableOpacity style={styles.chatButton}>
-              <Ionicons name="chatbubble-ellipses-outline" size={14} color="#4F46E5" />
-            </TouchableOpacity>
-          )}
-        </View>
+        <BidStatusBadge status={item.bid.status} />
       </View>
     </TouchableOpacity>
   );
@@ -444,21 +363,22 @@ const MyApplicationsScreen = () => {
   const StatusBadge = ({ status }) => {
     const getStatusConfig = (status) => {
       const configs = {
-        'pending': { bg: '#FEF3C7', text: '#92400E', label: 'Pending' },
-        'open': { bg: '#DBEAFE', text: '#1E40AF', label: 'Open' },
-        'in-progress': { bg: '#E0E7FF', text: '#5B21B6', label: 'In Progress' },
-        'review': { bg: '#FEF3C7', text: '#92400E', label: 'Under Review' },
-        'accepted': { bg: '#D1FAE5', text: '#065F46', label: 'Accepted' },
-        'rejected': { bg: '#FEE2E2', text: '#991B1B', label: 'Not Selected' },
-        'completed': { bg: '#D1FAE5', text: '#065F46', label: 'Completed' },
-        'closed': { bg: '#F3F4F6', text: '#374151', label: 'Closed' },
-        'assigned': { bg: '#E0E7FF', text: '#3730A3', label: 'Assigned' },
+        'pending': { bg: '#FEF3C7', text: '#92400E', label: 'Pending', icon: 'time-outline' },
+        'open': { bg: '#DBEAFE', text: '#1E40AF', label: 'Open', icon: 'lock-open-outline' },
+        'in-progress': { bg: '#E0E7FF', text: '#4338CA', label: 'In Progress', icon: 'play-circle-outline' },
+        'review': { bg: '#FEF3C7', text: '#92400E', label: 'Review', icon: 'eye-outline' },
+        'accepted': { bg: '#D1FAE5', text: '#065F46', label: 'Accepted', icon: 'checkmark-circle' },
+        'rejected': { bg: '#FEE2E2', text: '#991B1B', label: 'Not Selected', icon: 'close-circle-outline' },
+        'completed': { bg: '#D1FAE5', text: '#065F46', label: 'Completed', icon: 'checkmark-done-circle' },
+        'closed': { bg: '#F3F4F6', text: '#374151', label: 'Closed', icon: 'lock-closed-outline' },
+        'assigned': { bg: '#E0E7FF', text: '#3730A3', label: 'Assigned', icon: 'person-circle-outline' },
       };
       
       return configs[status?.toLowerCase()] || { 
         bg: '#F3F4F6', 
         text: '#6B7280', 
-        label: status || 'Unknown' 
+        label: status || 'Unknown',
+        icon: 'help-circle-outline'
       };
     };
 
@@ -466,6 +386,7 @@ const MyApplicationsScreen = () => {
 
     return (
       <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+        <Ionicons name={config.icon} size={13} color={config.text} />
         <Text style={[styles.statusText, { color: config.text }]}>
           {config.label}
         </Text>
@@ -476,15 +397,16 @@ const MyApplicationsScreen = () => {
   const BidStatusBadge = ({ status }) => {
     const getStatusConfig = (status) => {
       const configs = {
-        'pending': { bg: '#FEF3C7', text: '#92400E', label: 'Pending Review' },
-        'accepted': { bg: '#D1FAE5', text: '#065F46', label: 'Accepted' },
-        'rejected': { bg: '#FEE2E2', text: '#991B1B', label: 'Rejected' },
+        'pending': { bg: '#FEF3C7', text: '#92400E', label: 'Pending', icon: 'time-outline' },
+        'accepted': { bg: '#D1FAE5', text: '#065F46', label: 'Accepted', icon: 'checkmark-circle' },
+        'rejected': { bg: '#FEE2E2', text: '#991B1B', label: 'Rejected', icon: 'close-circle-outline' },
       };
       
       return configs[status?.toLowerCase()] || { 
         bg: '#F3F4F6', 
         text: '#6B7280', 
-        label: status || 'Unknown' 
+        label: status || 'Unknown',
+        icon: 'help-circle-outline'
       };
     };
 
@@ -492,6 +414,7 @@ const MyApplicationsScreen = () => {
 
     return (
       <View style={[styles.statusBadge, { backgroundColor: config.bg }]}>
+        <Ionicons name={config.icon} size={13} color={config.text} />
         <Text style={[styles.statusText, { color: config.text }]}>
           {config.label}
         </Text>
@@ -506,8 +429,8 @@ const MyApplicationsScreen = () => {
       const date = new Date(dateString);
       const now = new Date();
       const diffTime = Math.abs(now - date);
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       
       if (diffHours < 1) return 'just now';
       if (diffHours < 24) return `${diffHours}h ago`;
@@ -531,19 +454,19 @@ const MyApplicationsScreen = () => {
     if (hasOriginalData && filteredData.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="search-outline" size={48} color="#9CA3AF" />
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="search-outline" size={56} color="#D1D5DB" />
           </View>
           <Text style={styles.emptyTitle}>No Results Found</Text>
           <Text style={styles.emptyMessage}>
-            Try adjusting your search terms or filters to find what you're looking for.
+            Try adjusting your search or filters to find what you're looking for.
           </Text>
           <TouchableOpacity 
-            style={styles.exploreButton}
+            style={styles.actionButton}
             onPress={clearAllFilters}
           >
-            <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.exploreButtonText}>Clear Filters</Text>
+            <Ionicons name="refresh-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Clear Filters</Text>
           </TouchableOpacity>
         </View>
       );
@@ -551,11 +474,11 @@ const MyApplicationsScreen = () => {
 
     return (
       <View style={styles.emptyState}>
-        <View style={styles.emptyIcon}>
+        <View style={styles.emptyIconContainer}>
           <Ionicons 
             name={activeTab === 'applications' ? "document-text-outline" : "pricetags-outline"} 
-            size={48} 
-            color="#9CA3AF" 
+            size={56} 
+            color="#D1D5DB" 
           />
         </View>
         <Text style={styles.emptyTitle}>
@@ -563,16 +486,16 @@ const MyApplicationsScreen = () => {
         </Text>
         <Text style={styles.emptyMessage}>
           {activeTab === 'applications' 
-            ? "Start by exploring available tasks that match your skills and interests."
+            ? "Explore available tasks and apply to ones that match your skills."
             : "Browse open bidding tasks and submit your proposals to get started."
           }
         </Text>
         <TouchableOpacity 
-          style={styles.exploreButton}
+          style={styles.actionButton}
           onPress={() => navigate('AvailableTasks')}
         >
-          <Ionicons name="search-outline" size={16} color="#FFFFFF" />
-          <Text style={styles.exploreButtonText}>Explore Tasks</Text>
+          <Ionicons name="compass-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.actionButtonText}>Explore Tasks</Text>
         </TouchableOpacity>
       </View>
     );
@@ -588,7 +511,7 @@ const MyApplicationsScreen = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filter & Sort</Text>
+            <Text style={styles.modalTitle}>Filters & Sort</Text>
             <TouchableOpacity 
               style={styles.modalCloseButton}
               onPress={() => setFilterOpen(false)}
@@ -599,23 +522,23 @@ const MyApplicationsScreen = () => {
 
           <ScrollView 
             style={styles.modalBody}
-            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Status</Text>
-              <View style={styles.filterOptions}>
+              <Text style={styles.filterLabel}>Status</Text>
+              <View style={styles.filterChips}>
                 {statusOptions.map(option => (
                   <TouchableOpacity
                     key={option.value}
                     style={[
-                      styles.filterOption,
-                      selectedStatus === option.value && styles.filterOptionActive
+                      styles.chip,
+                      selectedStatus === option.value && styles.chipActive
                     ]}
                     onPress={() => setSelectedStatus(option.value)}
                   >
                     <Text style={[
-                      styles.filterOptionText,
-                      selectedStatus === option.value && styles.filterOptionTextActive
+                      styles.chipText,
+                      selectedStatus === option.value && styles.chipTextActive
                     ]}>
                       {option.label}
                     </Text>
@@ -625,20 +548,20 @@ const MyApplicationsScreen = () => {
             </View>
 
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Category</Text>
-              <View style={styles.filterOptions}>
+              <Text style={styles.filterLabel}>Category</Text>
+              <View style={styles.filterChips}>
                 {categoryOptions.map(option => (
                   <TouchableOpacity
                     key={option.value}
                     style={[
-                      styles.filterOption,
-                      selectedCategory === option.value && styles.filterOptionActive
+                      styles.chip,
+                      selectedCategory === option.value && styles.chipActive
                     ]}
                     onPress={() => setSelectedCategory(option.value)}
                   >
                     <Text style={[
-                      styles.filterOptionText,
-                      selectedCategory === option.value && styles.filterOptionTextActive
+                      styles.chipText,
+                      selectedCategory === option.value && styles.chipTextActive
                     ]}>
                       {option.label}
                     </Text>
@@ -648,20 +571,20 @@ const MyApplicationsScreen = () => {
             </View>
 
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Sort By</Text>
-              <View style={styles.filterOptions}>
+              <Text style={styles.filterLabel}>Sort By</Text>
+              <View style={styles.filterChips}>
                 {sortOptions.map(option => (
                   <TouchableOpacity
                     key={option.value}
                     style={[
-                      styles.filterOption,
-                      sortBy === option.value && styles.filterOptionActive
+                      styles.chip,
+                      sortBy === option.value && styles.chipActive
                     ]}
                     onPress={() => setSortBy(option.value)}
                   >
                     <Text style={[
-                      styles.filterOptionText,
-                      sortBy === option.value && styles.filterOptionTextActive
+                      styles.chipText,
+                      sortBy === option.value && styles.chipTextActive
                     ]}>
                       {option.label}
                     </Text>
@@ -673,16 +596,16 @@ const MyApplicationsScreen = () => {
 
           <View style={styles.modalFooter}>
             <TouchableOpacity 
-              style={styles.clearButton}
+              style={styles.secondaryButton}
               onPress={clearAllFilters}
             >
-              <Text style={styles.clearButtonText}>Clear All</Text>
+              <Text style={styles.secondaryButtonText}>Reset</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={styles.applyButton}
+              style={styles.primaryButton}
               onPress={() => setFilterOpen(false)}
             >
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
+              <Text style={styles.primaryButtonText}>Apply</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -692,9 +615,16 @@ const MyApplicationsScreen = () => {
 
   const renderHeader = () => (
     <View>
-     
-      
-      <SearchBar
+      {/* Stats Section */}
+  <View style={styles.statsSection}>
+  <View style={styles.statsHeader}>
+    <Text style={styles.statsTitle}>Overview</Text>
+    <Text style={styles.statsSubtitle}>
+      {activeTab === 'applications' ? 'Applications' : 'Bids'} Performance
+    </Text>
+  </View>
+
+  <SearchBar
         activeTab={activeTab}
         initialQuery={searchQuery}
         onSearch={handleSearch}
@@ -702,104 +632,236 @@ const MyApplicationsScreen = () => {
         hasActiveFilters={hasActiveFilters}
         onClearFilters={clearAllFilters}
       />
+  
+  <View style={styles.statsGrid}>
 
-      <View style={styles.tabSection}>
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
+    <LinearGradient
+       colors={['#EFF6FF', '#DBEAFE']}
+       
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }} style={[styles.statCard, styles.statCardPrimary]}>
+      <View style={styles.statTopRow}>
+        <View style={[styles.statIconContainer, styles.statIconPrimary]}>
+          <Ionicons name="layers-outline" size={20} color="#4F46E5" />
+        </View>
+        <Text style={styles.statValue}>{stats.total}</Text>
+      </View>
+      <Text style={styles.statLabel}>Total</Text>
+     {/* <View style={styles.statProgress}>
+        <View style={[styles.progressBar, styles.progressBarTotal]}>
+          <View 
             style={[
-              styles.tab,
-              activeTab === 'applications' && styles.activeTab
-            ]}
-            onPress={() => setActiveTab('applications')}
-          >
-            <View style={styles.tabInner}>
-              <View style={[
-                styles.tabIconContainer,
-                activeTab === 'applications' && styles.activeTabIconContainer
-              ]}>
-                <Ionicons 
-                  name={activeTab === 'applications' ? "document-text" : "document-text-outline"} 
-                  size={20} 
-                  color={activeTab === 'applications' ? '#FFFFFF' : '#6B7280'} 
-                />
-              </View>
-              <Text style={[
-                styles.tabText,
-                activeTab === 'applications' && styles.activeTabText
-              ]}>
-                Applications
-              </Text>
-              {applications.length > 0 && (
-                <View style={[
-                  styles.tabBadge,
-                  activeTab === 'applications' && styles.activeTabBadge
-                ]}>
-                  <Text style={styles.tabBadgeText}>{applications.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+              styles.progressFill, 
+              { width: `${Math.min(100, (stats.total / Math.max(stats.total, 1)) * 100)}%` }
+            ]} 
+          />
+        </View>
+      </View>*/}
+    </LinearGradient>
+    
 
-          <TouchableOpacity
+    <LinearGradient
+       colors={['#F0FDF4', '#DCFCE7']}        
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }} style={[styles.statCard, styles.statCardSuccess]}>
+      <View style={styles.statTopRow}>
+        <View style={[styles.statIconContainer, styles.statIconSuccess]}>
+          <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+        </View>
+        <Text style={styles.statValue}>{stats.accepted}</Text>
+      </View>
+      <Text style={styles.statLabel}>Accepted</Text>
+      <View style={styles.statProgress}>
+        {/*<View style={[styles.progressBar, styles.progressBarSuccess]}>
+          <View 
             style={[
-              styles.tab,
-              activeTab === 'bids' && styles.activeTab
-            ]}
-            onPress={() => setActiveTab('bids')}
-          >
-            <View style={styles.tabInner}>
-              <View style={[
-                styles.tabIconContainer,
-                activeTab === 'bids' && styles.activeTabIconContainer
-              ]}>
-                <Ionicons 
-                  name={activeTab === 'bids' ? "pricetags" : "pricetags-outline"} 
-                  size={20} 
-                  color={activeTab === 'bids' ? '#FFFFFF' : '#6B7280'} 
-                />
-              </View>
-              <Text style={[
-                styles.tabText,
-                activeTab === 'bids' && styles.activeTabText
-              ]}>
-                Bids
-              </Text>
-              {bids.length > 0 && (
-                <View style={[
-                  styles.tabBadge,
-                  activeTab === 'bids' && styles.activeTabBadge
-                ]}>
-                  <Text style={styles.tabBadgeText}>{bids.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+              styles.progressFill, 
+              { width: `${stats.total > 0 ? (stats.accepted / stats.total) * 100 : 0}%` }
+            ]} 
+          />
+        </View>*/}
+        <Text style={styles.statPercentage}>
+          {stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : 0}%
+        </Text>
+      </View>
+    </LinearGradient>
+
+    <LinearGradient
+       colors={['#FFFBEB', '#FEFCE8']}                              
+       start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }} style={[styles.statCard, styles.statCardWarning]}>
+      <View style={styles.statTopRow}>
+        <View style={[styles.statIconContainer, styles.statIconWarning]}>
+          <Ionicons name="time-outline" size={18} color="#CA8A04" />
+        </View>
+        <Text style={styles.statValue}>{stats.pending}</Text>
+      </View>
+      <Text style={styles.statLabel}>Pending</Text>
+      <View style={styles.statProgress}>
+        {/*<View style={[styles.progressBar, styles.progressBarWarning]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { width: `${stats.total > 0 ? (stats.pending / stats.total) * 100 : 0}%` }
+            ]} 
+          />
+        </View>*/}
+        <Text style={styles.statPercentage}>
+          {stats.total > 0 ? Math.round((stats.pending / stats.total) * 100) : 0}%
+        </Text>
+      </View>
+    </LinearGradient>
+
+    <View style={[styles.statCard, styles.statCardInfo]}>
+      <View style={styles.statTopRow}>
+        <View style={[styles.statIconContainer, styles.statIconInfo]}>
+          <Ionicons name="trending-up" size={18} color="#7C3AED" />
+        </View>
+        <Text style={styles.statValue}>{stats.successRate}%</Text>
+      </View>
+      <Text style={styles.statLabel}>Success Rate</Text>
+      <View style={styles.statProgress}>
+       {/* <View style={[styles.progressBar, styles.progressBarInfo]}>
+          <View 
+            style={[
+              styles.progressFill, 
+              { width: `${stats.successRate}%` }
+            ]} 
+          />
+        </View>*/}
+        <View style={styles.rateTrend}>
+          <Ionicons 
+            name={stats.successRate >= 50 ? "arrow-up" : "arrow-down"} 
+            size={12} 
+            color={stats.successRate >= 50 ? "#16A34A" : "#DC2626"} 
+          />
+          <Text style={[
+            styles.trendText,
+            { color: stats.successRate >= 50 ? "#16A34A" : "#DC2626" }
+          ]}>
+            {stats.successRate >= 50 ? "Good" : "Needs work"}
+          </Text>
         </View>
       </View>
-
-      <View style={styles.infoBanner}>
-        <View style={styles.infoHeader}>
-          <Ionicons name="information-circle" size={18} color="#6366F1" />
-          <Text style={styles.infoTitle}>Task Visibility</Text>
+    </View>
+  </View>
+</View>
+      {/* Tabs */} 
+<View style={styles.tabsContainer}>
+  <View style={styles.tabsBackground}>
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        activeTab === 'applications' && styles.tabActive
+      ]}
+      onPress={() => setActiveTab('applications')}
+    >
+      <View style={styles.tabContent}>
+        <View style={[
+          styles.tabIconContainer,
+          activeTab === 'applications' && styles.tabIconContainerActive
+        ]}>
+          <Ionicons 
+            name={activeTab === 'applications' ? "document-text" : "document-text-outline"} 
+            size={20} 
+            color={activeTab === 'applications' ? '#FFFFFF' : '#6B7280'} 
+          />
         </View>
+        <Text style={[
+          styles.tabLabel,
+          activeTab === 'applications' && styles.tabLabelActive
+        ]}>
+          Applications
+        </Text>
+        {applications.length > 0 && (
+          <View style={[
+            styles.tabCount,
+            activeTab === 'applications' && styles.tabCountActive
+          ]}>
+            <Text style={[
+              styles.tabCountText,
+              activeTab === 'applications' && styles.tabCountTextActive
+            ]}>
+              {applications.length}
+            </Text>
+          </View>
+        )}
+      </View>
+      {activeTab === 'applications' && <View style={styles.activeTabIndicator} />}
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        activeTab === 'bids' && styles.tabActive
+      ]}
+      onPress={() => setActiveTab('bids')}
+    >
+      <View style={styles.tabContent}>
+        <View style={[
+          styles.tabIconContainer,
+          activeTab === 'bids' && styles.tabIconContainerActive
+        ]}>
+          <Ionicons 
+            name={activeTab === 'bids' ? "pricetags" : "pricetags-outline"} 
+            size={20} 
+            color={activeTab === 'bids' ? '#FFFFFF' : '#6B7280'} 
+          />
+        </View>
+        <Text style={[
+          styles.tabLabel,
+          activeTab === 'bids' && styles.tabLabelActive
+        ]}>
+          Bids
+        </Text>
+        {bids.length > 0 && (
+          <View style={[
+            styles.tabCount,
+            activeTab === 'bids' && styles.tabCountActive
+          ]}>
+            <Text style={[
+              styles.tabCountText,
+              activeTab === 'bids' && styles.tabCountTextActive
+            ]}>
+              {bids.length}
+            </Text>
+          </View>
+        )}
+      </View>
+      {activeTab === 'bids' && <View style={styles.activeTabIndicator} />}
+    </TouchableOpacity>
+  </View>
+</View>
+
+      {/* Info Banner */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle-outline" size={16} color="#0EA5E9" />
         <Text style={styles.infoText}>
-          Tasks assigned to other taskers won't appear here even if you applied to them.
+          Tasks assigned to others won't appear here even if you applied
         </Text>
       </View>
 
+      {/* Active Filters Info */}
       {hasActiveFilters && (
-        <View style={styles.activeFiltersInfo}>
-          <Text style={styles.activeFiltersInfoText}>
-            Showing {getFilteredData().length} of {activeTab === 'applications' ? applications.length : bids.length} {activeTab}
-            {searchQuery && ` for "${searchQuery}"`}
+        <View style={styles.filterInfoBanner}>
+          <Text style={styles.filterInfoText}>
+            Showing {getFilteredData().length} of {activeTab === 'applications' ? applications.length : bids.length}
           </Text>
+          <TouchableOpacity onPress={clearAllFilters}>
+            <Text style={styles.clearFiltersText}>Clear</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
   );
 
   if (loading) {
-    return <LoadingIndicator text="Loading Tasks" />;
+    return (
+      <View style={styles.container}>
+        <Header title="My Tasks" />
+        <LoadingIndicator text="Loading Tasks" />
+      </View>
+    );
   }
 
   const filteredData = getFilteredData();
@@ -807,7 +869,7 @@ const MyApplicationsScreen = () => {
 
   return (
     <View style={styles.container}>
-       <Header title="My Tasks" />
+      <Header title="My Tasks" />
       <FlatList
         data={isEmpty ? [] : filteredData}
         keyExtractor={(item) => item._id || (item.task?._id + item.bid?._id)}
@@ -822,93 +884,252 @@ const MyApplicationsScreen = () => {
           />
         }
         ListEmptyComponent={isEmpty ? renderEmptyState() : null}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          isEmpty && styles.listContainerEmpty
+        ]}
         showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => <View style={styles.cardSeparator} />}
       />
       <FilterModal />
     </View>
   );
 };
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#F9FAFB',
   },
+  
+  // Search Bar
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 1,
+    marginVertical:10,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
+    gap: 10,
+    borderColor:'#F3F4F6',
+    marginHorizontal:6,
+    borderRadius:12,
+    borderBottomWidth: 4,
     borderBottomColor: '#F3F4F6',
-    gap: 12,
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    paddingVertical: 5,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    paddingVertical: 4,
+    fontSize: 18,
+    color: '#111827',
   },
   clearSearchButton: {
-    padding: 2,
+    padding: 4,
   },
-   searchButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: '#F9FAFB',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 1,
-      borderColor: '#E5E7EB',
-    },
-    searchButtonActive: {
-      backgroundColor: '#6366F1',
-      borderColor: '#6366F1',
-    },
-  filterButtonsContainer: {
-    flexDirection: 'row',
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    position: 'relative',
   },
-  tabSection: {
+  filterButtonActive: {
+    backgroundColor: '#4F46E5',
+  },
+  filterDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+
+  // Stats Section
+ // Enhanced Stats Section Styles
+statsSection: {
   backgroundColor: '#FFFFFF',
+  paddingHorizontal: 16,
+  paddingVertical: 20,
   borderBottomWidth: 1,
   borderBottomColor: '#F3F4F6',
 },
-tabContainer: {
-  flexDirection: 'row',
-  marginHorizontal: 20,
-  marginTop: 16,
+statsHeader: {
   marginBottom: 16,
+},
+statsTitle: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: '#111827',
+  marginBottom: 4,
+},
+statsSubtitle: {
+  fontSize: 14,
+  color: '#6B7280',
+  fontWeight: '500',
+},
+statsGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 12,
+},
+statCard: {
+  flex: 1,
+  minWidth: '47%',
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 3,
+},
+statCardPrimary: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#4F46E5',
+},
+statCardSuccess: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#16A34A',
+},
+statCardWarning: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#CA8A04',
+},
+statCardInfo: {
+  borderLeftWidth: 4,
+  borderLeftColor: '#7C3AED',
+},
+statTopRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: 8,
+},
+statIconContainer: {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+statIconPrimary: {
+  backgroundColor: '#EEF2FF',
+},
+statIconSuccess: {
+  backgroundColor: '#DCFCE7',
+},
+statIconWarning: {
+  backgroundColor: '#FEF9C3',
+},
+statIconInfo: {
+  backgroundColor: '#F3E8FF',
+},
+statValue: {
+  fontSize: 24,
+  fontWeight: '800',
+  color: '#111827',
+  textAlign: 'right',
+},
+statLabel: {
+  fontSize: 13,
+  color: '#6B7280',
+  fontWeight: '600',
+  marginBottom: 8,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+},
+statProgress: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+progressBar: {
+  flex: 1,
+  height: 6,
+  backgroundColor: '#F3F4F6',
+  borderRadius: 3,
+  overflow: 'hidden',
+},
+progressBarTotal: {
+  backgroundColor: '#E5E7EB',
+},
+progressBarSuccess: {
+  backgroundColor: '#D1FAE5',
+},
+progressBarWarning: {
+  backgroundColor: '#FEF3C7',
+},
+progressBarInfo: {
+  backgroundColor: '#EDE9FE',
+},
+progressFill: {
+  height: '100%',
+  borderRadius: 3,
+  backgroundColor: '#4F46E5',
+},
+statPercentage: {
+  fontSize: 11,
+  fontWeight: '700',
+  color: '#374151',
+  minWidth: 30,
+  textAlign: 'right',
+},
+rateTrend: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+trendText: {
+  fontSize: 11,
+  fontWeight: '600',
+},
+  // Tabs
+ // Enhanced Tabs Styles
+tabsContainer: {
+  backgroundColor: '#FFFFFF',
+  paddingHorizontal: 16,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+},
+tabsBackground: {
+  flexDirection: 'row',
   backgroundColor: '#F8FAFC',
   borderRadius: 16,
   padding: 6,
   borderWidth: 1,
   borderColor: '#E2E8F0',
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
+  shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.08,
-  shadowRadius: 12,
-  elevation: 4,
+  shadowRadius: 8,
+  elevation: 3,
 },
 tab: {
   flex: 1,
@@ -920,429 +1141,307 @@ tab: {
   borderWidth: 2,
   borderColor: 'transparent',
 },
-activeTab: {
+tabActive: {
   backgroundColor: '#FFFFFF',
-  borderColor: '#6366F1',
-  shadowColor: '#6366F1',
+  borderColor: '#4F46E5',
+  shadowColor: '#4F46E5',
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.15,
   shadowRadius: 8,
   elevation: 5,
 },
-tabInner: {
+tabContent: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 8,
 },
 tabIconContainer: {
-  width: 24,
-  height: 24,
-  borderRadius: 12,
-  justifyContent: 'center',
-  alignItems: 'center',
+  width: 32,
+  height: 32,
+  borderRadius: 16,
   backgroundColor: 'rgba(107, 114, 128, 0.1)',
-},
-activeTabIconContainer: {
-  backgroundColor: '#6366F1',
-},
-tabText: {
-  fontSize: 16,
-  fontWeight: '800',
-  color: '#6B7280',
-},
-activeTabText: {
-  color: '#6366F1',
-  fontWeight: '700',
-},
-tabBadge: {
-  position: 'absolute',
-  top: -4,
-  right: -2,
-  backgroundColor: '#EF4444',
-  borderRadius: 10,
-  minWidth: 18,
-  height: 20,
   justifyContent: 'center',
   alignItems: 'center',
-  paddingHorizontal: 4,
-  borderWidth: 2,
-  borderColor: '#FFFFFF',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.2,
-  shadowRadius: 2,
-  elevation: 2,
 },
-tabBadgeText: {
-  color: '#FFFFFF',
+tabIconContainerActive: {
+  backgroundColor: '#4F46E5',
+},
+tabLabel: {
+  fontSize: 15,
+  fontWeight: '700',
+  color: '#6B7280',
+  letterSpacing: -0.2,
+},
+tabLabelActive: {
+  color: '#4F46E5',
+  fontWeight: '800',
+},
+tabCount: {
+  backgroundColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  minWidth: 24,
+  height: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+tabCountActive: {
+  backgroundColor: '#4F46E5',
+},
+tabCountText: {
   fontSize: 12,
   fontWeight: '800',
+  color: '#374151',
 },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  statTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  statSubtitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statSuccessText: {
-    fontSize: 11,
-    color: '#10B981',
-    fontWeight: '500',
-  },
-  statPendingText: {
-    fontSize: 11,
-    color: '#F59E0B',
-    fontWeight: '500',
-  },
+tabCountTextActive: {
+  color: '#FFFFFF',
+},
+activeTabIndicator: {
+  position: 'absolute',
+  bottom: -6,
+  left: '50%',
+  marginLeft: -4,
+  width: 8,
+  height: 8,
+  borderRadius: 4,
+  backgroundColor: '#4F46E5',
+},
+
+  // Info Banner
   infoBanner: {
-    backgroundColor: '#F0F9FF',
-    marginHorizontal: 20,
-    marginBottom:12,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0EA5E9',
-  },
-  infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
     gap: 8,
-    marginBottom: 8,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0C4A6E',
   },
   infoText: {
+    flex: 1,
     fontSize: 13,
     color: '#0369A1',
     lineHeight: 18,
   },
-  headerActions: {
+
+  // Filter Info Banner
+  filterInfoBanner: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    justifyContent: 'space-between',
+    backgroundColor: '#EEF2FF',
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  searchButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  filterInfoText: {
+    fontSize: 13,
+    color: '#4338CA',
+    fontWeight: '500',
   },
+  clearFiltersText: {
+    fontSize: 13,
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+
+  // List
   listContainer: {
+    paddingBottom: 20,
   },
-  separator: {
+  listContainerEmpty: {
+    flexGrow: 1,
+  },
+  cardSeparator: {
     height: 12,
   },
+
+  // Card
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
     borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    marginHorizontal:10,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
     borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   taskInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
   },
   taskTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#111827',
     lineHeight: 22,
-    marginBottom: 12,
+    marginBottom: 6,
   },
-  employerRow: {
-    marginTop: 4,
-  },
-  employerContainer: {
+  employerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  employerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  employerInitial: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
+    gap: 6,
   },
   employerName: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  rating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  ratingText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
   },
-  budgetContainer: {
-    alignItems: 'flex-end',
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  budgetLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginBottom: 2,
+  ratingText: {
+    fontSize: 11,
+    color: '#92400E',
+    fontWeight: '600',
   },
-  budget: {
-    fontSize: 18,
+  budgetBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  budgetAmount: {
+    fontSize: 16,
     fontWeight: '700',
-    color: '#059669',
+    color: '#16A34A',
+  },
+  bidBadge: {
+    backgroundColor: '#EEF2FF',
   },
   bidAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#4F46E5',
-  },
-  cardContent: {
-    marginBottom: 16,
   },
   description: {
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
+    marginBottom: 12,
   },
-  bidMessage: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+  bidMessageBox: {
+    backgroundColor: '#F9FAFB',
     borderLeftWidth: 3,
     borderLeftColor: '#4F46E5',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
   },
   bidMessageText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 18,
     fontStyle: 'italic',
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
   },
-  metaInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  metaItem: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    flex: 1,
   },
-  metaText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  categoryTag: {
+  categoryPill: {
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    alignSelf: 'flex-start',
   },
   categoryText: {
     fontSize: 11,
     color: '#6B7280',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  timeText: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   statusText: {
     fontSize: 11,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  viewButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
+  // Empty State
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingVertical: 60,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  emptyIconContainer: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyMessage: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 32,
+    lineHeight: 20,
+    marginBottom: 24,
   },
-  exploreButton: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#4F46E5',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     gap: 8,
   },
-  exploreButtonText: {
+  actionButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    width: 230,
-    maxWidth: 230,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    paddingVertical: 4,
-  },
-  searchCloseButton: {
-    padding: 4,
-  },
-  activeFiltersBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  activeFiltersText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  activeFiltersInfo: {
-    backgroundColor: '#E0E7FF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#C7D2FE',
-    marginVertical:12,
-  },
-  activeFiltersInfoText: {
-    color: '#3730A3',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1350,91 +1449,98 @@ tabBadgeText: {
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: '700',
+    color: '#111827',
   },
   modalCloseButton: {
     padding: 4,
   },
   modalBody: {
-    padding: 20,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   filterSection: {
     marginBottom: 24,
   },
-  filterSectionTitle: {
-    fontSize: 16,
+  filterLabel: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 12,
   },
-  filterOptions: {
+  filterChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  filterOption: {
-    paddingHorizontal: 16,
+  chip: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  filterOptionActive: {
+  chipActive: {
     backgroundColor: '#4F46E5',
     borderColor: '#4F46E5',
   },
-  filterOptionText: {
-    fontSize: 14,
+  chipText: {
+    fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
   },
-  filterOptionTextActive: {
+  chipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
-  clearButton: {
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    marginBottom:25,
+    borderTopColor: '#F3F4F6',
+    gap: 12,
+  },
+  secondaryButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
   },
-  clearButtonText: {
-    color: '#6B7280',
+  secondaryButtonText: {
+    color: '#374151',
     fontWeight: '600',
+    fontSize: 14,
   },
-  applyButton: {
+  primaryButton: {
     flex: 2,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#4F46E5',
     alignItems: 'center',
   },
-  applyButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 14,
   },
 });
 

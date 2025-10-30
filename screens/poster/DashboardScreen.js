@@ -57,12 +57,9 @@ export default function DashboardScreen() {
             (task.status === 'Assigned' && task.assignmentAccepted)
         ).length
 
-        const completedThisWeek = postedTasks.filter(task => {
-            if (task.status !== 'Completed') return false
-            const completionDate = new Date(task.updatedAt || task.createdAt)
-            const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-            return completionDate > oneWeekAgo
-        }).length
+        const completed = postedTasks?.filter(task => 
+             ['Completed', 'Closed'].includes(task.status)
+           ).length || 0;
 
         const totalSpent = payments
             .filter(payment => payment.status === 'completed')
@@ -77,7 +74,7 @@ export default function DashboardScreen() {
             requiresMyAction,
             awaitingMyReview,
             inProgress,
-            completedThisWeek,
+            completed,
             totalSpent,
             inEscrow
         }
@@ -261,9 +258,9 @@ export default function DashboardScreen() {
                     <LinearGradient
                         colors={['#1A1F3B', '#2D325D', '#4A4F8C']}
                         style={styles.welcomeGradient}
-                         start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                      >
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
                         <View style={styles.welcomeHeader}>
                             <View>
                                 <Text style={styles.welcomeGreeting}>
@@ -284,12 +281,12 @@ export default function DashboardScreen() {
                                 <Text style={styles.quickStatValue}>{dashboardStats.totalTasks}</Text>
                                 <Text style={styles.quickStatLabel}>Total Tasks</Text>
                             </View>
-                            <View />
+                           
                             <View style={styles.quickStat}>
                                 <Text style={styles.quickStatValue}>{dashboardStats.requiresMyAction}</Text>
                                 <Text style={styles.quickStatLabel}>Action Needed</Text>
                             </View>
-                            <View  />
+                           
                             <View style={styles.quickStat}>
                                 <Text style={styles.quickStatValue}>{dashboardStats.inProgress}</Text>
                                 <Text style={styles.quickStatLabel}>In Progress</Text>
@@ -298,55 +295,88 @@ export default function DashboardScreen() {
                     </LinearGradient>
                 </View>
 
-                {/* ACTION-ORIENTED Metrics */}
+                {/* ACTION-ORIENTED Metrics with Gradients */}
                 <View style={styles.metricsSection}>
                     <View style={styles.metricsGrid}>
-                        
+                        {/* Awaiting Review Card */}
                         <TouchableOpacity 
-                            style={[styles.metricCard, styles.actionCard1]}
+                            style={styles.metricCard}
                             onPress={() => navigate('PostedTasks', { filter: 'review' })}
                         >
-                            <View style={[styles.metricIcon, { backgroundColor: '#FEF2F2' }]}>
-                                <Ionicons name="document-text-outline" size={24} color="#EF4444" />
-                            </View>
-                            <Text style={styles.metricValue}>{dashboardStats.awaitingMyReview}</Text>
-                            <Text style={styles.metricLabel}>Awaiting your Review</Text>
-                            <Text style={styles.metricSubtitle}>Needs your action</Text>
+                            <LinearGradient
+                                colors={['#FFF5F5', '#FEE2E2']}
+                                style={styles.metricGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.metricContent}>
+                                    <View style={[styles.metricIcon, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
+                                        <Ionicons name="document-text-outline" size={20} color="#EF4444" />
+                                    </View>
+                                    <Text style={styles.metricValue}>{dashboardStats.awaitingMyReview}</Text>
+                                    <Text style={styles.metricLabel}>Awaiting Review</Text>
+                                </View>
+                            </LinearGradient>
                         </TouchableOpacity>
 
+                        {/* In Progress Card */}
                         <TouchableOpacity 
-                            style={[styles.metricCard, styles.progressCard]}
+                            style={styles.metricCard}
                             onPress={() => navigate('PostedTasks', { filter: 'in-progress' })}
                         >
-                            <View style={[styles.metricIcon, { backgroundColor: '#EFF6FF' }]}>
-                                <Ionicons name="play-circle-outline" size={24} color="#3B82F6" />
-                            </View>
-                            <Text style={styles.metricValue}>{dashboardStats.inProgress}</Text>
-                            <Text style={styles.metricLabel}>In Progress</Text>
-                            <Text style={styles.metricSubtitle}>Being worked on</Text>
+                            <LinearGradient
+                                colors={['#EFF6FF', '#DBEAFE']}
+                                style={styles.metricGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.metricContent}>
+                                    <View style={[styles.metricIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                                        <Ionicons name="play-circle-outline" size={20} color="#3B82F6" />
+                                    </View>
+                                    <Text style={styles.metricValue}>{dashboardStats.inProgress}</Text>
+                                    <Text style={styles.metricLabel}>In Progress</Text>
+                                </View>
+                            </LinearGradient>
                         </TouchableOpacity>
 
-                        <TouchableOpacity 
-                            style={[styles.metricCard, styles.successCard]}
-                        >
-                            <View style={[styles.metricIcon, { backgroundColor: '#F0FDF4' }]}>
-                                <Ionicons name="checkmark-done" size={24} color="#10B981" />
-                            </View>
-                            <Text style={styles.metricValue}>{dashboardStats.completedThisWeek}</Text>
-                            <Text style={styles.metricLabel}>Completed</Text>
-                            <Text style={styles.metricSubtitle}>This week</Text>
+                        {/* Completed Card */}
+                        <TouchableOpacity style={styles.metricCard}>
+                            <LinearGradient
+                                colors={['#F0FDF4', '#DCFCE7']}
+                                style={styles.metricGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.metricContent}>
+                                    <View style={[styles.metricIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                                        <Ionicons name="checkmark-done" size={20} color="#10B981" />
+                                    </View>
+                                    <Text style={styles.metricValue}>{dashboardStats.completed}</Text>
+                                    <Text style={styles.metricLabel}>Completed</Text>
+                                </View>
+                            </LinearGradient>
                         </TouchableOpacity>
 
+                        {/* Finance Card */}
                         <TouchableOpacity 
-                            style={[styles.metricCard, styles.financeCard]}
+                            style={styles.metricCard}
                             onPress={() => navigate('Payments')}
                         >
-                            <View style={[styles.metricIcon, { backgroundColor: '#F8FAFC' }]}>
-                                <Ionicons name="wallet-outline" size={24} color="#6B7280" />
-                            </View>
-                            <Text style={styles.metricValue}>GHS {dashboardStats.inEscrow}</Text>
-                            <Text style={styles.metricLabel}>In Escrow</Text>
-                            <Text style={styles.metricSubtitle}>Funds held</Text>
+                            <LinearGradient
+                                colors={['#F8FAFC', '#F1F5F9']}
+                                style={styles.metricGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <View style={styles.metricContent}>
+                                    <View style={[styles.metricIcon, { backgroundColor: 'rgba(107, 114, 128, 0.1)' }]}>
+                                        <Ionicons name="wallet-outline" size={20} color="#6B7280" />
+                                    </View>
+                                    <Text style={styles.metricValue}>GHS {dashboardStats.inEscrow}</Text>
+                                    <Text style={styles.metricLabel}>In Escrow</Text>
+                                </View>
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -517,54 +547,43 @@ const styles = StyleSheet.create({
     metricCard: {
         flex: 1,
         minWidth: (width - 52) / 2,
+        height: 100,
         backgroundColor: '#FFFFFF',
-        padding: 16,
         borderRadius: 12,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
+        shadowRadius: 4,
+        elevation: 3,
+        overflow: 'hidden',
     },
-    actionCard1: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#EF4444',
+    metricGradient: {
+        flex: 1,
+        padding: 12,
     },
-    progressCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#3B82F6',
-    },
-    successCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#10B981',
-    },
-    financeCard: {
-        borderLeftWidth: 4,
-        borderLeftColor: '#6B7280',
+    metricContent: {
+        flex: 1,
+        justifyContent: 'space-between',
     },
     metricIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 12,
+        alignSelf: 'flex-start',
     },
     metricValue: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: '#1F2937',
-        marginBottom: 4,
+        marginTop: 4,
     },
     metricLabel: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#374151',
-        marginBottom: 2,
-    },
-    metricSubtitle: {
-        fontSize: 12,
-        color: '#6B7280',
+        marginTop: 2,
     },
     section: {
         padding: 16,
@@ -704,4 +723,3 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 })
-

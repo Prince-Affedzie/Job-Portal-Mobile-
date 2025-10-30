@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getSignedUrl, sendFileToS3 } from '../../api/commonApi';
 import { submitWorkForReview } from '../../api/miniTaskApi';
 
@@ -142,7 +142,7 @@ const WorkSubmissionModal = ({
         const fileList = await Promise.all(
           result.assets.map(async (file) => {
             try {
-              const fileInfo = await FileSystem.getInfo(file.uri);
+             const fileInfo = await FileSystem.getInfoAsync(file.uri);
               return {
                 name: file.name,
                 uri: file.uri,

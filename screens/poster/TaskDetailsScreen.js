@@ -195,10 +195,10 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView}>
+        <View style={styles.scrollView}>
         <Header title="Task Details" showBackButton={true} />
         <LoadingIndicator text='Loading Task Details...' />
-        </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
@@ -360,12 +360,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.quickStatValue}>{task.applicants?.length || 0}</Text>
                   <Text style={styles.quickStatLabel}>Applicants</Text>
                 </View>
-                <View style={styles.quickStatDivider} />
+               
                 <View style={styles.quickStat}>
                   <Text style={styles.quickStatValue}>{task.metrics?.views || '0'}</Text>
                   <Text style={styles.quickStatLabel}>Views</Text>
                 </View>
-                <View style={styles.quickStatDivider} />
+                
                 <View style={styles.quickStat}>
                   <Text style={styles.quickStatValue}>{task.metrics?.saves || '0'}</Text>
                   <Text style={styles.quickStatLabel}>Saves</Text>
@@ -413,7 +413,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               isActive={activeTab === 'task'}
               onPress={() => setActiveTab('task')}
             />
-            {isAssigned && (
+            {isAssigned && !isTaskCompleted && (
               <TabButton
                 title="Tasker"
                 icon="person-outline"
@@ -909,7 +909,6 @@ const styles = StyleSheet.create({
   quickStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 12,
   },

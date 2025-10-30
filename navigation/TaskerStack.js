@@ -17,6 +17,7 @@ import HelpSupportScreen from "../screens/tasker/SupportScreen"
 import EarningScreen from "../screens/tasker/EarningsScreen";
 import PaymentMethodScreen from '../screens/tasker/PaymentMethodScreen'
 import { Ionicons } from "@expo/vector-icons";
+import { MaterialIcons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -140,10 +141,10 @@ function TaskerTabs() {
           options={{
             tabBarLabel: 'Dashboard',
             tabBarIcon: ({ color, size, focused }) => (
-              <Ionicons
-                name={focused ? "analytics" : "analytics-outline"}
-                color={color}
-                size={size}
+              <MaterialIcons
+                    name={focused ? "dashboard" : "dashboard"}
+                    color={color}
+                     size={size}
               />
             ),
           }}

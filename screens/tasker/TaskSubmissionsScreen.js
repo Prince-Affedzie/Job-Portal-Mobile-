@@ -15,12 +15,13 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Header from '../../component/tasker/Header';
 import { getMyWorkSubmissions, deleteWorkSubmission } from '../../api/miniTaskApi';
-import { getPreviewUrl } from '../../api/commonApi'; // Import your API function
+import { getPreviewUrl } from '../../api/commonApi';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
@@ -37,12 +38,10 @@ const SubmissionsScreen = () => {
   const [filter, setFilter] = useState('all');
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [openingFile, setOpeningFile] = useState(null);
-  const [fileUrls, setFileUrls] = useState({}); // Cache for file URLs
+  const [fileUrls, setFileUrls] = useState({});
   const scrollViewRef = useRef();
 
-  // Function to get file URL from API
   const getFileUrl = async (fileKey, submissionStatus) => {
-    // Check if we already have the URL cached
     const cacheKey = `${fileKey}-${submissionStatus}`;
     if (fileUrls[cacheKey]) {
       return fileUrls[cacheKey];
@@ -52,7 +51,6 @@ const SubmissionsScreen = () => {
       const res = await getPreviewUrl(fileKey, submissionStatus);
       if (res.status === 200) {
         const previewURL = res.data.previewURL;
-        // Cache the URL
         setFileUrls(prev => ({
           ...prev,
           [cacheKey]: previewURL
@@ -67,25 +65,21 @@ const SubmissionsScreen = () => {
     }
   };
 
-  // Function to open files
   const openFile = async (file, submissionStatus) => {
     try {
       setOpeningFile(file.fileKey);
       
-      // Get the file URL from API
       const fileUrl = await getFileUrl(file.fileKey, submissionStatus);
       if (!fileUrl) {
         Alert.alert('Error', 'File URL not found');
         return;
       }
 
-      // Check if we can open the URL
       const canOpen = await Linking.canOpenURL(fileUrl);
       
       if (canOpen) {
         await Linking.openURL(fileUrl);
       } else {
-        // If cannot open directly, try to download and share
         await downloadAndShareFile(file, fileUrl);
       }
       
@@ -97,19 +91,15 @@ const SubmissionsScreen = () => {
     }
   };
 
-  // Alternative method for downloading and sharing files
   const downloadAndShareFile = async (file, fileUrl) => {
     try {
       const fileName = file.fileKey.split('/').pop();
       const localUri = FileSystem.cacheDirectory + fileName;
       
-      // Download the file
       const downloadResult = await FileSystem.downloadAsync(fileUrl, localUri);
       
       if (downloadResult.status === 200) {
-        // Check if sharing is available
         if (await Sharing.isAvailableAsync()) {
-          // Share the file - this will open the system share sheet
           await Sharing.shareAsync(downloadResult.uri, {
             mimeType: getMimeType(file.fileKey),
             UTI: getUTI(file.fileKey)
@@ -129,7 +119,6 @@ const SubmissionsScreen = () => {
     }
   };
 
-  // Helper function to get MIME type
   const getMimeType = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     const mimeTypes = {
@@ -155,7 +144,6 @@ const SubmissionsScreen = () => {
     return mimeTypes[ext] || 'application/octet-stream';
   };
 
-  // Helper function to get UTI (iOS)
   const getUTI = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     const utis = {
@@ -181,7 +169,6 @@ const SubmissionsScreen = () => {
         );
         setSubmissions(sortedSubmissions);
         
-        // Select the most recent submission by default
         if (sortedSubmissions.length > 0 && !selectedSubmission) {
           setSelectedSubmission(sortedSubmissions[0]);
         }
@@ -214,7 +201,8 @@ const SubmissionsScreen = () => {
           textColor: '#92400E',
           borderColor: '#FCD34D',
           icon: 'time-outline',
-          text: 'Awaiting Review'
+          text: 'Awaiting Review',
+          gradient: ['#FEF3C7', '#FDE68A']
         };
       case 'approved':
         return {
@@ -222,7 +210,8 @@ const SubmissionsScreen = () => {
           textColor: '#065F46',
           borderColor: '#34D399',
           icon: 'checkmark-circle-outline',
-          text: 'Approved'
+          text: 'Approved',
+          gradient: ['#D1FAE5', '#A7F3D0']
         };
       case 'rejected':
         return {
@@ -230,7 +219,8 @@ const SubmissionsScreen = () => {
           textColor: '#991B1B',
           borderColor: '#FCA5A5',
           icon: 'close-circle-outline',
-          text: 'Rejected'
+          text: 'Rejected',
+          gradient: ['#FEE2E2', '#FECACA']
         };
       default:
         return {
@@ -238,7 +228,8 @@ const SubmissionsScreen = () => {
           textColor: '#374151',
           borderColor: '#D1D5DB',
           icon: 'time-outline',
-          text: status
+          text: status,
+          gradient: ['#F3F4F6', '#E5E7EB']
         };
     }
   };
@@ -275,11 +266,9 @@ const SubmissionsScreen = () => {
               if (res.status === 200) {
                 Alert.alert('Success', 'Submission removed successfully');
                 
-                // Update submissions list
                 const updatedSubmissions = submissions.filter((s) => s._id !== submissionId);
                 setSubmissions(updatedSubmissions);
                 
-                // If we deleted the selected submission, select the next one
                 if (selectedSubmission && selectedSubmission._id === submissionId) {
                   if (updatedSubmissions.length > 0) {
                     setSelectedSubmission(updatedSubmissions[0]);
@@ -354,152 +343,161 @@ const SubmissionsScreen = () => {
         ]}
         onPress={() => {
           setSelectedSubmission(submission);
-          // Scroll to top when selecting on mobile
           scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         }}
       >
-        <View style={styles.submissionHeader}>
-          <Text style={styles.submissionNumber}>
-            Submission #{getSubmissionNumber(submission)}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusDetails.color }]}>
-            <Ionicons name={statusDetails.icon} size={14} color={statusDetails.textColor} />
-            <Text style={[styles.statusText, { color: statusDetails.textColor }]}>
-              {statusDetails.text}
-            </Text>
+        <LinearGradient
+          colors={isSelected ? ['#EEF2FF', '#E0E7FF'] : ['#FFFFFF', '#F8FAFC']}
+          style={styles.submissionGradient}
+        >
+          <View style={styles.submissionHeader}>
+            <View style={styles.submissionInfo}>
+              <View style={styles.submissionNumberContainer}>
+                <Ionicons name="document-text-outline" size={16} color="#6366F1" />
+                <Text style={styles.submissionNumber}>
+                  Submission #{getSubmissionNumber(submission)}
+                </Text>
+              </View>
+              <LinearGradient
+                colors={statusDetails.gradient}
+                style={styles.statusBadge}
+              >
+                <Ionicons name={statusDetails.icon} size={14} color={statusDetails.textColor} />
+                <Text style={[styles.statusText, { color: statusDetails.textColor }]}>
+                  {statusDetails.text}
+                </Text>
+              </LinearGradient>
+            </View>
+            
+            <View style={styles.submissionMeta}>
+              <View style={styles.metaItem}>
+                <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                <Text style={styles.metaText}>{formatDate(submission.createdAt)}</Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Ionicons name="document-outline" size={14} color="#6B7280" />
+                <Text style={styles.metaText}>{submission.files?.length || 0} file(s)</Text>
+              </View>
+              {submission.message && (
+                <View style={styles.metaItem}>
+                  <Ionicons name="chatbubble-outline" size={14} color="#6B7280" />
+                  <Text style={styles.metaText}>Has message</Text>
+                </View>
+              )}
+            </View>
           </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  const FileItem = ({ file, submissionStatus }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [fileUrl, setFileUrl] = useState(null);
+    const [isImage, setIsImage] = useState(false);
+    const [isVideo, setIsVideo] = useState(false);
+
+    useEffect(() => {
+      const checkFileType = () => {
+        const fileName = file.fileKey.toLowerCase();
+        const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
+        const videoRegex = /\.(mp4|webm|mov|avi|wmv|mkv)$/i;
+        
+        setIsImage(imageRegex.test(fileName));
+        setIsVideo(videoRegex.test(fileName));
+      };
+
+      checkFileType();
+    }, [file.fileKey]);
+
+    useEffect(() => {
+      const fetchPreviewUrl = async () => {
+        if (isImage || isVideo) {
+          try {
+            const url = await getFileUrl(file.fileKey, submissionStatus);
+            setFileUrl(url);
+          } catch (error) {
+            console.error('Error fetching preview URL:', error);
+          }
+        }
+      };
+
+      fetchPreviewUrl();
+    }, [file.fileKey, submissionStatus, isImage, isVideo]);
+
+    const handleFilePress = async () => {
+      setIsLoading(true);
+      try {
+        await openFile(file, submissionStatus);
+      } catch (error) {
+        console.error('Error handling file press:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    return (
+      <TouchableOpacity 
+        style={styles.fileItem}
+        onPress={handleFilePress}
+        disabled={isLoading || openingFile === file.fileKey}
+      >
+        {(isImage || isVideo) && fileUrl ? (
+          <View style={styles.previewThumbnail}>
+            {isImage ? (
+              <Image 
+                source={{ uri: fileUrl }} 
+                style={styles.thumbnailImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.videoThumbnail}>
+                <Image 
+                  source={{ uri: fileUrl }} 
+                  style={styles.thumbnailImage}
+                  resizeMode="cover"
+                />
+                <View style={styles.playIconContainer}>
+                  <Ionicons name="play-circle" size={24} color="#FFFFFF" />
+                </View>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.fileIconContainer}>
+            <Ionicons 
+              name={getFileTypeIcon(file.fileKey)} 
+              size={24} 
+              color="#6366F1" 
+            />
+          </View>
+        )}
+        
+        <View style={styles.fileInfo}>
+          <Text style={styles.fileName} numberOfLines={1}>
+            {file.fileKey.split('/').pop()}
+          </Text>
+          <Text style={styles.fileType}>
+            {getFileTypeIcon(file.fileKey).replace('-outline', '')}
+            {(isImage || isVideo) && ' • Tap to open'}
+          </Text>
         </View>
         
-        <View style={styles.submissionMeta}>
-          <View style={styles.metaItem}>
-            <Ionicons name="calendar-outline" size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{formatDate(submission.createdAt)}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="document-outline" size={14} color="#6B7280" />
-            <Text style={styles.metaText}>{submission.files?.length || 0} file(s)</Text>
-          </View>
-          {submission.message && (
-            <View style={styles.metaItem}>
-              <Ionicons name="chatbubble-outline" size={14} color="#6B7280" />
-              <Text style={styles.metaText}>Has message</Text>
-            </View>
+        <View style={styles.previewButton}>
+          {(isLoading || openingFile === file.fileKey) ? (
+            <ActivityIndicator size="small" color="#6366F1" />
+          ) : (
+            <LinearGradient
+              colors={['#6366F1', '#4F46E5']}
+              style={styles.openButtonGradient}
+            >
+              <Ionicons name="open-outline" size={16} color="#FFFFFF" />
+            </LinearGradient>
           )}
         </View>
       </TouchableOpacity>
     );
   };
-
-  // File Item Component
-  // File Item Component with Preview
-const FileItem = ({ file, submissionStatus }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [fileUrl, setFileUrl] = useState(null);
-  const [isImage, setIsImage] = useState(false);
-  const [isVideo, setIsVideo] = useState(false);
-
-  // Determine file type and fetch URL on mount
-  useEffect(() => {
-    const checkFileType = () => {
-      const fileName = file.fileKey.toLowerCase();
-      const imageRegex = /\.(jpg|jpeg|png|gif|webp)$/i;
-      const videoRegex = /\.(mp4|webm|mov|avi|wmv|mkv)$/i;
-      
-      setIsImage(imageRegex.test(fileName));
-      setIsVideo(videoRegex.test(fileName));
-    };
-
-    checkFileType();
-  }, [file.fileKey]);
-
-  // Fetch file URL for preview (thumbnail only)
-  useEffect(() => {
-    const fetchPreviewUrl = async () => {
-      if (isImage || isVideo) {
-        try {
-          const url = await getFileUrl(file.fileKey, submissionStatus);
-          setFileUrl(url);
-        } catch (error) {
-          console.error('Error fetching preview URL:', error);
-        }
-      }
-    };
-
-    fetchPreviewUrl();
-  }, [file.fileKey, submissionStatus, isImage, isVideo]);
-
-  const handleFilePress = async () => {
-    // Always open the file using the original function
-    setIsLoading(true);
-    try {
-      await openFile(file, submissionStatus);
-    } catch (error) {
-      console.error('Error handling file press:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <TouchableOpacity 
-      style={styles.fileItem}
-      onPress={handleFilePress}
-      disabled={isLoading || openingFile === file.fileKey}
-    >
-      {/* File Icon or Preview Thumbnail */}
-      {(isImage || isVideo) && fileUrl ? (
-  <View style={styles.previewThumbnail}>
-    {isImage ? (
-      <Image 
-        source={{ uri: fileUrl }} 
-        style={styles.thumbnailImage}
-        resizeMode="cover"
-      />
-    ) : (
-      <View style={styles.videoThumbnail}>
-        <Image 
-          source={{ uri: fileUrl }} 
-          style={styles.thumbnailImage}
-          resizeMode="cover"
-        />
-        <View style={styles.playIconContainer}>
-          <Ionicons name="play-circle" size={24} color="#FFFFFF" />
-        </View>
-      </View>
-    )}
-  </View>
-) : (
-  <Ionicons 
-    name={getFileTypeIcon(file.fileKey)} 
-    size={20} 
-    color="#6366F1" 
-  />
-)}
-      
-      <View style={styles.fileInfo}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {file.fileKey.split('/').pop()}
-        </Text>
-        <Text style={styles.fileType}>
-          {getFileTypeIcon(file.fileKey).replace('-outline', '')}
-          {(isImage || isVideo) && ' • Tap to open'}
-        </Text>
-      </View>
-      
-      <View style={styles.previewButton}>
-        {(isLoading || openingFile === file.fileKey) ? (
-          <ActivityIndicator size="small" color="#6366F1" />
-        ) : (
-          <Ionicons 
-            name="open-outline" 
-            size={18} 
-            color="#6366F1" 
-          />
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-};
 
   if (loading) {
     return (
@@ -526,11 +524,43 @@ const FileItem = ({ file, submissionStatus }) => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Section */}
-        <View style={styles.headerSection}>
-          <Text style={styles.title}>Submissions</Text>
-          <Text style={styles.subtitle}>Manage your work submissions for this project</Text>
-        </View>
+        {/* Hero Section */}
+        <LinearGradient
+          colors={['#6366F1', '#4F46E5']}
+          style={styles.heroSection}
+        >
+          <View style={styles.heroContent}>
+            {/*<View style={styles.heroIcon}>
+              <Ionicons name="document-text-outline" size={32} color="#FFFFFF" />
+            </View>*/}
+            <View style={styles.heroText}>
+              <Text style={styles.heroTitle}>Work Submissions</Text>
+              <Text style={styles.heroDescription}>
+                Manage and review your submitted work for this task
+              </Text>
+            </View>
+          </View>
+          <View style={styles.heroStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{submissions.length}</Text>
+              <Text style={styles.statLabel}>Total</Text>
+            </View>
+           
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {submissions.filter(s => s.status === 'approved').length}
+              </Text>
+              <Text style={styles.statLabel}>Approved</Text>
+            </View>
+          
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {submissions.filter(s => s.status === 'pending').length}
+              </Text>
+              <Text style={styles.statLabel}>Pending</Text>
+            </View>
+          </View>
+        </LinearGradient>
 
         {/* Filter Section */}
         <View style={styles.filterSection}>
@@ -546,9 +576,12 @@ const FileItem = ({ file, submissionStatus }) => {
 
         {getFilteredSubmissions().length === 0 ? (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
+            <LinearGradient
+              colors={['#F8FAFC', '#F1F5F9']}
+              style={styles.emptyIllustration}
+            >
               <Ionicons name="document-outline" size={48} color="#9CA3AF" />
-            </View>
+            </LinearGradient>
             <Text style={styles.emptyTitle}>
               {filter === 'all' ? "No Submissions Found" : `No ${filter} submissions`}
             </Text>
@@ -578,17 +611,24 @@ const FileItem = ({ file, submissionStatus }) => {
               <View style={styles.detailsSection}>
                 <Text style={styles.sectionTitle}>Submission Details</Text>
                 
-                <View style={styles.detailsCard}>
+                <LinearGradient
+                  colors={['#FFFFFF', '#F8FAFC']}
+                  style={styles.detailsCard}
+                >
                   {/* Header */}
                   <View style={styles.detailsHeader}>
-                    <View>
+                    <View style={styles.detailsTitleSection}>
                       <View style={styles.detailsTitleRow}>
+                        <View style={styles.titleIcon}>
+                          <Ionicons name="document-text-outline" size={20} color="#6366F1" />
+                        </View>
                         <Text style={styles.detailsTitle}>
                           Submission #{getSubmissionNumber(selectedSubmission)}
                         </Text>
-                        <View style={[styles.statusBadge, { 
-                          backgroundColor: getStatusDetails(selectedSubmission.status).color 
-                        }]}>
+                        <LinearGradient
+                          colors={getStatusDetails(selectedSubmission.status).gradient}
+                          style={styles.statusBadge}
+                        >
                           <Ionicons 
                             name={getStatusDetails(selectedSubmission.status).icon} 
                             size={14} 
@@ -599,7 +639,7 @@ const FileItem = ({ file, submissionStatus }) => {
                           }]}>
                             {getStatusDetails(selectedSubmission.status).text}
                           </Text>
-                        </View>
+                        </LinearGradient>
                       </View>
                       <Text style={styles.submissionDate}>
                         Submitted on {formatDate(selectedSubmission.createdAt)}
@@ -621,7 +661,10 @@ const FileItem = ({ file, submissionStatus }) => {
 
                   {/* Task Information */}
                   <View style={styles.taskInfo}>
-                    <Text style={styles.infoLabel}>Task Information</Text>
+                    <View style={styles.infoHeader}>
+                      <Ionicons name="briefcase-outline" size={18} color="#6366F1" />
+                      <Text style={styles.infoLabel}>Task Information</Text>
+                    </View>
                     <Text style={styles.taskTitle}>
                       {selectedSubmission.taskId?.title || taskTitle || 'Untitled Task'}
                     </Text>
@@ -631,7 +674,7 @@ const FileItem = ({ file, submissionStatus }) => {
                   {selectedSubmission.message && (
                     <View style={styles.messageSection}>
                       <View style={styles.messageHeader}>
-                        <Ionicons name="chatbubble-outline" size={18} color="#374151" />
+                        <Ionicons name="chatbubble-outline" size={18} color="#6366F1" />
                         <Text style={styles.messageLabel}>Your Message</Text>
                       </View>
                       <View style={styles.messageBox}>
@@ -646,7 +689,7 @@ const FileItem = ({ file, submissionStatus }) => {
                   {selectedSubmission.feedback && (
                     <View style={styles.feedbackSection}>
                       <View style={styles.feedbackHeader}>
-                        <Ionicons name="chatbubble-outline" size={18} color="#1E40AF" />
+                        <Ionicons name="chatbubble-ellipses-outline" size={18} color="#10B981" />
                         <Text style={styles.feedbackLabel}>Client Feedback</Text>
                       </View>
                       <View style={styles.feedbackBox}>
@@ -659,7 +702,10 @@ const FileItem = ({ file, submissionStatus }) => {
 
                   {/* Files */}
                   <View style={styles.filesSection}>
-                    <Text style={styles.filesLabel}>Submitted Files</Text>
+                    <View style={styles.filesHeader}>
+                      <Ionicons name="folder-outline" size={18} color="#6366F1" />
+                      <Text style={styles.filesLabel}>Submitted Files</Text>
+                    </View>
                     <View style={styles.filesList}>
                       {selectedSubmission.files?.map((file, index) => (
                         <FileItem 
@@ -670,7 +716,7 @@ const FileItem = ({ file, submissionStatus }) => {
                       ))}
                     </View>
                   </View>
-                </View>
+                </LinearGradient>
               </View>
             )}
           </View>
@@ -685,50 +731,103 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748B',
-  },
   scrollView: {
     flex: 1,
   },
-  headerSection: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
+  
+  // Hero Section
+  heroSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 24,
+    borderRadius: 20,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  title: {
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  heroIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  heroText: {
+    flex: 1,
+  },
+  heroTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: '800',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
+  heroDescription: {
+    fontSize: 16,
+    color: '#E0E7FF',
+    lineHeight: 22,
   },
+  heroStats: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    padding: 16,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#E0E7FF',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+
+  // Filter Section
   filterSection: {
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   filterContainer: {
     flexDirection: 'row',
-    padding: 16,
     gap: 8,
   },
   filterButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    minWidth: 100,
+    alignItems: 'center',
   },
   filterButtonActive: {
     backgroundColor: '#6366F1',
@@ -736,86 +835,112 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#64748B',
   },
   filterButtonTextActive: {
     color: '#FFFFFF',
   },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: 40,
     backgroundColor: '#FFFFFF',
     margin: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
+  emptyIllustration: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  content: {
-    padding: 16,
-    gap: 16,
-  },
-  submissionList: {
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  submissionItem: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
+    marginBottom: 24,
+    borderWidth: 2,
     borderColor: '#F1F5F9',
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  // Content
+  content: {
+    padding: 16,
+    gap: 20,
+  },
+
+  // Submission List
+  submissionList: {
+    gap: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  submissionItem: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  submissionGradient: {
+    padding: 16,
+    borderRadius: 16,
+  },
   submissionItemSelected: {
+    borderWidth: 2,
     borderColor: '#6366F1',
-    backgroundColor: '#EEF2FF',
   },
   submissionHeader: {
+    gap: 12,
+  },
+  submissionInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+  },
+  submissionNumberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   submissionNumber: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#1E293B',
-    flex: 1,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 12,
     gap: 4,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   submissionMeta: {
     gap: 6,
@@ -826,16 +951,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaText: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#64748B',
   },
+
+  // Details Section
   detailsSection: {
-    gap: 12,
+    gap: 16,
   },
   detailsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
@@ -843,141 +974,167 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  detailsTitleSection: {
+    flex: 1,
   },
   detailsTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  titleIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   detailsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1E293B',
+    flex: 1,
   },
   submissionDate: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#64748B',
   },
   deleteButton: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 10,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#FECACA',
     backgroundColor: '#FEF2F2',
+    marginLeft: 12,
   },
+
+  // Task Info
   taskInfo: {
-    padding: 12,
+    padding: 16,
     backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   infoLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   taskTitle: {
-    fontSize: 14,
-    color: '#1E293B',
+    fontSize: 16,
+    color: '#374151',
     fontWeight: '500',
+    lineHeight: 22,
   },
+
+  // Message Section
   messageSection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   messageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   messageLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#374151',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   messageBox: {
-    padding: 12,
+    padding: 16,
     backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
   messageText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 22,
   },
+
+  // Feedback Section
   feedbackSection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   feedbackHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   feedbackLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E40AF',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#10B981',
   },
   feedbackBox: {
-    padding: 12,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: '#BBF7D0',
   },
   feedbackText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#374151',
-    lineHeight: 20,
+    lineHeight: 22,
   },
+
+  // Files Section
   filesSection: {
     marginBottom: 16,
   },
+  filesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
   filesLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#374151',
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   filesList: {
-    gap: 8,
+    gap: 12,
   },
+
+  // File Item
   fileItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
     backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    gap: 12,
+    gap: 16,
   },
-  fileInfo: {
-    flex: 1,
-  },
-  fileName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 2,
-  },
-  fileType: {
-    fontSize: 12,
-    color: '#6B7280',
-    textTransform: 'capitalize',
-  },
-  previewButton: {
-    padding: 8,
-    borderRadius: 6,
+  fileIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-   previewThumbnail: {
+  previewThumbnail: {
     width: 60,
     height: 60,
     borderRadius: 8,
@@ -996,114 +1153,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-
-  // Preview Modal Styles
-  previewModal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    zIndex: 1000,
-    justifyContent: 'space-between',
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  previewTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  previewContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  fullPreviewImage: {
-    width: '100%',
-    height: '100%',
-    maxWidth: 500,
-    maxHeight: 500,
-  },
-  videoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  videoMessage: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  playButton: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  playButtonText: {
-    color: '#6366F1',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  previewActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    gap: 12,
-  },
-  primaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#6366F1',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#6B7280',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  
-  fileItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    gap: 12,
-  },
   playIconContainer: {
     position: 'absolute',
     top: 0,
@@ -1112,9 +1161,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Optional: slight overlay for better visibility
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-
+  fileInfo: {
+    flex: 1,
+  },
+  fileName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  fileType: {
+    fontSize: 14,
+    color: '#64748B',
+    textTransform: 'capitalize',
+  },
+  previewButton: {
+    padding: 4,
+  },
+  openButtonGradient: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default SubmissionsScreen;

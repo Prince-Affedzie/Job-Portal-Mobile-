@@ -227,13 +227,16 @@ const ClientProfileScreen = ({ navigation }) => {
   };
 
   const StatsCard = ({ value, label, icon, color }) => (
-    <View style={styles.statsCard}>
+    <LinearGradient
+      colors={['#FFFFFF', '#F8FAFC']}
+      style={styles.statsCard}
+    >
       <View style={[styles.statsIcon, { backgroundColor: color }]}>
         <Ionicons name={icon} size={20} color="#FFFFFF" />
       </View>
       <Text style={styles.statsValue}>{value}</Text>
       <Text style={styles.statsLabel}>{label}</Text>
-    </View>
+    </LinearGradient>
   );
 
   const formatMemberSince = () => {
@@ -248,9 +251,14 @@ const ClientProfileScreen = ({ navigation }) => {
   };
 
   const QuickActionButton = ({ title, icon, color, onPress }) => (
-    <TouchableOpacity style={[styles.quickActionButton, { backgroundColor: color }]} onPress={onPress}>
-      <Ionicons name={icon} size={24} color="#FFFFFF" />
-      <Text style={styles.quickActionText}>{title}</Text>
+    <TouchableOpacity style={styles.quickActionButton} onPress={onPress}>
+      <LinearGradient
+        colors={[color, `${color}CC`]}
+        style={styles.quickActionGradient}
+      >
+        <Ionicons name={icon} size={24} color="#FFFFFF" />
+        <Text style={styles.quickActionText}>{title}</Text>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
@@ -266,7 +274,7 @@ const ClientProfileScreen = ({ navigation }) => {
             disabled={loading || imageUploading}
           >
             {loading || imageUploading ? (
-              <ActivityIndicator size="small" color="#6366F1" />
+              <ActivityIndicator size="small" color={editing ? "#FFFFFF" : "#6366F1"} />
             ) : (
               <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
                 {editing ? 'Save' : 'Edit'}
@@ -285,8 +293,6 @@ const ClientProfileScreen = ({ navigation }) => {
         <LinearGradient
           colors={['#1A1F3B', '#2D325D']}
           style={styles.profileHeader}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
         >
           <View style={styles.profileImageContainer}>
             <Image
@@ -311,10 +317,12 @@ const ClientProfileScreen = ({ navigation }) => {
           
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{profileData.name}</Text>
+            <Text style={styles.profileEmail}>{profileData.email}</Text>
+            
             <View style={styles.verificationContainer}>
               {profileData.verified && (
                 <View style={styles.verificationBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                  <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
                   <Text style={styles.verificationText}>Verified Client</Text>
                 </View>
               )}
@@ -497,7 +505,9 @@ const ClientProfileScreen = ({ navigation }) => {
           <View style={styles.preferencesList}>
             <View style={styles.preferenceItem}>
               <View style={styles.preferenceInfo}>
-                <Ionicons name="shield-checkmark-outline" size={20} color="#6366F1" />
+                <View style={styles.preferenceIcon}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color="#6366F1" />
+                </View>
                 <View style={styles.preferenceText}>
                   <Text style={styles.preferenceLabel}>Verified Taskers Only</Text>
                   <Text style={styles.preferenceDescription}>Only show verified taskers in applications</Text>
@@ -513,7 +523,9 @@ const ClientProfileScreen = ({ navigation }) => {
             
             <View style={styles.preferenceItem}>
               <View style={styles.preferenceInfo}>
-                <Ionicons name="star-outline" size={20} color="#6366F1" />
+                <View style={styles.preferenceIcon}>
+                  <Ionicons name="star-outline" size={20} color="#6366F1" />
+                </View>
                 <View style={styles.preferenceText}>
                   <Text style={styles.preferenceLabel}>High-Rated Taskers</Text>
                   <Text style={styles.preferenceDescription}>Prioritize taskers with 4+ star ratings</Text>
@@ -539,7 +551,9 @@ const ClientProfileScreen = ({ navigation }) => {
           <View style={styles.notificationList}>
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <Ionicons name="person-add-outline" size={20} color="#6366F1" />
+                <View style={styles.notificationIcon}>
+                  <Ionicons name="person-add-outline" size={20} color="#6366F1" />
+                </View>
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>New Applicants</Text>
                   <Text style={styles.notificationDescription}>When someone applies to your tasks</Text>
@@ -555,7 +569,9 @@ const ClientProfileScreen = ({ navigation }) => {
             
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6366F1" />
+                <View style={styles.notificationIcon}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6366F1" />
+                </View>
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Messages</Text>
                   <Text style={styles.notificationDescription}>New messages from taskers</Text>
@@ -571,7 +587,9 @@ const ClientProfileScreen = ({ navigation }) => {
 
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <Ionicons name="checkmark-done-outline" size={20} color="#6366F1" />
+                <View style={styles.notificationIcon}>
+                  <Ionicons name="checkmark-done-outline" size={20} color="#6366F1" />
+                </View>
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Task Updates</Text>
                   <Text style={styles.notificationDescription}>Task status changes and completions</Text>
@@ -596,19 +614,25 @@ const ClientProfileScreen = ({ navigation }) => {
           
           <View style={styles.accountActions}>
             <TouchableOpacity style={styles.accountButton} onPress={() => navigate('PostedTasks')}>
-              <Ionicons name="list-outline" size={20} color="#6366F1" />
+              <View style={styles.accountButtonIcon}>
+                <Ionicons name="list-outline" size={20} color="#6366F1" />
+              </View>
               <Text style={styles.accountButtonText}>My Posted Tasks</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.accountButton} onPress={() => navigate('Payments')}>
-              <Ionicons name="receipt-outline" size={20} color="#6366F1" />
+              <View style={styles.accountButtonIcon}>
+                <Ionicons name="receipt-outline" size={20} color="#6366F1" />
+              </View>
               <Text style={styles.accountButtonText}>Payment History</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
             
             <TouchableOpacity  style={styles.accountButton} onPress={()=>navigate('ClientSupport')}>
-              <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
+              <View style={styles.accountButtonIcon}>
+                <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
+              </View>
               <Text style={styles.accountButtonText}>Help & Support</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
             </TouchableOpacity>
@@ -617,7 +641,9 @@ const ClientProfileScreen = ({ navigation }) => {
               style={[styles.accountButton, styles.logoutButton]}
               onPress={handleLogout}
             >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              <View style={styles.accountButtonIcon}>
+                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              </View>
               <Text style={[styles.accountButtonText, styles.logoutText]}>Log Out</Text>
             </TouchableOpacity>
           </View>
@@ -637,7 +663,6 @@ const ClientProfileScreen = ({ navigation }) => {
   );
 };
 
-// Your existing styles remain the same...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -648,9 +673,11 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: '#F1F5F9',
+    minWidth: 60,
+    alignItems: 'center',
   },
   headerButtonActive: {
     backgroundColor: '#6366F1',
@@ -672,7 +699,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -699,6 +726,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   profileInfo: {
     flex: 1,
@@ -709,14 +741,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 4,
   },
-  profileTitle: {
+  profileEmail: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 2,
-  },
-  profileIndustry: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 12,
   },
   verificationContainer: {
@@ -727,15 +754,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 12,
-    gap: 4,
+    gap: 6,
   },
   verificationText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -744,15 +771,16 @@ const styles = StyleSheet.create({
   },
   statsCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   statsIcon: {
     width: 40,
@@ -761,6 +789,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statsValue: {
     fontSize: 18,
@@ -772,6 +805,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     textAlign: 'center',
+    fontWeight: '500',
   },
   section: {
     backgroundColor: '#FFFFFF',
@@ -781,9 +815,11 @@ const styles = StyleSheet.create({
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -793,7 +829,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1E293B',
   },
   sectionContent: {
@@ -807,6 +843,15 @@ const styles = StyleSheet.create({
   quickActionButton: {
     flex: 1,
     minWidth: '45%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionGradient: {
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
@@ -818,39 +863,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  profileField: {
-    marginBottom: 16,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  fieldValue: {
-    fontSize: 16,
-    color: '#1E293B',
-    paddingVertical: 8,
-  },
-  fieldInput: {
-    fontSize: 16,
-    color: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  multilineInput: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  placeholderText: {
-    color: '#94A3B8',
-    fontStyle: 'italic',
-  },
   preferencesList: {
-    gap: 8,
+    gap: 12,
   },
   preferenceItem: {
     flexDirection: 'row',
@@ -864,21 +878,30 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  preferenceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   preferenceText: {
     flex: 1,
   },
   preferenceLabel: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1E293B',
     marginBottom: 2,
   },
   preferenceDescription: {
     fontSize: 14,
     color: '#64748B',
+    lineHeight: 18,
   },
   notificationList: {
-    gap: 8,
+    gap: 12,
   },
   notificationItem: {
     flexDirection: 'row',
@@ -892,18 +915,27 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   notificationText: {
     flex: 1,
   },
   notificationLabel: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#1E293B',
     marginBottom: 2,
   },
   notificationDescription: {
     fontSize: 14,
     color: '#64748B',
+    lineHeight: 18,
   },
   accountActions: {
     gap: 4,
@@ -911,20 +943,29 @@ const styles = StyleSheet.create({
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 4,
   },
   viewAllText: {
     fontSize: 14,
     color: '#6366F1',
-    fontWeight: '500',
+    fontWeight: '600',
     marginRight: 2,
   },
   accountButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
     borderRadius: 12,
     gap: 12,
+  },
+  accountButtonIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   accountButtonText: {
     flex: 1,
@@ -946,12 +987,13 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: '#64748B',
     textAlign: 'center',
+    fontWeight: '500',
   },
   footerSubtext: {
     fontSize: 12,
-    color: '#CBD5E1',
+    color: '#94A3B8',
     textAlign: 'center',
     marginTop: 4,
   },

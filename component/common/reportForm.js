@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AuthContext } from '../../context/AuthContext';
 import { raiseDispute, addReportingEvidence, sendFileToS3 } from '../../api/commonApi';
 
@@ -104,7 +104,7 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
 
       if (result.assets && result.assets.length > 0) {
         const file = result.assets[0];
-        const fileInfo = await FileSystem.getInfo(file.uri);
+        const fileInfo = await FileSystem.getInfoAsync(file.uri);
         const fileSizeMB = (fileInfo.size || file.size || 0) / (1024 * 1024);
 
         if (fileSizeMB > 5) {

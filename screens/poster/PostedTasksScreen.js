@@ -3,6 +3,7 @@ import React, { useState, useContext, useEffect } from 'react'
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient'
 import { PosterContext } from '../../context/PosterContext';
 import { AuthContext } from "../../context/AuthContext";
 import { navigate } from '../../services/navigationService'
@@ -13,6 +14,102 @@ const { height, width } = Dimensions.get('window')
 
 const statusFilters = ['All', 'Open', 'Assigned', 'In Progress', 'Review', 'Completed'];
 const categoryFilters = ['All', 'Home Services', 'Delivery & Errands', 'Digital Services', 'Writing & Assistance', 'Learning & Tutoring', 'Creative Tasks', 'Event Support', 'Others'];
+
+// Statistics Component
+const StatsOverview = ({ stats }) => (
+  <View style={styles.statsSection}>
+    <View style={styles.statsHeader}>
+      <Text style={styles.statsTitle}>Tasks Overview</Text>
+      <Text style={styles.statsSubtitle}>Your Tasks Performance</Text>
+    </View>
+    
+    <View style={styles.statsGrid}>
+      <LinearGradient
+        colors={['#EFF6FF', '#DBEAFE']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}style={[styles.statCard, styles.statCardPrimary]}>
+        <View style={styles.statTopRow}>
+          <View style={[styles.statIconContainer, styles.statIconPrimary]}>
+            <Ionicons name="layers-outline" size={20} color="#4F46E5" />
+          </View>
+          <Text style={styles.statValue}>{stats.total}</Text>
+        </View>
+        <Text style={styles.statLabel}>Total Tasks</Text>
+        {/*<View style={styles.statProgress}>
+          <View style={[styles.progressBar, styles.progressBarTotal]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${Math.min(100, (stats.total / Math.max(stats.total, 1)) * 100)}%` }
+              ]} 
+            />
+          </View>
+        </View>*/}
+      </LinearGradient>
+
+      <LinearGradient
+      colors={['#F0FDF4', '#DCFCE7']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }} style={[styles.statCard, styles.statCardSuccess]}>
+        <View style={styles.statTopRow}>
+          <View style={[styles.statIconContainer, styles.statIconSuccess]}>
+            <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+          </View>
+          <Text style={styles.statValue}>{stats.completed}</Text>
+        </View>
+        <Text style={styles.statLabel}>Completed</Text>
+        <View style={styles.statProgress}>
+          <Text style={styles.statPercentage}>
+            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+          </Text>
+        </View>
+      </LinearGradient>
+
+      <LinearGradient
+        colors={['#FFFBEB', '#FEFCE8']}                              
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}  style={[styles.statCard, styles.statCardWarning]}>
+        <View style={styles.statTopRow}>
+          <View style={[styles.statIconContainer, styles.statIconWarning]}>
+            <Ionicons name="time-outline" size={18} color="#CA8A04" />
+          </View>
+          <Text style={styles.statValue}>{stats.inProgress}</Text>
+        </View>
+        <Text style={styles.statLabel}>In Progress</Text>
+        <View style={styles.statProgress}>
+          <Text style={styles.statPercentage}>
+            {stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}%
+          </Text>
+        </View>
+      </LinearGradient>
+
+      <View style={[styles.statCard, styles.statCardInfo]}>
+        <View style={styles.statTopRow}>
+          <View style={[styles.statIconContainer, styles.statIconInfo]}>
+            <Ionicons name="trending-up" size={18} color="#7C3AED" />
+          </View>
+          <Text style={styles.statValue}>{stats.applicants}</Text>
+        </View>
+        <Text style={styles.statLabel}>Total Applicants</Text>
+        <View style={styles.statProgress}>
+          <View style={styles.rateTrend}>
+            <Ionicons 
+              name={stats.applicantsPerTask >= 2 ? "arrow-up" : "arrow-down"} 
+              size={12} 
+              color={stats.applicantsPerTask >= 2 ? "#16A34A" : "#DC2626"} 
+            />
+            <Text style={[
+              styles.trendText,
+              { color: stats.applicantsPerTask >= 2 ? "#16A34A" : "#DC2626" }
+            ]}>
+              {stats.applicantsPerTask >= 2 ? "Good" : "Low"} interest
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  </View>
+);
 
 export default function PostedTasksScreen() {
   const { user } = useContext(AuthContext);
@@ -48,6 +145,43 @@ export default function PostedTasksScreen() {
       setDeletionError(null);
     }
   }, [actionModalVisible]);
+
+  // Calculate statistics for the client
+  const calculateStats = () => {
+    const total = postedTasks?.length || 0;
+    
+    const completed = postedTasks?.filter(task => 
+      ['Completed', 'Closed'].includes(task.status)
+    ).length || 0;
+    
+    const inProgress = postedTasks?.filter(task => 
+      ['In-progress', 'Assigned', 'Review'].includes(task.status)
+    ).length || 0;
+    
+    const open = postedTasks?.filter(task => 
+      ['Open', 'Pending'].includes(task.status)
+    ).length || 0;
+
+    // Calculate total applicants across all tasks
+    const totalApplicants = postedTasks?.reduce((sum, task) => {
+      const applicantsCount = task.applicants?.length || 0;
+      const bidsCount = task.bids?.length || 0;
+      return sum + Math.max(applicantsCount, bidsCount);
+    }, 0) || 0;
+
+    const applicantsPerTask = total > 0 ? (totalApplicants / total).toFixed(1) : 0;
+
+    return { 
+      total, 
+      completed, 
+      inProgress, 
+      open,
+      applicants: totalApplicants,
+      applicantsPerTask: parseFloat(applicantsPerTask)
+    };
+  };
+
+  const stats = calculateStats();
 
   const deleteATask = async (taskId, taskTitle) => {
     // Set deleting status for this specific task
@@ -388,7 +522,7 @@ export default function PostedTasksScreen() {
           </View>
 
           {item.budget ? (
-           <View style={styles.detailRow}>
+      <View style={styles.detailRow}>
        <View style={styles.detailItem}>
          <Ionicons name="cash-outline" size={16} color="#666" />
          <Text style={styles.detailText}>Budget: GHS {item.budget}</Text>
@@ -419,6 +553,9 @@ export default function PostedTasksScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Statistics Section */}
+        <StatsOverview stats={stats} />
+
         {/* Search Section */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
@@ -646,7 +783,8 @@ export default function PostedTasksScreen() {
     </SafeAreaView>
   );
 }
-// Updated styles with search and filter components
+
+// Updated styles with statistics and search components
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -662,6 +800,150 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+
+  // Statistics Section Styles
+  statsSection: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  statsHeader: {
+    marginBottom: 16,
+  },
+  statsTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  statsSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statCardPrimary: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#4F46E5',
+  },
+  statCardSuccess: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#16A34A',
+  },
+  statCardWarning: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#CA8A04',
+  },
+  statCardInfo: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#7C3AED',
+  },
+  statTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  statIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statIconPrimary: {
+    backgroundColor: '#EEF2FF',
+  },
+  statIconSuccess: {
+    backgroundColor: '#DCFCE7',
+  },
+  statIconWarning: {
+    backgroundColor: '#FEF9C3',
+  },
+  statIconInfo: {
+    backgroundColor: '#F3E8FF',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#111827',
+    textAlign: 'right',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarTotal: {
+    backgroundColor: '#E5E7EB',
+  },
+  progressBarSuccess: {
+    backgroundColor: '#D1FAE5',
+  },
+  progressBarWarning: {
+    backgroundColor: '#FEF3C7',
+  },
+  progressBarInfo: {
+    backgroundColor: '#EDE9FE',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#4F46E5',
+  },
+  statPercentage: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#374151',
+    minWidth: 30,
+    textAlign: 'right',
+  },
+  rateTrend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Search and Filter Styles
   searchSection: {
     flexDirection: 'row',
     alignItems: 'center',

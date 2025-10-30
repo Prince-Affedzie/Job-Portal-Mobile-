@@ -161,7 +161,12 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   };
 
   if (loading) {
-    return <LoadingIndicator text="Loading task details..." logoStyle="glow" />;
+    return (
+    <SafeAreaView style={styles.container}>
+    <Header title="Task Details" showBackButton={true} />
+    <LoadingIndicator text="Loading task details..." logoStyle="glow" />
+    </SafeAreaView> 
+  );
   }
 
   if (!task) {
