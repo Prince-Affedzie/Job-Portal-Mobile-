@@ -15,6 +15,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { NotificationContext } from "../../context/NotificationContext";
 import { navigate, goBack } from '../../services/navigationService';
 import { useContext } from 'react';
+import { useNavigation } from "@react-navigation/native";
 
 const Header = ({ 
   title, 
@@ -43,12 +44,14 @@ const Header = ({
     }
   };
 
+  const navigation = useNavigation()
+
   const handleProfilePress = () => {
     navigate('ProfileTab');
   };
 
   const handleNotificationPress = () => {
-   user?.role==="job_seeker"? navigate('NotificationsScreen'):navigate('Notifications'); // Replace with your actual notification screen name
+   navigation.navigate('Notifications'); // Replace with your actual notification screen name
   };
 
   const HeaderBackground = gradient ? LinearGradient : View;

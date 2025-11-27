@@ -1,120 +1,34 @@
-import { View, Text, StyleSheet, ScrollView,SafeAreaView, Dimensions,Alert, TouchableOpacity, FlatList, Modal, RefreshControl, TextInput, ActivityIndicator } from 'react-native'
+// screens/tasker/AllTasksScreen.js
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, Dimensions, Alert, TouchableOpacity, FlatList, Modal, RefreshControl, TextInput, ActivityIndicator } from 'react-native'
 import React, { useState, useContext, useEffect } from 'react'
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient'
 import { PosterContext } from '../../context/PosterContext';
+import { ServiceRequestContext } from '../../context/ServiceRequestContext';
 import { AuthContext } from "../../context/AuthContext";
 import { navigate } from '../../services/navigationService'
 import Header from "../../component/tasker/Header";
 import LoadingIndicator from '../../component/common/LoadingIndicator';
+import  StatsOverview from '../../component/client/StatsOverView';
+import TaskFilters from '../../component/client/TaskFilters';
+import TaskList from '../../component/client/TaskList';
+import TaskActionModal from '../../component/client/TaskActionModal';
 
 const { height, width } = Dimensions.get('window')
 
-const statusFilters = ['All', 'Open', 'Assigned', 'In Progress', 'Review', 'Completed'];
-const categoryFilters = ['All', 'Home Services', 'Delivery & Errands', 'Digital Services', 'Writing & Assistance', 'Learning & Tutoring', 'Creative Tasks', 'Event Support', 'Others'];
+const TABS = {
+  POSTED: 'posted',
+  REQUESTED: 'requested'
+};
 
-// Statistics Component
-const StatsOverview = ({ stats }) => (
-  <View style={styles.statsSection}>
-    <View style={styles.statsHeader}>
-      <Text style={styles.statsTitle}>Tasks Overview</Text>
-      <Text style={styles.statsSubtitle}>Your Tasks Performance</Text>
-    </View>
-    
-    <View style={styles.statsGrid}>
-      <LinearGradient
-        colors={['#EFF6FF', '#DBEAFE']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}style={[styles.statCard, styles.statCardPrimary]}>
-        <View style={styles.statTopRow}>
-          <View style={[styles.statIconContainer, styles.statIconPrimary]}>
-            <Ionicons name="layers-outline" size={20} color="#4F46E5" />
-          </View>
-          <Text style={styles.statValue}>{stats.total}</Text>
-        </View>
-        <Text style={styles.statLabel}>Total Tasks</Text>
-        {/*<View style={styles.statProgress}>
-          <View style={[styles.progressBar, styles.progressBarTotal]}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${Math.min(100, (stats.total / Math.max(stats.total, 1)) * 100)}%` }
-              ]} 
-            />
-          </View>
-        </View>*/}
-      </LinearGradient>
-
-      <LinearGradient
-      colors={['#F0FDF4', '#DCFCE7']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }} style={[styles.statCard, styles.statCardSuccess]}>
-        <View style={styles.statTopRow}>
-          <View style={[styles.statIconContainer, styles.statIconSuccess]}>
-            <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-          </View>
-          <Text style={styles.statValue}>{stats.completed}</Text>
-        </View>
-        <Text style={styles.statLabel}>Completed</Text>
-        <View style={styles.statProgress}>
-          <Text style={styles.statPercentage}>
-            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-          </Text>
-        </View>
-      </LinearGradient>
-
-      <LinearGradient
-        colors={['#FFFBEB', '#FEFCE8']}                              
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}  style={[styles.statCard, styles.statCardWarning]}>
-        <View style={styles.statTopRow}>
-          <View style={[styles.statIconContainer, styles.statIconWarning]}>
-            <Ionicons name="time-outline" size={18} color="#CA8A04" />
-          </View>
-          <Text style={styles.statValue}>{stats.inProgress}</Text>
-        </View>
-        <Text style={styles.statLabel}>In Progress</Text>
-        <View style={styles.statProgress}>
-          <Text style={styles.statPercentage}>
-            {stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0}%
-          </Text>
-        </View>
-      </LinearGradient>
-
-      <View style={[styles.statCard, styles.statCardInfo]}>
-        <View style={styles.statTopRow}>
-          <View style={[styles.statIconContainer, styles.statIconInfo]}>
-            <Ionicons name="trending-up" size={18} color="#7C3AED" />
-          </View>
-          <Text style={styles.statValue}>{stats.applicants}</Text>
-        </View>
-        <Text style={styles.statLabel}>Total Applicants</Text>
-        <View style={styles.statProgress}>
-          <View style={styles.rateTrend}>
-            <Ionicons 
-              name={stats.applicantsPerTask >= 2 ? "arrow-up" : "arrow-down"} 
-              size={12} 
-              color={stats.applicantsPerTask >= 2 ? "#16A34A" : "#DC2626"} 
-            />
-            <Text style={[
-              styles.trendText,
-              { color: stats.applicantsPerTask >= 2 ? "#16A34A" : "#DC2626" }
-            ]}>
-              {stats.applicantsPerTask >= 2 ? "Good" : "Low"} interest
-            </Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  </View>
-);
-
-export default function PostedTasksScreen() {
+export default function AllTasksScreen() {
   const { user } = useContext(AuthContext);
-  const { postedTasks, loading, loadPostedTasks,deleteTask } = useContext(PosterContext);
+  const { postedTasks, loading: postedLoading, loadPostedTasks, deleteTask } = useContext(PosterContext);
+  const { serviceRequests, loading: requestsLoading, loadServiceRequests, deleteServiceRequest } = useContext(ServiceRequestContext);
   
+  const [activeTab, setActiveTab] = useState(TABS.POSTED);
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -122,53 +36,77 @@ export default function PostedTasksScreen() {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Deletion status tracking
-  const [deletingTasks, setDeletingTasks] = useState({}); // Track deleting tasks by ID
+  const [deletingTasks, setDeletingTasks] = useState({});
   const [deletionError, setDeletionError] = useState(null);
 
-  // Load tasks on component mount
+  const loading = activeTab === TABS.POSTED ? postedLoading : requestsLoading;
+  const currentTasks = activeTab === TABS.POSTED ? postedTasks : serviceRequests;
+
   useEffect(() => {
-    loadPostedTasks();
+    loadData();
   }, []);
 
-  // Pull to refresh
+  const loadData = async () => {
+    await loadPostedTasks();
+    await loadServiceRequests();
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadPostedTasks();
+    await loadData();
     setRefreshing(false);
   };
 
-  // Clear deletion error when modal closes or component unmounts
-  useEffect(() => {
-    if (!actionModalVisible) {
-      setDeletionError(null);
-    }
-  }, [actionModalVisible]);
-
-  // Calculate statistics for the client
   const calculateStats = () => {
-    const total = postedTasks?.length || 0;
+    const postedTasksData = postedTasks || [];
+    const requestedTasksData = serviceRequests || [];
     
-    const completed = postedTasks?.filter(task => 
+    const totalPosted = postedTasksData.length;
+    const totalRequested = requestedTasksData.length;
+    const total = totalPosted + totalRequested;
+    
+    const completedPosted = postedTasksData.filter(task => 
       ['Completed', 'Closed'].includes(task.status)
-    ).length || 0;
+    ).length;
     
-    const inProgress = postedTasks?.filter(task => 
+    const completedRequested = requestedTasksData.filter(task => 
+      ['Completed', 'Closed'].includes(task.status)
+    ).length;
+    
+    const completed = completedPosted + completedRequested;
+    
+    const inProgressPosted = postedTasksData.filter(task => 
       ['In-progress', 'Assigned', 'Review'].includes(task.status)
-    ).length || 0;
+    ).length;
     
-    const open = postedTasks?.filter(task => 
-      ['Open', 'Pending'].includes(task.status)
-    ).length || 0;
+    const inProgressRequested = requestedTasksData.filter(task => 
+      ['In-progress', 'Assigned', 'Review', 'Booked'].includes(task.status)
+    ).length;
+    
+    const inProgress = inProgressPosted + inProgressRequested;
 
-    // Calculate total applicants across all tasks
-    const totalApplicants = postedTasks?.reduce((sum, task) => {
+    const openPosted = postedTasksData.filter(task => 
+      ['Open', 'Pending'].includes(task.status)
+    ).length;
+    
+    const openRequested = requestedTasksData.filter(task => 
+      ['Pending', 'Quoted'].includes(task.status)
+    ).length;
+    
+    const open = openPosted + openRequested;
+
+    // Calculate total applicants/offers
+    const postedApplicants = postedTasksData.reduce((sum, task) => {
       const applicantsCount = task.applicants?.length || 0;
       const bidsCount = task.bids?.length || 0;
       return sum + Math.max(applicantsCount, bidsCount);
-    }, 0) || 0;
+    }, 0);
 
+    const requestedOffers = requestedTasksData.reduce((sum, task) => {
+      return sum + (task.offers?.length || 0);
+    }, 0);
+
+    const totalApplicants = postedApplicants + requestedOffers;
     const applicantsPerTask = total > 0 ? (totalApplicants / total).toFixed(1) : 0;
 
     return { 
@@ -177,14 +115,15 @@ export default function PostedTasksScreen() {
       inProgress, 
       open,
       applicants: totalApplicants,
-      applicantsPerTask: parseFloat(applicantsPerTask)
+      applicantsPerTask: parseFloat(applicantsPerTask),
+      posted: totalPosted,
+      requested: totalRequested
     };
   };
 
   const stats = calculateStats();
 
-  const deleteATask = async (taskId, taskTitle) => {
-    // Set deleting status for this specific task
+  const deleteATask = async (taskId, taskTitle, isRequested = false) => {
     setDeletingTasks(prev => ({ ...prev, [taskId]: true }));
     setDeletionError(null);
 
@@ -206,13 +145,17 @@ export default function PostedTasksScreen() {
             style: "destructive",
             onPress: async () => {
               try {
-                const res = await deleteTask(taskId);
+                let res;
+                if (isRequested) {
+                  res = await deleteServiceRequest(taskId);
+                } else {
+                  res = await deleteTask(taskId);
+                }
+                
                 if (res.status === 200) {
                   Alert.alert("Success", "Task deleted successfully!", [{ text: "OK" }]);
                   resolve({ success: true, data: res.data });
-                  
-                  // Refresh the task list
-                  await loadPostedTasks();
+                  await loadData();
                 } else {
                   throw new Error(res.data?.message || 'Failed to delete task');
                 }
@@ -226,7 +169,6 @@ export default function PostedTasksScreen() {
                 Alert.alert("Delete Failed", errorMessage, [{ text: "OK" }]);
                 resolve({ success: false, error: errorMessage });
               } finally {
-                // Clear deleting status regardless of outcome
                 setDeletingTasks(prev => ({ ...prev, [taskId]: false }));
               }
             }
@@ -236,62 +178,45 @@ export default function PostedTasksScreen() {
     });
   };
 
-  // Filter tasks based on selected filters and search
-  const filteredTasks = (postedTasks || []).filter(task => {
-    // Status filter
-    if (selectedFilter !== 'All') {
-      if (selectedFilter === 'Open' && !['Open', 'Pending'].includes(task.status)) return false;
-      if (selectedFilter === 'Assigned' && task.status !== 'Assigned') return false;
-      if (selectedFilter === 'In Progress' && task.status !== 'In-progress') return false;
-      if (selectedFilter === 'Review' && task.status !== 'Review') return false;
-      if (selectedFilter === 'Completed' && !['Completed', 'Closed'].includes(task.status)) return false;
-    }
-
-    // Category filter
-    if (selectedCategory !== 'All' && task.category !== selectedCategory) {
-      return false;
-    }
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      const matchesTitle = task.title?.toLowerCase().includes(query);
-      const matchesDescription = task.description?.toLowerCase().includes(query);
-      const matchesCategory = task.category?.toLowerCase().includes(query);
-      const matchesSkills = task.skillsRequired?.some(skill => 
-        skill.toLowerCase().includes(query)
-      );
-      
-      if (!matchesTitle && !matchesDescription && !matchesCategory && !matchesSkills) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  const handleActionPress = (task) => {
-    setSelectedTask(task);
+  const handleActionPress = (task, isRequested = false) => {
+    setSelectedTask({ ...task, isRequested });
     setActionModalVisible(true);
   };
 
   const handleActionSelect = async (action) => {
     if (!selectedTask) return;
     
+    const { isRequested, ...task } = selectedTask;
+    
     if (action === 'View Details') {
-      navigate('ClientTaskDetail', { taskId: selectedTask._id });
+      if (isRequested) {
+        navigate('ServiceRequestDetail', { requestId: task._id });
+      } else {
+        navigate('ClientTaskDetail', { taskId: task._id });
+      }
     } else if (action === 'Edit') {
-      navigate('EditTask', { taskId: selectedTask._id, task: selectedTask });
+      if (isRequested) {
+        navigate('EditServiceRequest', { requestId: task._id, request: task });
+      } else {
+        navigate('EditTask', { taskId: task._id, task: task });
+      }
     } else if (action === 'View Applicants') {
-      navigate('TaskApplicants', { 
-        taskId: selectedTask._id,
-        applicants: selectedTask.applicants || []
-      });
+      if (isRequested) {
+        navigate('ServiceRequestOffers', {
+              requestId: task._id,
+              offers: task.offers || [],
+              request: task
+            });
+      } else {
+        navigate('TaskApplicants', { 
+          taskId: task._id,
+          applicants: task.applicants || []
+        });
+      }
     } else if (action === 'Delete') {
-      const result = await deleteATask(selectedTask._id, selectedTask.title);
-      
+      const result = await deleteATask(task._id, task.title || task.description, isRequested);
       if (result.success) {
-        loadPostedTasks(); 
+        loadData();
       }
     }
     
@@ -306,234 +231,6 @@ export default function PostedTasksScreen() {
 
   const hasActiveFilters = selectedFilter !== 'All' || selectedCategory !== 'All' || searchQuery.trim();
 
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown date';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Get priority based on deadline or other factors
-  const getTaskPriority = (task) => {
-    if (!task.deadline) return 'Medium';
-    
-    const deadline = new Date(task.deadline);
-    const now = new Date();
-    const daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-    
-    if (daysUntilDeadline < 2) return 'High';
-    if (daysUntilDeadline < 7) return 'Medium';
-    return 'Low';
-  };
-
-  const renderTaskItem = ({ item }) => {
-    // Check if this task is currently being deleted
-    const isDeleting = deletingTasks[item._id];
-    
-    // Map your actual statuses to display names and colors
-    const getStatusDisplay = (status) => {
-      switch(status) {
-        case 'Completed':
-          return { display: 'Completed', color: '#4CAF50' };
-        case 'Closed':
-          return { display: 'Closed', color: '#666' };
-        case 'In-progress':
-          return { display: 'In Progress', color: '#2196F3' };
-        case 'Assigned':
-          return { display: 'Assigned', color: '#FF9800' };
-        case 'Review':
-          return { display: 'Review', color: '#9C27B0' };
-        case 'Open':
-          return { display: 'Open', color: '#4CAF50' };
-        case 'Pending':
-          return { display: 'Pending', color: '#F44336' };
-        default:
-          return { display: status, color: '#666' };
-      }
-    };
-
-    const statusDisplay = getStatusDisplay(item.status);
-    const priority = getTaskPriority(item);
-
-    // Get icon and background color based on status
-    const getStatusStyles = (status) => {
-      switch(status) {
-        case 'Completed':
-        case 'Closed':
-          return { 
-            iconBg: '#e8f5e8', 
-            iconName: 'checkmark-circle',
-            iconColor: '#4CAF50'
-          };
-        case 'In-progress':
-          return { 
-            iconBg: '#e8f4fd', 
-            iconName: 'play-circle',
-            iconColor: '#2196F3'
-          };
-        case 'Assigned':
-          return { 
-            iconBg: '#fff3e0', 
-            iconName: 'person-circle',
-            iconColor: '#FF9800'
-          };
-        case 'Review':
-          return { 
-            iconBg: '#f3e5f5', 
-            iconName: 'alert-circle',
-            iconColor: '#9C27B0'
-          };
-        case 'Open':
-          return { 
-            iconBg: '#e8f5e8', 
-            iconName: 'briefcase',
-            iconColor: '#4CAF50'
-          };
-        case 'Pending':
-          return { 
-            iconBg: '#ffebee', 
-            iconName: 'time-outline',
-            iconColor: '#F44336'
-          };
-        default:
-          return { 
-            iconBg: '#f0f0f0', 
-            iconName: 'briefcase',
-            iconColor: '#666'
-          };
-      }
-    };
-
-    const statusStyles = getStatusStyles(item.status);
-
-    // Get assigned tasker name
-    const getAssignedTo = (task) => {
-      if (!task.assignedTo) return 'Not Assigned';
-      
-      if (typeof task.assignedTo === 'object' && task.assignedTo.name) {
-        return task.assignedTo.name;
-      }
-      
-      return 'Assigned';
-    };
-
-    // Get applicant count
-    const getApplicantCount = (task) => {
-      const applicantsCount = task.applicants?.length || 0;
-      const bidsCount = task.bids?.length || 0;
-      return Math.max(applicantsCount, bidsCount);
-    };
-
-    return (
-      <TouchableOpacity 
-        style={[
-          styles.taskCard,
-          isDeleting && styles.deletingTaskCard
-        ]}
-        onPress={() => !isDeleting && navigate('ClientTaskDetail', { taskId: item._id })}
-        disabled={isDeleting}
-      >
-        {isDeleting && (
-          <View style={styles.deletingOverlay}>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.deletingText}>Deleting...</Text>
-          </View>
-        )}
-        
-        <View style={styles.taskHeader}>
-          <View style={styles.titleContainer}>
-            <View style={[styles.iconCircle, { backgroundColor: statusStyles.iconBg }]}>
-              <Ionicons 
-                name={statusStyles.iconName} 
-                size={20} 
-                color={statusStyles.iconColor} 
-              />
-            </View>
-            <Text style={[
-              styles.taskTitle,
-              isDeleting && styles.deletingText
-            ]}>{item.title}</Text>
-          </View>
-
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={() => !isDeleting && handleActionPress(item)}
-            disabled={isDeleting}
-          >
-            {isDeleting ? (
-              <ActivityIndicator size="small" color="#666" />
-            ) : (
-              <Entypo name="dots-three-vertical" size={18} color="#666" />
-            )}
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.taskDetails}>
-          <View style={styles.detailRow}>
-            <View style={[styles.statusBadge, { backgroundColor: statusDisplay.color }]}>
-              <Text style={styles.statusText}>{statusDisplay.display}</Text>
-            </View>
-            <View style={styles.priorityBadge}>
-              <Text style={styles.priorityText}>{priority} Priority</Text>
-            </View>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <View style={styles.detailItem}>
-              <Ionicons name="people-outline" size={16} color="#666" />
-              <Text style={styles.detailText}>{getApplicantCount(item)} applicant(s)</Text>
-            </View>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <View style={styles.detailItem}>
-              <Ionicons name="person-outline" size={16} color="#666" />
-              <Text style={styles.detailText}>Assigned to: {getAssignedTo(item)}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.descriptionText} numberOfLines={2}>
-              {item.description}
-            </Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <View style={styles.detailItem}>
-              <Ionicons name="calendar-outline" size={16} color="#666" />
-              <Text style={styles.detailText}>
-                Posted: {formatDate(item.createdAt)}
-                {item.deadline && ` • Due: ${formatDate(item.deadline)}`}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.detailRow}>
-            <View style={styles.detailItem}>
-              <Ionicons name="location-outline" size={16} color="#666" />
-              <Text style={styles.detailText}>
-                {item.locationType === 'remote' ? 'Remote' : 'On-site'} • {item.category}
-              </Text>
-            </View>
-          </View>
-
-          {item.budget ? (
-      <View style={styles.detailRow}>
-       <View style={styles.detailItem}>
-         <Ionicons name="cash-outline" size={16} color="#666" />
-         <Text style={styles.detailText}>Budget: GHS {item.budget}</Text>
-       </View>
-      </View>
-       ) : null}
-        </View>
-      </TouchableOpacity>
-     );
-  };
-
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -546,6 +243,28 @@ export default function PostedTasksScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <Header title="My Tasks" />
+      
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === TABS.POSTED && styles.activeTab]}
+          onPress={() => setActiveTab(TABS.POSTED)}
+        >
+          <Text style={[styles.tabText, activeTab === TABS.POSTED && styles.activeTabText]}>
+            Posted Tasks ({stats.posted})
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === TABS.REQUESTED && styles.activeTab]}
+          onPress={() => setActiveTab(TABS.REQUESTED)}
+        >
+          <Text style={[styles.tabText, activeTab === TABS.REQUESTED && styles.activeTabText]}>
+            Requested ({stats.requested})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView 
         style={styles.scrollView}
         refreshControl={
@@ -553,16 +272,13 @@ export default function PostedTasksScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Statistics Section */}
-        <StatsOverview stats={stats} />
-
         {/* Search Section */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search tasks by title, description, skills..."
+              placeholder={`Search ${activeTab === TABS.POSTED ? 'posted tasks' : 'service requests'}...`}
               value={searchQuery}
               onChangeText={setSearchQuery}
               returnKeyType="search"
@@ -589,202 +305,69 @@ export default function PostedTasksScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Expanded Filters */}
+        {/* Statistics Section */}
+        <StatsOverview stats={stats} />
+
+        {/* Filters */}
         {showFilters && (
-          <View style={styles.filtersExpanded}>
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Status</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.filterChips}>
-                  {statusFilters.map((filter) => (
-                    <TouchableOpacity 
-                      key={filter}
-                      style={[
-                        styles.filterChip,
-                        selectedFilter === filter && styles.filterChipActive
-                      ]}
-                      onPress={() => setSelectedFilter(filter)}
-                    >
-                      <Text style={[
-                        styles.filterChipText,
-                        selectedFilter === filter && styles.filterChipTextActive
-                      ]}>
-                        {filter}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-
-            <View style={styles.filterRow}>
-              <Text style={styles.filterLabel}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.filterChips}>
-                  {categoryFilters.map((category) => (
-                    <TouchableOpacity 
-                      key={category}
-                      style={[
-                        styles.filterChip,
-                        selectedCategory === category && styles.filterChipActive
-                      ]}
-                      onPress={() => setSelectedCategory(category)}
-                    >
-                      <Text style={[
-                        styles.filterChipText,
-                        selectedCategory === category && styles.filterChipTextActive
-                      ]}>
-                        {category}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-
-            {hasActiveFilters && (
-              <TouchableOpacity style={styles.clearFiltersButton} onPress={clearFilters}>
-                <Ionicons name="close" size={16} color="#6366F1" />
-                <Text style={styles.clearFiltersText}>Clear All Filters</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <TaskFilters
+            selectedFilter={selectedFilter}
+            setSelectedFilter={setSelectedFilter}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            hasActiveFilters={hasActiveFilters}
+            clearFilters={clearFilters}
+            taskType={activeTab}
+          />
         )}
 
-        {/* Results Header */}
-     <View style={styles.resultsHeader}>
-  <Text style={styles.resultsTitle}>
-    {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Found
-  </Text>
-  {hasActiveFilters && (
-    <View style={styles.filtersContainer}>
-      {(selectedFilter !== 'All' || selectedCategory !== 'All' || searchQuery) && (
-        <Text style={styles.resultsSubtitle}>
-          {selectedFilter !== 'All' && `• ${selectedFilter} `}
-          {selectedCategory !== 'All' && `• ${selectedCategory} `}
-          {searchQuery && `• "${searchQuery}"`}
-        </Text>
-      )}
-    </View>
-  )}
-</View>
-
-        {/* Tasks List */}
-        <View style={styles.tasksSection}>
-          {filteredTasks.length > 0 ? (
-            <FlatList
-              data={filteredTasks}
-              renderItem={renderTaskItem}
-              keyExtractor={item => item._id || item.id}
-              scrollEnabled={false}
-              style={styles.tasksList}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="document-text-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyStateText}>
-                {postedTasks?.length === 0 ? 'No tasks posted yet' : 'No tasks match your search'}
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                {postedTasks?.length === 0 ? 'Create your first task to get started!' : 'Try adjusting your filters or search terms'}
-              </Text>
-              {hasActiveFilters && (
-                <TouchableOpacity style={styles.clearEmptyFilters} onPress={clearFilters}>
-                  <Text style={styles.clearEmptyFiltersText}>Clear Filters</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
+        {/* Task List */}
+        <TaskList
+          tasks={currentTasks}
+          activeTab={activeTab}
+          selectedFilter={selectedFilter}
+          selectedCategory={selectedCategory}
+          searchQuery={searchQuery}
+          deletingTasks={deletingTasks}
+          onTaskPress={(task) => {
+            if (activeTab === TABS.POSTED) {
+              navigate('ClientTaskDetail', { taskId: task._id });
+            } else {
+              navigate('ServiceRequestDetail', { requestId: task._id });
+            }
+          }}
+          onActionPress={(task) => handleActionPress(task, activeTab === TABS.REQUESTED)}
+          onRefresh={loadData}
+        />
       </ScrollView>
       
       {/* Add Button */}
       <TouchableOpacity 
         style={styles.addButton}
-        onPress={() => navigate('CreateTask')}
+        onPress={() => {
+          if (activeTab === TABS.POSTED) {
+            navigate('CreateTask');
+          } else {
+            navigate('Taskers');
+          }
+        }}
       >
         <Entypo name="plus" size={30} color="white" />
       </TouchableOpacity>
       
       {/* Action Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <TaskActionModal
         visible={actionModalVisible}
-        onRequestClose={() => setActionModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Task Actions</Text>
-              <TouchableOpacity onPress={() => setActionModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Show deletion error if any */}
-            {deletionError && (
-              <View style={styles.errorBanner}>
-                <Ionicons name="warning-outline" size={18} color="#FFF" />
-                <Text style={styles.errorText}>Deletion failed: {deletionError}</Text>
-              </View>
-            )}
-            
-            <View style={styles.actionList}>
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() => handleActionSelect('View Details')}
-              >
-                <Ionicons name="eye-outline" size={22} color="#2196F3" />
-                <Text style={styles.actionText}>View Details</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() =>navigate('EditTask',{taskId:selectedTask._id,task:selectedTask})}
-              >
-                <Ionicons name="create-outline" size={22} color="#FF9800" />
-                <Text style={styles.actionText}>Edit Task</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionItem}
-                onPress={() => navigate('TaskApplicants', { 
-                      taskId:selectedTask._id,
-                      task: selectedTask,
-                      assignedTo:selectedTask.assignedTo || null
-                    })}
-              >
-                <Ionicons name="people-outline" size={22} color="#9C27B0" />
-                <Text style={styles.actionText}>View Applicants</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[
-                  styles.actionItem,
-                  deletingTasks[selectedTask?._id] && styles.disabledAction
-                ]}
-                onPress={() => handleActionSelect('Delete')}
-                disabled={deletingTasks[selectedTask?._id]}
-              >
-                {deletingTasks[selectedTask?._id] ? (
-                  <ActivityIndicator size="small" color="#F44336" />
-                ) : (
-                  <Ionicons name="trash-outline" size={22} color="#F44336" />
-                )}
-                <Text style={[styles.actionText, styles.deleteText]}>
-                  {deletingTasks[selectedTask?._id] ? 'Deleting...' : 'Delete Task'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setActionModalVisible(false)}
+        task={selectedTask}
+        onActionSelect={handleActionSelect}
+        deletionError={deletionError}
+        deletingTasks={deletingTasks}
+      />
     </SafeAreaView>
   );
 }
 
-// Updated styles with statistics and search components
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -794,156 +377,36 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-
-  // Statistics Section Styles
-  statsSection: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  statsHeader: {
-    marginBottom: 16,
-  },
-  statsTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  statsSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  statsGrid: {
+  tabContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '47%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
   },
-  statCardPrimary: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4F46E5',
-  },
-  statCardSuccess: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#16A34A',
-  },
-  statCardWarning: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#CA8A04',
-  },
-  statCardInfo: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#7C3AED',
-  },
-  statTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statIconPrimary: {
-    backgroundColor: '#EEF2FF',
-  },
-  statIconSuccess: {
-    backgroundColor: '#DCFCE7',
-  },
-  statIconWarning: {
-    backgroundColor: '#FEF9C3',
-  },
-  statIconInfo: {
-    backgroundColor: '#F3E8FF',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    textAlign: 'right',
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  statProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  progressBar: {
+  tab: {
     flex: 1,
-    height: 6,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarTotal: {
-    backgroundColor: '#E5E7EB',
-  },
-  progressBarSuccess: {
-    backgroundColor: '#D1FAE5',
-  },
-  progressBarWarning: {
-    backgroundColor: '#FEF3C7',
-  },
-  progressBarInfo: {
-    backgroundColor: '#EDE9FE',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#4F46E5',
-  },
-  statPercentage: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#374151',
-    minWidth: 30,
-    textAlign: 'right',
-  },
-  rateTrend: {
-    flexDirection: 'row',
+    paddingVertical: 12,
     alignItems: 'center',
-    gap: 4,
+    borderRadius: 8,
   },
-  trendText: {
-    fontSize: 11,
+  activeTab: {
+    backgroundColor: '#6366F1',
+  },
+  tabText: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#666',
   },
-
-  // Search and Filter Styles
+  activeTabText: {
+    color: '#FFFFFF',
+  },
   searchSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -959,7 +422,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    marginBottom:10,
+    marginBottom: 10,
   },
   searchIcon: {
     marginRight: 8,
@@ -987,217 +450,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#6366F1',
   },
-  filtersExpanded: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  filterRow: {
-    marginBottom: 16,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  filterChips: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  filterChipActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
-  },
-  filterChipText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: '#FFFFFF',
-  },
-  clearFiltersButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 6,
-    gap: 4,
-  },
-  clearFiltersText: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  resultsHeader: {
-  marginBottom: 24,
-  padding: 16,
-  backgroundColor: '#FFFFFF',
-  borderRadius: 12,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.08,
-  shadowRadius: 4,
-  elevation: 2,
-  borderLeftWidth: 4,
-  borderLeftColor: '#6366F1',
-},
-resultsTitle: {
-  fontSize: 20,
-  fontWeight: '700',
-  color: '#1E293B',
-  marginBottom: 6,
-  letterSpacing: -0.3,
-},
-filtersContainer: {
-  paddingTop: 8,
-  borderTopWidth: 1,
-  borderTopColor: '#F1F5F9',
-},
-resultsSubtitle: {
-  fontSize: 14,
-  color: '#64748B',
-  fontWeight: '500',
-  lineHeight: 18,
-},
-  tasksSection: {
-    flex: 1,
-    marginBottom: 20,
-  },
-  tasksList: {
-    flex: 1,
-  },
-  taskCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  taskTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  iconCircle: {
-    height: 40,
-    width: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  menuButton: {
-    padding: 4,
-  },
-  taskDetails: {
-    // Details container
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  priorityBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-  },
-  priorityText: {
-    color: '#666',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 6,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#555',
-    lineHeight: 20,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    color: '#666',
-    marginTop: 16,
-    fontWeight: '500',
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  clearEmptyFilters: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#6366F1',
-    borderRadius: 8,
-  },
-  clearEmptyFiltersText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   addButton: {
     position: 'absolute',
     bottom: 20,
@@ -1210,99 +462,5 @@ resultsSubtitle: {
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
-  },
- modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  justifyContent: 'flex-end',
-},
-modalContent: {
-  backgroundColor: 'white',
-  borderTopLeftRadius: 20,
-  borderTopRightRadius: 20,
-  padding: 20,
-  maxHeight: height * 0.6,
-  // Add shadow for depth
-  shadowColor: '#000',
-  shadowOffset: {
-    width: 0,
-    height: -2,
-  },
-  shadowOpacity: 0.25,
-  shadowRadius: 3.84,
-  elevation: 5,
-  // Smooth entrance animation
-  transform: [{ translateY: 0 }],
-},
-modalHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 20,
-  paddingBottom: 10,
-  borderBottomWidth: 1,
-  borderBottomColor: '#f0f0f0',
-},
-modalTitle: {
-  fontSize: 18,
-  fontWeight: '600',
-  color: '#333',
-},
-  actionList: {
-    // Action list container
-  },
-  actionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  actionText: {
-    fontSize: 16,
-    marginLeft: 15,
-    color: '#333',
-  },
-  deleteText: {
-    color: '#F44336',
-  },
-  deletingTaskCard: {
-    opacity: 0.6,
-  },
-  deletingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  deletingText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  disabledAction: {
-    opacity: 0.5,
-  },
-  errorBanner: {
-    backgroundColor: '#F44336',
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  errorText: {
-    color: '#FFFFFF',
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
   },
 });

@@ -227,7 +227,7 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 2,
   },
   tabButton: {
     flex: 1,
@@ -272,10 +272,7 @@ export const styles = StyleSheet.create({
   },
 
   // Enhanced Section Cards
-  tabContent: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
+  
   sectionCard: {
     backgroundColor: '#FFFFFF',
     padding: 20,
@@ -284,7 +281,9 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    width:'100%'
+    
+   
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -583,7 +582,7 @@ export const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+   
   },
   safetyList: {
     gap: 8,
@@ -703,6 +702,27 @@ export const styles = StyleSheet.create({
     gap: 8,
     minWidth: 160,
   },
+  // Add these styles to your styles/tasker/AppliedTaskDetailScreen.Styles.js
+
+fabMessage: {
+  backgroundColor: '#3B82F6',
+  borderColor: '#1D4ED8',
+  borderWidth: 2,
+  shadowColor: '#3B82F6',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.3,
+  shadowRadius: 8,
+  elevation: 6,
+},
+fabMessageText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '700',
+  marginLeft: 8,
+  textShadowColor: 'rgba(0, 0, 0, 0.2)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 2,
+},
   fabSubmit: {
     backgroundColor: '#8B5CF6',
   },

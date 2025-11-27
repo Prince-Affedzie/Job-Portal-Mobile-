@@ -390,7 +390,7 @@ const ClientProfileScreen = ({ navigation }) => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Ionicons name="business-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Business Information</Text>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
           </View>
           <View style={styles.sectionContent}>
             <ProfileField

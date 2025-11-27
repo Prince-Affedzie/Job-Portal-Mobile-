@@ -12,6 +12,7 @@ import {
   Alert,
   RefreshControl,
   FlatList,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -25,7 +26,6 @@ import { navigate } from '../../services/navigationService';
 import { triggerPayment } from '../../services/PaymentServices';
 import { usePaystack } from "react-native-paystack-webview";
 import LoadingIndicator from '../../component/common/LoadingIndicator'
-
 
 const { width } = Dimensions.get('window');
 
@@ -113,147 +113,292 @@ export default function ApplicantsScreen({ route }) {
     await loadData();
   };
 
+  // Process full payment for assignment
+  const processFullPayment = async (applicantId, applicantName) => {
+    try {
+      setProcessingAction(applicantId);
+
+      let paymentSuccess = true;
+      if (!isAlreadyFunded) {
+        paymentSuccess = await triggerPayment({
+          popup,
+          email: user.email,
+          phone: user.phone,
+          amount: task.budget,
+          taskId: task._id,
+          beneficiary: applicantId,
+        });
+        
+        if (!paymentSuccess) {
+          Alert.alert(
+            "Payment Not Completed",
+            "Task assignment has been cancelled since payment was not successful."
+          );
+          return; 
+        }
+      }
+
+      const response = await assignApplicantToTask(taskId, applicantId);
+      if (response.status === 200) {
+        const successMessage = isAlreadyFunded 
+          ? `Task reassigned to ${applicantName}!` 
+          : `Task assigned to ${applicantName}!`;
+        Alert.alert("Success", successMessage);
+
+        await Promise.all([
+          fetchTaskData(),
+          loadData()
+        ]);
+
+        setData(prev => prev.map(item => ({
+          ...item,
+          isAssigned: item._id === applicantId,
+        })));
+
+      } else {
+        throw new Error(response.data?.message || "Assignment failed");
+      }
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Error assigning task";
+      Alert.alert("Error", errorMessage);
+      console.error(error);
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  // Process full payment for bid acceptance
+  const processFullBidPayment = async (bidder, amount, bidId, bidderName) => {
+    try {
+      setProcessingAction(bidId);
+
+      let paymentSuccess = true;
+      if (!isAlreadyFunded) {
+        paymentSuccess = await triggerPayment({
+          popup,
+          email: user.email,
+          phone: user.phone,
+          amount: amount,
+          taskId: task._id,
+          beneficiary: bidder._id,
+        });
+        
+        if (!paymentSuccess) {
+          Alert.alert(
+            "Payment Not Completed",
+            "Task assignment has been cancelled since payment was not successful."
+          );
+          return; 
+        }
+      }
+
+      const response = await acceptBidForTask(taskId, bidId);
+      if (response.status === 200) {
+        const successMessage = isAlreadyFunded 
+          ? `Task reassigned to ${bidderName}!` 
+          : `Bid accepted from ${bidderName}!`;
+        Alert.alert("Success", successMessage);
+        
+        await Promise.all([
+          fetchTaskData(),
+          loadData()
+        ]);
+
+        setData(prev => prev.map(item => ({
+          ...item,
+          isAccepted: item._id === bidId
+        })));
+
+      } else {
+        throw new Error(response.data?.message || 'Bid acceptance failed');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error || 'Error accepting bid';
+      Alert.alert("Error", errorMessage);
+      console.error(error);
+    } finally {
+      setProcessingAction(null);
+    }
+  };
+
+  // Handle assignment with payment flexibility
   const handleAssign = async (applicantId, applicantName) => {
     const alertTitle = isAlreadyFunded ? "Reassign Task" : "Assign Task & Make Payment";
-    const alertMessage = isAlreadyFunded 
-      ? `You can reassign this task to ${applicantName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
-      : `Assigning ${applicantName} will initiate a secure payment of GH₵${task.budget} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
+    
+    if (isAlreadyFunded) {
+      // If already funded, just reassign
+      Alert.alert(
+        alertTitle,
+        `You can reassign this task to ${applicantName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Reassign",
+            style: "default",
+            onPress: () => processFullPayment(applicantId, applicantName)
+          },
+        ]
+      );
+    } else {
+      // Ask about payment capability
+      Alert.alert(
+        alertTitle,
+        `Assigning ${applicantName} requires payment of GH₵${task.budget}.
+        \nYour payment of ₵${task.budget} will be securely held in escrow and only released to ${applicantName || 'the tasker'}
+once you both confirm the task is completed satisfactorily.`,
+        // \n\nCan you pay the full amount now?
+        [
+          { text: "Cancel", style: "cancel" },
+          /*{
+            text: "Can't Pay In Full?",
+            style: "default",
+            onPress: () => handleCantPayFull(applicantId, applicantName, task.budget, 'assignment')
+          },*/
+          {
+            text: "Yes, Pay Full Amount",
+            style: "default",
+            onPress: () => processFullPayment(applicantId, applicantName)
+          },
+          
+        ]
+      );
+    }
+  };
 
+  // Handle bid acceptance with payment flexibility
+  const handleAcceptBid = async (bidder, amount, bidId, bidderName) => {
+    const alertTitle = isAlreadyFunded ? "Reassign Task" : "Accept Bid";
+    
+    if (isAlreadyFunded) {
+      // If already funded, just reassign
+      Alert.alert(
+        alertTitle,
+        `You can reassign this task to ${bidderName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Reassign", 
+            style: "default",
+            onPress: () => processFullBidPayment(bidder, amount, bidId, bidderName)
+          }
+        ]
+      );
+    } else {
+      // Ask about payment capability
+      Alert.alert(
+        alertTitle,
+        `Accepting ${bidderName}'s bid requires payment of GH₵${amount}.
+        \nYour payment of ₵${amount} will be securely held in escrow and only released to ${bidderName || 'the tasker'}
+once you both confirm the task is completed satisfactorily.`,
+        //\n\nCan you pay the full amount now?
+        [
+          { text: "Cancel", style: "cancel" },
+          /*{
+            text: "Can't Pay In Full?",
+            style: "default",
+            onPress: () => handleCantPayFull(bidder._id, bidderName, amount, 'bid', bidId)
+          },*/
+          { 
+            text: "Yes, Pay Full Amount", 
+            style: "default",
+            onPress: () => processFullBidPayment(bidder, amount, bidId, bidderName)
+          },
+          
+        ]
+      );
+    }
+  };
+
+  // Handle "can't pay full" scenario
+  const handleCantPayFull = (userId, userName, amount, type, bidId = null) => {
+    const taskType = type === 'assignment' ? 'assignment' : 'bid acceptance';
+    
     Alert.alert(
-      alertTitle,
-      alertMessage,
+      "Need Payment Assistance?",
+      `We understand that GH₵${amount} might be a large amount to pay at once.\n\nOur support team can help you arrange a partial payment plan with ${userName}.\n\nWe'll contact the tasker on your behalf and if they agree, you can pay 50% now and 50% later.`,
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: isAlreadyFunded ? "Reassign" : "Continue",
-          style: "default",
-          onPress: async () => {
-            try {
-              setProcessingAction(applicantId);
-
-              let paymentSuccess = true;
-              if (!isAlreadyFunded) {
-                paymentSuccess = await triggerPayment({
-                  popup,
-                  email: user.email,
-                  phone: user.phone,
-                  amount: task.budget,
-                  taskId: task._id,
-                  beneficiary: applicantId,
-                });
-                
-                if (!paymentSuccess) {
-                  Alert.alert(
-                    "Payment Not Completed",
-                    "Task assignment has been cancelled since payment was not successful."
-                  );
-                  return; 
-                }
-              }
-
-              const response = await assignApplicantToTask(taskId, applicantId);
-              if (response.status === 200) {
-                const successMessage = isAlreadyFunded 
-                  ? `Task reassigned to ${applicantName}!` 
-                  : `Task assigned to ${applicantName}!`;
-                Alert.alert("Success", successMessage);
-
-                await Promise.all([
-                  fetchTaskData(),
-                  loadData()
-                ]);
-
-                setData(prev => prev.map(item => ({
-                  ...item,
-                  isAssigned: item._id === applicantId,
-                })));
-
-              } else {
-                throw new Error(response.data?.message || "Assignment failed");
-              }
-            } catch (error) {
-              const errorMessage =
-                error.response?.data?.message ||
-                error.response?.data?.error ||
-                "Error assigning task";
-              Alert.alert("Error", errorMessage);
-              console.error(error);
-            } finally {
-              setProcessingAction(null);
-            }
-          },
-        },
+        { 
+          text: "Contact Support", 
+          onPress: () => contactSupportForPaymentPlan(userId, userName, amount, type, bidId)
+        }
       ]
     );
   };
 
-  const handleAcceptBid = async (bidder, amount, bidId, bidderName) => {
-    const alertTitle = isAlreadyFunded ? "Reassign Task" : "Accept Bid";
-    const alertMessage = isAlreadyFunded 
-      ? `You can reassign this task to ${bidderName} since the current tasker hasn't accepted yet. The task is already funded, so no additional payment is required.\n\nDo you want to continue?`
-      : `Assigning ${bidderName} will initiate a secure payment of GH₵${amount} that will be held in escrow until the work is completed and approved.\n\nDo you want to continue?`;
+  // Contact support for payment plan
+  const contactSupportForPaymentPlan = (userId, userName, amount, type, bidId = null) => {
+    const taskType = type === 'assignment' ? 'assignment' : 'bid acceptance';
+    const supportMessage = `Hello, I need help with a payment plan for task "${task?.title}".\n\nTaskId: ${task?._id}\nTasker: ${userName}\nAmount: GH₵${amount}\nTask Type: ${taskType}\nI'd like to pay 50% now and 50% later.\n\nPlease contact the tasker on my behalf.`;
 
     Alert.alert(
-      alertTitle,
-      alertMessage,
+      "Contact Support",
+      "Choose how you'd like to contact our support team:",
       [
         { text: "Cancel", style: "cancel" },
         { 
-          text: isAlreadyFunded ? "Reassign" : "Accept Bid", 
-          style: "default",
-          onPress: async () => {
-            try {
-              setProcessingAction(bidId);
+          text: "Call Support", 
+          onPress: () => callSupport(supportMessage)
+        },
+        { 
+          text: "WhatsApp Support", 
+          onPress: () => whatsAppSupport(supportMessage)
+        },
+        { 
+          text: "Email Support", 
+          onPress: () => emailSupport(supportMessage)
+        }
+      ]
+    );
+  };
 
-              let paymentSuccess = true;
-              if (!isAlreadyFunded) {
-                paymentSuccess = await triggerPayment({
-                  popup,
-                  email: user.email,
-                  phone: user.phone,
-                  amount: amount,
-                  taskId: task._id,
-                  beneficiary: bidder._id,
-                });
-                
-                if (!paymentSuccess) {
-                  Alert.alert(
-                    "Payment Not Completed",
-                    "Task assignment has been cancelled since payment was not successful."
-                  );
-                  return; 
-                }
-              }
+  // Support contact methods
+  const callSupport = (message) => {
+    Alert.alert(
+      "Call Support",
+      "Call our support team at +233505671577 to discuss your payment plan.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Call Now", 
+          onPress: () => Linking.openURL('tel:+233505671577')
+        }
+      ]
+    );
+  };
 
-              const response = await acceptBidForTask(taskId, bidId);
-              if (response.status === 200) {
-                const successMessage = isAlreadyFunded 
-                  ? `Task reassigned to ${bidderName}!` 
-                  : `Bid accepted from ${bidderName}!`;
-                Alert.alert("Success", successMessage);
-                
-                await Promise.all([
-                  fetchTaskData(),
-                  loadData()
-                ]);
+  const whatsAppSupport = (message) => {
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/233505671577?text=${encodedMessage}`;
+    
+    Alert.alert(
+      "WhatsApp Support",
+      "Open WhatsApp to message our support team about your payment plan?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Open WhatsApp", 
+          onPress: () => Linking.openURL(whatsappUrl)
+        }
+      ]
+    );
+  };
 
-                setData(prev => prev.map(item => ({
-                  ...item,
-                  isAccepted: item._id === bidId
-                })));
-
-              } else {
-                throw new Error(response.data?.message || 'Bid acceptance failed');
-              }
-            } catch (error) {
-              const errorMessage = error.response?.data?.message ||
-                error.response?.data?.error || 'Error accepting bid';
-              Alert.alert("Error", errorMessage);
-              console.error(error);
-            } finally {
-              setProcessingAction(null);
-            }
-          }
+  const emailSupport = (message) => {
+    const emailUrl = `mailto:workaflow726@gmail.com?subject=Payment Plan Request - Task: ${task?.title}&body=${encodeURIComponent(message)}`;
+    
+    Alert.alert(
+      "Email Support",
+      "Send an email to our support team about your payment plan?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Send Email", 
+          onPress: () => Linking.openURL(emailUrl)
         }
       ]
     );
@@ -396,10 +541,7 @@ export default function ApplicantsScreen({ route }) {
             <View style={styles.ratingContainer}>
               <Ionicons name="star" size={14} color="#F59E0B" />
               <Text style={styles.ratingText}>
-                {applicant.rating ? parseFloat(applicant.rating.toFixed(1)) : 'N/A'}
-              </Text>
-              <Text style={styles.completedText}>
-                • {applicant.completedTasks || 0} completed
+                {applicant.rating ? parseFloat(applicant.rating.toFixed(1)) : 'N/A'} rating
               </Text>
             </View>
           </View>
@@ -417,31 +559,6 @@ export default function ApplicantsScreen({ route }) {
           </LinearGradient>
         </View>
       </View>
-
-      {/* Stats Grid 
-      <View style={styles.statsGrid}>
-        <View style={styles.statItem}>
-          <Ionicons name="trending-up" size={16} color="#10B981" />
-          <Text style={styles.statValue}>
-            {applicant.completionRate ? `${applicant.completionRate}%` : 'N/A'}
-          </Text>
-          <Text style={styles.statLabel}>Success</Text>
-        </View>
-        
-        <View style={styles.statItem}>
-          <Ionicons name="time" size={16} color="#8B5CF6" />
-          <Text style={styles.statValue}>{applicant.experience || 0}</Text>
-          <Text style={styles.statLabel}>Exp</Text>
-        </View>
-        
-        <View style={styles.statItem}>
-          <Ionicons name="calendar" size={16} color="#F59E0B" />
-          <Text style={styles.statValue}>
-            {applicant.appliedDate ? moment(applicant.appliedDate).fromNow() : 'Recently'}
-          </Text>
-          <Text style={styles.statLabel}>Applied</Text>
-        </View>
-      </View>*/}
 
       {/* Skills */}
       {applicant.skills && applicant.skills.length > 0 && (
@@ -485,14 +602,6 @@ export default function ApplicantsScreen({ route }) {
           <Ionicons name="person-outline" size={16} color="#6366F1" />
           <Text style={styles.secondaryButtonText}>View Profile</Text>
         </TouchableOpacity>
-
-        {/*<TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => handleChat(applicant)}
-        >
-          <Ionicons name="chatbubble-outline" size={16} color="#8B5CF6" />
-          <Text style={styles.secondaryButtonText}>Chat</Text>
-        </TouchableOpacity>*/}
 
         {!applicant.isAssigned ? (
           <TouchableOpacity 
@@ -562,10 +671,7 @@ export default function ApplicantsScreen({ route }) {
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={14} color="#F59E0B" />
                 <Text style={styles.ratingText}>
-                  {bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'}
-                </Text>
-                <Text style={styles.completedText}>
-                  • {bidder?.completedTasks || 0} completed
+                  {bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'} rating
                 </Text>
               </View>
             </View>
@@ -609,23 +715,6 @@ export default function ApplicantsScreen({ route }) {
           )}
         </View>
 
-        {/* Stats Grid 
-        <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
-            <Ionicons name="trending-up" size={16} color="#10B981" />
-            <Text style={styles.statValue}>
-              {bidder?.completionRate ? `${bidder.completionRate}%` : 'N/A'}
-            </Text>
-            <Text style={styles.statLabel}>Success</Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Ionicons name="time" size={16} color="#8B5CF6" />
-            <Text style={styles.statValue}>{bidder?.experience || 0}</Text>
-            <Text style={styles.statLabel}>Exp</Text>
-          </View>
-        </View>*/}
-
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity 
@@ -635,14 +724,6 @@ export default function ApplicantsScreen({ route }) {
             <Ionicons name="person-outline" size={16} color="#6366F1" />
             <Text style={styles.secondaryButtonText}>Profile</Text>
           </TouchableOpacity>
-
-          {/*<TouchableOpacity 
-            style={[styles.actionButton, styles.secondaryButton]}
-            onPress={() => handleChat(bid)}
-          >
-            <Ionicons name="chatbubble-outline" size={16} color="#8B5CF6" />
-            <Text style={styles.secondaryButtonText}>Chat</Text>
-          </TouchableOpacity>*/}
 
           {!bid.isAccepted ? (
             <TouchableOpacity 
@@ -766,7 +847,7 @@ export default function ApplicantsScreen({ route }) {
       >
         {/* Task Info Header */}
         <LinearGradient
-          colors={['#6366F1', '#4F46E5']}
+          colors={['#1A1F3B', '#2D1B69']}
           style={styles.taskHeader}
         >
           <View style={styles.taskInfo}>
@@ -879,6 +960,8 @@ export default function ApplicantsScreen({ route }) {
     </SafeAreaView>
   );
 }
+
+// ... (keep all the same styles from the previous code)
 
 const styles = StyleSheet.create({
   container: {

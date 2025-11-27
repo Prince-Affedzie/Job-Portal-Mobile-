@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import {getTasksNearby, getMiniTasks, getYourAppliedMiniTasks } from "../api/miniTaskApi";
 import {applyToMiniTask,bidOnMiniTask} from "../api/miniTaskApi";
+import {getAvailableRequests} from "../api/serviceRequestAPI/taskerAPI"
 import { AuthContext } from "./AuthContext";
 import {viewAllEarnings} from "../api/paymentApi"
 
@@ -10,9 +11,12 @@ export const TaskerProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
   const [availableTasks, setAvailableTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
+  const [bids, setBids] = useState([])
   const [tasksNearby,setTaskNearby] = useState([])
   const [loading, setLoading] = useState(false);
   const [earnings,setEarnings] = useState([])
+  const [serviceRequests, setServiceRequests] = useState([])
+  const [applications,setApplications] = useState([])
 
   // Load available tasks for tasker
   const loadAvailableTasks = async (params) => {
@@ -49,6 +53,8 @@ export const TaskerProvider = ({ children }) => {
     setLoading(true);
     try {
       const res = await getYourAppliedMiniTasks();
+      setBids(res.data.bids)
+      setApplications(res.data.applications)
       return res
     } catch (err) {
       console.log("Failed to fetch my tasks:", err);
@@ -57,6 +63,22 @@ export const TaskerProvider = ({ children }) => {
     }
   };
 
+
+  const loadTaskerServiceRequests = async()=>{
+       if (!token) return;
+        setLoading(true);
+     try {
+      const res = await getAvailableRequests();
+      setServiceRequests(res.data)
+      setServiceRequests(res.data)
+      return res
+
+    } catch (err) {
+      console.log("Failed to fetch my tasks:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
   // Apply for a task
   const applyTask = async (taskId) => {
     try {
@@ -107,14 +129,18 @@ export const TaskerProvider = ({ children }) => {
         availableTasks,
         tasksNearby,
         myTasks,
+        applications,
+        bids,
+        serviceRequests,
         loading,
         loadAvailableTasks,
         loadNearbyTasks,
         loadMyTasks,
+        loadTaskerServiceRequests,
         applyTask,
         bidOnTask,
         getAllEarnings,
-        earnings
+        earnings,
       }}
     >
       {children}

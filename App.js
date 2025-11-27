@@ -1,10 +1,11 @@
-import React from "react";
+import React, {useEffect} from "react";
 import Constants from "expo-constants";
 import { AuthProvider } from "./context/AuthContext";
 import { TaskerProvider } from "./context/TaskerContext";
 import { PosterProvider } from "./context/PosterContext";
 import {TaskerOnboardingProvider} from "./context/TaskerOnboardingContext"
 import { NotificationProvider } from "./context/NotificationContext";
+import {ServiceRequestProvider} from "./context/ServiceRequestContext"
 import RootNavigator from "./navigation/RootNavigator";
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import NotificationPopup from "./component/common/NotificationPopUp";
@@ -20,6 +21,19 @@ function PushNotificationInitializer() {
 }
 
 export default function App() {
+
+ /* useEffect(() => {
+    (async () => {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,  // ← LOUDSPEAKER
+        staysActiveInBackground: false,
+      });
+      console.log('AUDIO MODE: LOUDSPEAKER FORCED');
+    })();
+  }, []);*/
   
   return (
      <SafeAreaProvider>
@@ -28,6 +42,7 @@ export default function App() {
       <TaskerProvider>
         <PosterProvider>
           <NotificationProvider>
+            <ServiceRequestProvider>
           <PaystackProvider debug 
            publicKey={PayStack_Public_Key}
            currency="GHS"
@@ -37,6 +52,7 @@ export default function App() {
            <NotificationPopup/>
           <RootNavigator />
           </PaystackProvider>
+          </ServiceRequestProvider>
           </NotificationProvider>
         </PosterProvider>
       </TaskerProvider>

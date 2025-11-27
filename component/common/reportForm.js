@@ -66,7 +66,7 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
   // Initialize form data when modal opens
   useEffect(() => {
     if (isVisible && task && user) {
-      const againstUser = task.assignedTo === user._id ? task.employer?._id : task.assignedTo || task.assignedTo._id;
+      const againstUser = task.assignedTo || task.assignedTasker._id === user._id ? task.employer?._id || task.client : task.assignedTo || task.assignedTasker._id;
       setFormData({
         against: againstUser || '',
         taskId: task._id || '',

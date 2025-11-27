@@ -6,7 +6,7 @@ import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
 import TaskDetailsScreen from "../screens/tasker/TaskDetails";
 import TaskerDashboard from "../screens/tasker/DashboardScreen";
 import TaskerProfileScreen from "../screens/tasker/ProfileScreen";
-import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
+import TaskerTasksScreen from "../screens/tasker/MyTasksScreen";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import AppliedTaskDetailsScreen from "../screens/tasker/AppliedTaskDetailScreen";
 import SubmissionsScreen from "../screens/tasker/TaskSubmissionsScreen";
@@ -16,6 +16,8 @@ import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 import HelpSupportScreen from "../screens/tasker/SupportScreen"
 import EarningScreen from "../screens/tasker/EarningsScreen";
 import PaymentMethodScreen from '../screens/tasker/PaymentMethodScreen'
+import WorkSamplesScreen from '../screens/tasker/WorkSamplesScreen'
+import ServiceRequestDetailScreen from '../screens/tasker/ServiceRequestDetailScreen'
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -35,9 +37,11 @@ function TaskerStackNavigator() {
       <Stack.Screen name="Submissions" component={SubmissionsScreen} />
       <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
       <Stack.Screen name="EarningScreen" component={EarningScreen} />
-      <Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />
+      {/*<Stack.Screen name="NotificationsScreen" component={NotificationsScreen} />*/}
       <Stack.Screen name="SupportScreen" component={HelpSupportScreen} />
       <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
+      <Stack.Screen name="WorkSamples" component={WorkSamplesScreen} />
+      <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
@@ -98,7 +102,7 @@ function TaskerTabs() {
 
         <Tab.Screen
           name="MyTasks"
-          component={MyApplicationsScreen}
+          component={TaskerTasksScreen}
           options={{
             tabBarLabel: 'My Tasks',
             tabBarIcon: ({ color, size, focused }) => (

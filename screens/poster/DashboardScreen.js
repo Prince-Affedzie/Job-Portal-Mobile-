@@ -163,8 +163,16 @@ export default function DashboardScreen() {
             title: 'Post New Task',
             icon: 'add-circle-outline',
             color: ['#6366F1', '#4F46E5'],
-            description: 'Create a new task',
+            description: 'Post publicly and get multiple bids from taskers',
             screen: 'CreateTask'
+        },
+        {
+            id: 'request',
+            title: 'Request Service',
+            icon: 'document-text-outline',
+            color: ['#F59E0B', '#D97706'],
+            description: 'Directly request service from trusted taskers for private work',
+            screen: 'Taskers',
         },
         {
             id: 'my-tasks',
@@ -174,18 +182,10 @@ export default function DashboardScreen() {
             description: 'View all your tasks',
             screen: 'PostedTasks'
         },
-        {
-            id: 'review',
-            title: 'Review Work',
-            icon: 'document-text-outline',
-            color: ['#F59E0B', '#D97706'],
-            description: `${dashboardStats.awaitingMyReview} to review`,
-            screen: 'PostedTasks',
-            params: { filter: 'review' }
-        },
+        
         {
             id: 'payments',
-            title: 'Payments',
+            title: 'My Spendings',
             icon: 'wallet-outline',
             color: ['#8B5CF6', '#7C3AED'],
             description: `GHS ${dashboardStats.inEscrow} in escrow`,
@@ -453,7 +453,7 @@ export default function DashboardScreen() {
                         </View>
                         <Text style={styles.emptyTitle}>Ready to get started?</Text>
                         <Text style={styles.emptyDescription}>
-                            Post your first task and find skilled professionals to help you get things done
+                            Post your first task you need help with and find skilled professionals to help you get things done
                         </Text>
                         <TouchableOpacity 
                             style={styles.primaryButton}

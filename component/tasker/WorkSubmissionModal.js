@@ -32,6 +32,7 @@ const WorkSubmissionModal = ({
   isVisible,
   onClose,
   taskId,
+  type,
   task,
   onSubmissionSuccess,
 }) => {
@@ -307,7 +308,7 @@ const WorkSubmissionModal = ({
       if (fileKeys.length === 0) {
         throw new Error('All file uploads failed');
       }
-      await submitWorkForReview(taskId, {
+      await submitWorkForReview(taskId,type, {
         message: message.trim(),
         fileKeys,
       });

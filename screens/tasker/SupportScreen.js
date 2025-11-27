@@ -96,7 +96,7 @@ const HelpSupportScreen = () => {
       title: "Contact Support",
       description: "Get help from our team",
       icon: "chatbubble-ellipses",
-      action: ()=>Linking.openURL(`https://wa.me/233597802841`),
+      action: ()=>Linking.openURL(`https://wa.me/233505671577`),
       color: "#667eea"
     },
     /*{
@@ -131,19 +131,19 @@ const HelpSupportScreen = () => {
   };
 
   const handleContactSupport = () => {
-    const email = "support@novaedgeapp.com";
+    const email = "workaflow726@gmail.com";
     Linking.openURL(`mailto:${email}?subject=Support Request&body=Hello, I need help with...`);
   };
 
   const handleCallSupport = () => {
     Alert.alert(
       "Contact Support",
-      "Call our support team at +233597802841",
+      "Call our support team at 0505671577",
       [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Call", 
-          onPress: () => Linking.openURL('tel:+233597802841'),
+          onPress: () => Linking.openURL('tel:+233505671577'),
           style: "default"
         }
       ]
@@ -152,7 +152,7 @@ const HelpSupportScreen = () => {
 
   const handleWhatsAppSupport = () => {
     const message = "Hello, I need help with...";
-    Linking.openURL(`https://wa.me/233597802841?text=${encodeURIComponent(message)}`);
+    Linking.openURL(`https://wa.me/233505671577?text=${encodeURIComponent(message)}`);
   };
 
   const filteredFaqs = faqs.filter(faq => {
@@ -181,9 +181,9 @@ const HelpSupportScreen = () => {
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          <View style={styles.heroIcon}>
+          {/*<View style={styles.heroIcon}>
             <Ionicons name="help-buoy" size={32} color="#667eea" />
-          </View>
+          </View>*/}
           <Text style={styles.heroTitle}>How can we help you?</Text>
           <Text style={styles.heroSubtitle}>
             Find instant answers, contact support, or explore resources

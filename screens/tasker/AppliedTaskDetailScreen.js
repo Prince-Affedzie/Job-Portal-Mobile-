@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  
   Image,
   ActivityIndicator,
   TouchableWithoutFeedback,
@@ -28,6 +27,7 @@ import { navigate } from '../../services/navigationService';
 import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
+import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
 
 const { width } = Dimensions.get('window');
 
@@ -89,6 +89,30 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
       Alert.alert('Error', 'Failed to load task details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // NEW: Message Client Functionality
+  const handleMessageClient = async () => {
+    try {
+      if (!task?.employer?._id) {
+        Alert.alert('Error', 'Client information not available');
+        return;
+      }
+
+      const res = await startOrGetChatRoom({ 
+        userId2: task.employer._id, 
+        jobId: task._id 
+      });
+      
+      if (res.status === 200) {
+        const roomId = res.data._id;
+        toggleFAB(); // Close FAB menu
+        navigate('ChatWindow', { roomId: roomId });
+      }
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      Alert.alert('Error', 'Failed to start chat with client');
     }
   };
 
@@ -234,6 +258,9 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const canSubmitWork = isAssignedToUser && !isTaskCompleted;
   const hasTaskerMarkedDone = task?.markedDoneByTasker === true;
   const canMarkAsDone = isAssignedToUser && !isTaskCompleted && !hasTaskerMarkedDone;
+
+  // NEW: Check if task is assigned and not completed
+  const canMessageClient = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;
 
   // NEW: Get requirements function
   const getRequirements = () => {
@@ -394,7 +421,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
         {/* Enhanced Header Section */}
         <View style={styles.heroCard}>
           <LinearGradient
-            colors={['#6366F1', '#4F46E5']}
+            colors={['#1A1F3B', '#2D1B69']}
             style={styles.heroGradient}
           >
             <View style={styles.heroHeader}>
@@ -486,7 +513,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
             isActive={activeTab === 'task'}
             onPress={() => setActiveTab('task')}
           />
-          {isAssignedToUser && (
+          {isAssignedToUser && !isTaskCompleted && (
             <TabButton
               title="Employer"
               icon="business-outline"
@@ -515,6 +542,9 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                 </View>
                 <Text style={styles.taskDescription}>{task.description}</Text>
 
+                  {/* Media Display - NEW SECTION */}
+                  <MediaDisplay media={task.media} />
+                  
                 {/* Key Information Grid */}
                 <View style={styles.infoGrid}>
                   <InfoCard
@@ -575,7 +605,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
             </>
           )}
 
-          {activeTab === 'employer' && isAssignedToUser && task.employer && (
+          {activeTab === 'employer' && isAssignedToUser && task.employer && !isTaskCompleted && (
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
                 <Ionicons name="person" size={22} color="#6366F1" />
@@ -770,6 +800,27 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
         >
           {isAssignedToUser && task?.assignmentAccepted && (
             <>
+              {/* NEW: Message Client Button */}
+              {canMessageClient && (
+                <Animated.View style={{
+                  transform: [{
+                    translateY: fabAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [25, 0]
+                    })
+                  }],
+                  opacity: fabAnimation
+                }}>
+                  <TouchableOpacity 
+                    style={[styles.fabActionButton, styles.fabMessage]}
+                    onPress={handleMessageClient}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
+                    <Text style={styles.fabActionText}>Message Client</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+
               {canSubmitWork && (
                 <Animated.View style={{
                   transform: [{
@@ -848,7 +899,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                 }}>
                   <View style={[styles.fabActionButton, styles.fabCompleteDisabled]}>
                     <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                    <Text style={styles.fabActionText}>Already Marked Done</Text>
+                    <Text style={styles.fabActionText}> Marked Done</Text>
                   </View>
                 </Animated.View>
               ) : canMarkAsDone ? (
@@ -998,6 +1049,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
         onClose={() => setShowWorkModal(false)}
         taskId={task._id}
         task={task}
+        type='miniTask'
         onSubmissionSuccess={() => {
           loadTaskDetails();
         }}

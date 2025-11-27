@@ -14,3 +14,10 @@ export const getMicroTaskBids = (id) =>
 
 export const acceptBidForTask = (taskId, bidId) =>
   API.put(`/api/h1/v2/accept_bid/mini_task/${taskId}/${bidId}`);
+
+export const searchTaskers = (searchData)=>
+  API.post('/api/h1/v2/taskers-search',searchData)
+
+
+export const GetTaskers = ()=>
+  API.get('/api/h1/v2/taskers-get')

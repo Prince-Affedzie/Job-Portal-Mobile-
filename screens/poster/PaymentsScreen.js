@@ -13,28 +13,103 @@ import {
   StatusBar,
   Animated,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
 import { AuthContext } from '../../context/AuthContext';
-import { getClientPayments } from '../../api/paymentApi'; // You'll need to create this API
-import LoadingIndicator from '../../component/common/LoadingIndicator'
-
+import { getClientPayments } from '../../api/paymentApi';
+import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width, height } = Dimensions.get('window');
+
+// Move getStatusConfig to the main component scope
+const getStatusConfig = (status) => {
+  const configs = {
+    'released': { color: '#10B981', icon: 'checkmark-circle', label: 'Paid', bgColor: '#F0FDF4' },
+    'in_escrow': { color: '#F59E0B', icon: 'lock-closed', label: 'In Escrow', bgColor: '#FFFBEB' },
+    'pending': { color: '#6366F1', icon: 'time', label: 'Processing', bgColor: '#EEF2FF' },
+    'refunded': { color: '#8B5CF6', icon: 'arrow-back', label: 'Refunded', bgColor: '#FAF5FF' },
+    'failed': { color: '#EF4444', icon: 'close-circle', label: 'Failed', bgColor: '#FEF2F2' }
+  };
+  return configs[status] || configs.pending;
+};
 
 const PaymentsScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState('month'); // 'all', 'week', 'month', 'year'
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'released', 'in_escrow', 'pending', 'refunded'
+  const [timeRange, setTimeRange] = useState('month');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [fadeAnim] = useState(new Animated.Value(0));
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [statsAnim] = useState(new Animated.Value(0));
+  const [referenceModalVisible, setReferenceModalVisible] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+
+  // Enhanced task title resolver
+  const getTaskTitle = (payment) => {
+    // Check if taskId exists and has data
+    if (!payment.taskId) {
+      return 'Task Payment';
+    }
+
+    // Handle different task schema structures
+    const task = payment.taskId;
+    
+    // Priority 1: Check for title field
+    if (task.title && task.title.trim() !== '') {
+      return task.title;
+    }
+    
+    // Priority 2: Check for type field
+    if (task.type && task.type.trim() !== '') {
+      // Format the type to be more readable
+      const formattedType = task.type
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      return formattedType;
+    }
+    
+    // Priority 3: Check for description (first few words)
+    if (task.description && task.description.trim() !== '') {
+      const words = task.description.split(' ').slice(0, 5).join(' ');
+      return words + (task.description.split(' ').length > 5 ? '...' : '');
+    }
+    
+    // Priority 4: Check for category
+    if (task.category && task.category.trim() !== '') {
+      return `${task.category} Task`;
+    }
+    
+    // Fallback: Use payment reference or generic title
+    if (payment.reference) {
+      return `Payment ${payment.reference.substring(0, 8)}...`;
+    }
+    
+    return 'Task Payment';
+  };
+
+  // Enhanced reference display with modal support
+  const getPaymentReference = (payment) => {
+    return payment.reference || payment.transactionRef || payment._id || 'N/A';
+  };
+
+  const showReferenceModal = (payment) => {
+    setSelectedPayment(payment);
+    setReferenceModalVisible(true);
+  };
+
+  const copyToClipboard = async (text) => {
+    // You'll need to install and use expo-clipboard
+    // import * as Clipboard from 'expo-clipboard';
+    // await Clipboard.setStringAsync(text);
+    Alert.alert('Copied!', 'Payment reference copied to clipboard');
+  };
 
   const filterPaymentsByTimeRange = (payments, range) => {
     const now = moment();
@@ -61,7 +136,7 @@ const PaymentsScreen = ({ navigation }) => {
     return payments.filter(payment => payment.status === status);
   };
 
-   const getPreviousPeriod = (currentRange) => {
+  const getPreviousPeriod = (currentRange) => {
     switch (currentRange) {
       case 'week': return 'week';
       case 'month': return 'month';
@@ -124,11 +199,9 @@ const PaymentsScreen = ({ navigation }) => {
     };
   }, [payments, timeRange, statusFilter]);
 
- 
-
   const fetchPayments = async () => {
     try {
-      const response = await getClientPayments(); // API to get payments where user is initiator
+      const response = await getClientPayments();
       setPayments(response.data || []);
     } catch (error) {
       console.error('Error fetching payments:', error);
@@ -194,83 +267,181 @@ const PaymentsScreen = ({ navigation }) => {
   );
 
   const PaymentItem = ({ payment, index }) => {
-  const getStatusConfig = (status) => {
-    const configs = {
-      'released': { color: '#10B981', icon: 'checkmark-circle', label: 'Paid', bgColor: '#F0FDF4' },
-      'in_escrow': { color: '#F59E0B', icon: 'lock-closed', label: 'In Escrow', bgColor: '#FFFBEB' },
-      'pending': { color: '#6366F1', icon: 'time', label: 'Processing', bgColor: '#EEF2FF' },
-      'refunded': { color: '#8B5CF6', icon: 'arrow-back', label: 'Refunded', bgColor: '#FAF5FF' },
-      'failed': { color: '#EF4444', icon: 'close-circle', label: 'Failed', bgColor: '#FEF2F2' }
-    };
-    return configs[status] || configs.pending;
+    const statusConfig = getStatusConfig(payment.status);
+    const taskTitle = getTaskTitle(payment);
+    const paymentReference = getPaymentReference(payment);
+
+    return (
+      <Animated.View 
+        style={[
+          styles.paymentItem,
+          {
+            opacity: fadeAnim,
+            transform: [{
+              translateX: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0]
+              })
+            }]
+          }
+        ]}
+      >
+        <TouchableOpacity  onPress={() => showReferenceModal(payment)} style={styles.paymentLeft}>
+          <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
+            <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
+          </View>
+          
+          <View style={styles.paymentInfo}>
+            <Text style={styles.paymentTask} numberOfLines={2}>
+              {taskTitle}
+            </Text>
+            
+            <View style={styles.paymentMeta}>
+              <Text style={styles.paymentDate} numberOfLines={1}>
+                {moment(payment.createdAt).format('MMM D, YYYY • h:mm A')}
+              </Text>
+            </View>
+            
+            <View style={styles.paymentDetails}>
+              <Text style={styles.paymentMethod} numberOfLines={1}>
+                {getPaymentMethodLabel(payment.paymentMethod)}
+              </Text>
+              
+              {/* Enhanced Reference Display */}
+              <TouchableOpacity 
+                style={styles.referenceContainer}
+                onPress={() => showReferenceModal(payment)}
+              >
+                <Ionicons name="document-text" size={12} color="#6B7280" />
+                <Text style={styles.transactionRef} numberOfLines={1}>
+                  Ref: {paymentReference.substring(0, 12)}...
+                </Text>
+                <Ionicons name="expand" size={10} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity >
+        
+        <View style={styles.paymentRight}>
+          <Text style={[
+            styles.amountText,
+            payment.status === 'refunded' && styles.amountRefunded,
+            payment.status === 'failed' && styles.amountFailed
+          ]}>
+            {payment.status === 'refunded' ? '+' : '-'}₵{payment.amount.toLocaleString()}
+          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+            <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
+            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+              {statusConfig.label}
+            </Text>
+          </View>
+        </View>
+      </Animated.View>
+    );
   };
 
-  const statusConfig = getStatusConfig(payment.status);
+ const ReferenceModal = () => {
+  if (!selectedPayment) return null;
+
+  const statusConfig = getStatusConfig(selectedPayment.status);
 
   return (
-    <Animated.View 
-      style={[
-        styles.paymentItem,
-        {
-          opacity: fadeAnim,
-          transform: [{
-            translateX: fadeAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [50, 0]
-            })
-          }]
-        }
-      ]}
+    <Modal
+      visible={referenceModalVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setReferenceModalVisible(false)}
     >
-      <View style={styles.paymentLeft}>
-        <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
-          <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
-        </View>
-        
-        <View style={styles.paymentInfo}>
-          <Text style={styles.paymentTask} numberOfLines={1}>
-            {payment.taskId?.title || `Task Payment`}
-          </Text>
-          
-          {/* Date and Status in separate rows to prevent overlapping */}
-          <View style={styles.paymentMeta}>
-            <Text style={styles.paymentDate} numberOfLines={1}>
-              {moment(payment.createdAt).format('MMM D, YYYY • h:mm A')}
-            </Text>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Payment Details</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setReferenceModalVisible(false)}
+            >
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
           </View>
-          
-          <View style={styles.paymentDetails}>
-            <Text style={styles.paymentMethod} numberOfLines={1}>
-              {getPaymentMethodLabel(payment.paymentMethod)}
-            </Text>
-            {payment.transactionRef && (
-              <Text style={styles.transactionRef} numberOfLines={1}>
-                Ref: {payment.transactionRef}
+
+          {/* Scrollable Body - This is the key fix */}
+          <ScrollView
+            style={styles.modalBody}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
+            <View style={styles.detailRow}>
+              <Text style={styles.referenceLabel}>Reference ID:</Text>
+              <Text style={styles.referenceValue}>
+                {getPaymentReference(selectedPayment)}
               </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.referenceLabel}>Task:</Text>
+              <Text style={styles.referenceValue}>
+                {getTaskTitle(selectedPayment)}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.referenceLabel}>Amount:</Text>
+              <Text style={[styles.referenceValue, styles.amountHighlight]}>
+                ₵{selectedPayment.amount.toLocaleString()}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.referenceLabel}>Date:</Text>
+              <Text style={styles.referenceValue}>
+                {moment(selectedPayment.createdAt).format('MMMM D, YYYY [at] h:mm A')}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.referenceLabel}>Status:</Text>
+              <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
+                <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                  {statusConfig.label}
+                </Text>
+              </View>
+            </View>
+
+            {selectedPayment.paymentMethod && (
+              <View style={styles.detailRow}>
+                <Text style={styles.referenceLabel}>Payment Method:</Text>
+                <Text style={styles.referenceValue}>
+                  {getPaymentMethodLabel(selectedPayment.paymentMethod)}
+                </Text>
+              </View>
             )}
+          </ScrollView>
+
+          {/* Fixed Bottom Actions */}
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={() => copyToClipboard(getPaymentReference(selectedPayment))}
+            >
+              {/*<Ionicons name="copy-outline" size={18} color="#FFFFFF" />*/}
+              <Text style={styles.copyButtonText}>Copy Reference</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setReferenceModalVisible(false)}
+            >
+              <Text style={styles.closeModalText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
-      
-      <View style={styles.paymentRight}>
-        <Text style={[
-          styles.amountText,
-          payment.status === 'refunded' && styles.amountRefunded,
-          payment.status === 'failed' && styles.amountFailed
-        ]}>
-          {payment.status === 'refunded' ? '+' : '-'}₵{payment.amount.toLocaleString()}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-          <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
-          <Text style={[styles.statusText, { color: statusConfig.color }]}>
-            {statusConfig.label}
-          </Text>
-        </View>
-      </View>
-    </Animated.View>
+    </Modal>
   );
 };
-
   const getPaymentMethodLabel = (method) => {
     const labels = {
       'mobile_money': 'Mobile Money',
@@ -432,9 +603,6 @@ const PaymentsScreen = ({ navigation }) => {
           </View>
         </LinearGradient>
 
-        {/* Time Range Filter 
-        <TimeRangeFilter />*/}
-
         {/* Status Filter */}
         <StatusFilter />
 
@@ -563,18 +731,11 @@ const PaymentsScreen = ({ navigation }) => {
         {/* Bottom Padding */}
         <View style={styles.bottomPadding} />
       </Animated.ScrollView>
+
+      {/* Reference Modal */}
+      <ReferenceModal />
     </SafeAreaView>
   );
-};
-
-const getTimeRangeLabel = (range) => {
-  const labels = {
-    'week': 'This Week',
-    'month': 'This Month',
-    'year': 'This Year',
-    'all': 'All Time'
-  };
-  return labels[range] || range;
 };
 
 const styles = StyleSheet.create({
@@ -821,7 +982,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -859,102 +1020,112 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   paymentItem: {
-  flexDirection: 'row',
-  alignItems: 'flex-start', // Changed from 'center' to 'flex-start'
-  justifyContent: 'space-between',
-  padding: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: '#F8FAFC',
-  minHeight: 80, // Ensure minimum height
-},
-paymentLeft: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',
-  flex: 1,
-  marginRight: 12, // Add some space between left and right sections
-},
-paymentIcon: {
-  width: 40,
-  height: 40,
-  borderRadius: 12,
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginRight: 12,
-  flexShrink: 0, // Prevent icon from shrinking
-},
-paymentInfo: {
-  flex: 1,
-  minWidth: 0, // Important for text truncation to work
-},
-paymentTask: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#1F2937',
-  marginBottom: 4,
-},
-paymentMeta: {
-  marginBottom: 2,
-},
-paymentDate: {
-  fontSize: 12,
-  color: '#6B7280',
-  fontWeight: '500',
-},
-paymentDetails: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-  flexWrap: 'wrap', // Allow wrapping if needed
-},
-paymentMethod: {
-  fontSize: 11,
-  color: '#9CA3AF',
-  fontWeight: '500',
-  backgroundColor: '#F3F4F6',
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  borderRadius: 4,
-  flexShrink: 1,
-},
-transactionRef: {
-  fontSize: 10,
-  color: '#9CA3AF',
-  fontFamily: 'monospace',
-  flexShrink: 1,
-},
-paymentRight: {
-  alignItems: 'flex-end',
-  minWidth: 90, // Ensure enough width for amount and status
-  flexShrink: 0, // Prevent right section from shrinking
-},
-amountText: {
-  fontSize: 16,
-  fontWeight: '800',
-  color: '#EF4444',
-  marginBottom: 6,
-  textAlign: 'right',
-},
-amountRefunded: {
-  color: '#10B981',
-},
-amountFailed: {
-  color: '#6B7280',
-  textDecorationLine: 'line-through',
-},
-statusBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 6,
-  gap: 4,
-  alignSelf: 'flex-start', // Ensure badge doesn't stretch
-},
-statusText: {
-  fontSize: 10,
-  fontWeight: '700',
-  textTransform: 'uppercase',
-},
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+    minHeight: 80,
+  },
+  paymentLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    marginRight: 12,
+  },
+  paymentIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    flexShrink: 0,
+  },
+  paymentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  paymentTask: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  paymentMeta: {
+    marginBottom: 2,
+  },
+  paymentDate: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  paymentDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  paymentMethod: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    flexShrink: 1,
+  },
+  referenceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  transactionRef: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontFamily: 'monospace',
+  },
+  paymentRight: {
+    alignItems: 'flex-end',
+    minWidth: 90,
+    flexShrink: 0,
+  },
+  amountText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#EF4444',
+    marginBottom: 6,
+    textAlign: 'right',
+  },
+  amountRefunded: {
+    color: '#10B981',
+  },
+  amountFailed: {
+    color: '#6B7280',
+    textDecorationLine: 'line-through',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+    alignSelf: 'flex-start',
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
   emptyState: {
     alignItems: 'center',
     padding: 40,
@@ -993,7 +1164,7 @@ statusText: {
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 2,
   },
   infoHeader: {
     flexDirection: 'row',
@@ -1034,6 +1205,140 @@ statusText: {
   bottomPadding: {
     height: 30,
   },
+  // Updated Modal Styles for better sizing
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+
+modalContent: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 20,
+  width: '105%',
+  maxWidth: 420,
+   paddingHorizontal: 20,
+  maxHeight: height * 0.85, // Limits height to 85% of screen
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.25,
+  shadowRadius: 20,
+  elevation: 15,
+},
+
+modalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: 20,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+  backgroundColor: '#FFFFFF',
+},
+
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#1F2937',
+},
+
+closeButton: {
+  padding: 4,
+},
+
+modalBody: {
+  flexGrow: 1,
+  maxHeight: height * 0.55, // Ensures body can scroll if needed
+},
+
+detailRow: {
+  marginBottom: 16,
+},
+
+referenceLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#6B7280',
+  marginBottom: 6,
+},
+
+referenceValue: {
+  fontSize: 15,
+  color: '#1F2937',
+  fontWeight: '500',
+  backgroundColor: '#F9FAFB',
+  padding: 14,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+
+amountHighlight: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: '#EF4444',
+},
+
+statusBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 8,
+  gap: 6,
+},
+
+statusText: {
+  fontSize: 11,
+  fontWeight: '700',
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+},
+
+modalActions: {
+  flexDirection: 'row',
+  gap: 12,
+  padding: 20,
+  borderTopWidth: 1,
+  borderTopColor: '#F3F4F6',
+  backgroundColor: '#FFFFFF',
+},
+
+copyButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#6366F1',
+  paddingVertical: 14,
+  borderRadius: 12,
+  gap: 8,
+},
+
+copyButtonText: {
+  color: '#FFFFFF',
+  fontWeight: '600',
+  fontSize: 15,
+},
+
+closeModalButton: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: '#F3F4F6',
+  paddingVertical: 14,
+  borderRadius: 12,
+},
+
+closeModalText: {
+  color: '#6B7280',
+  fontWeight: '600',
+  fontSize: 15,
+},
 });
 
 export default PaymentsScreen;

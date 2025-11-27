@@ -7,11 +7,7 @@ import { verifyTaskPayment } from "../api/paymentApi";
 
 export const triggerPayment = async ({ popup, email,phone, amount, taskId, beneficiary }) => {
   try {
-    const initRes = await initializeTaskPayment({
-      taskId,
-      beneficiary,
-      amount: amount ,
-    });
+    const initRes = await initializeTaskPayment();
     const { reference } = initRes.data;
 
     return new Promise((resolve) => {
@@ -21,10 +17,14 @@ export const triggerPayment = async ({ popup, email,phone, amount, taskId, benef
         amount: amount,
         reference,
         onSuccess: async (res) => {
-          console.log("Payment Success!");
+        console.log("Payment Success!");
 
           try {
-            const verifyRes = await verifyTaskPayment(reference);
+          const verifyRes = await verifyTaskPayment(reference,{
+           taskId,
+           beneficiary,
+           amount: amount ,
+           });
            
             if (verifyRes.status === 200) {
               Alert.alert("Payment Successful", "Funds secured in escrow.");

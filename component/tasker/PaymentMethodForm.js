@@ -23,7 +23,7 @@ const PAYMENT_PROVIDERS = [
 
 const PAYMENT_TYPES = [
   { id: 'mobile_money', name: 'Mobile Money' },
-  { id: 'bank_account', name: 'Bank Account' },
+  
 ];
 
 const PaymentMethodForm = ({ 

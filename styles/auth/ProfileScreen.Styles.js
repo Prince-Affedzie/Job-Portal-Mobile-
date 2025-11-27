@@ -178,7 +178,7 @@ export const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#1E293B',
     flex: 1,
   },
@@ -194,8 +194,8 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   fieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '800',
     color: '#374151',
     marginBottom: 6,
   },
@@ -551,19 +551,7 @@ export const styles = StyleSheet.create({
     marginBottom:24,
     gap: 12,
   },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#64748B',
-  },
+  
   saveButton: {
     flex: 2,
     paddingVertical: 12,
@@ -753,7 +741,86 @@ availabilityContainer: {
     color: '#6366F1',
   },
 
-
+ workSamplesContainer: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 12,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#F1F5F9',
+  marginTop: 8,
+},
+workSamplesContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+workSamplesIconContainer: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: '#EEF2FF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+workSamplesTextContainer: {
+  flex: 1,
+},
+workSamplesTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginBottom: 4,
+},
+workSamplesDescription: {
+  fontSize: 14,
+  color: '#64748B',
+},
+workSamplesPreview: {
+  marginTop: 12,
+  marginLeft: -4,
+},
+workSampleThumbnail: {
+  width: 80,
+  height: 80,
+  borderRadius: 8,
+  marginHorizontal: 4,
+  overflow: 'hidden',
+  position: 'relative',
+},
+workSampleImage: {
+  width: '100%',
+  height: '100%',
+  borderRadius: 8,
+},
+moreSamplesOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderRadius: 8,
+},
+moreSamplesText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: '600',
+},
+viewAllButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 4,
+  paddingHorizontal: 8,
+},
+viewAllText: {
+  color: '#6366F1',
+  fontSize: 14,
+  fontWeight: '500',
+  marginRight: 2,
+},
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -772,7 +839,7 @@ availabilityContainer: {
   sectionCancelButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#ee4b4bff',
     borderRadius: 6,
     minWidth: 60,
     alignItems: 'center',
@@ -780,7 +847,7 @@ availabilityContainer: {
   sectionCancelButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#64748B',
+    color: '#FFFF',
   },
   sectionSaveButton: {
     paddingHorizontal: 12,
@@ -796,5 +863,270 @@ availabilityContainer: {
     color: '#FFFFFF',
   },
 
-  
+  availabilityHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  marginBottom: 12,
+  paddingHorizontal: 4,
+},
+availabilityHeaderLeft: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  flex: 1,
+},
+availabilityIconContainer: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: '#EEF2FF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+availabilityHeaderTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#1E293B',
+  marginBottom: 2,
+},
+availabilityHeaderSubtitle: {
+  fontSize: 14,
+  color: '#64748B',
+  lineHeight: 18,
+},
+availabilityEditButton: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#F8FAFC',
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+},
+availabilityContainer: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: '#F1F5F9',
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.05,
+  shadowRadius: 3,
+  elevation: 2,
+},
+availabilityContainerDisabled: {
+  opacity: 0.6,
+},
+availabilityContent: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  padding: 20,
+},
+availabilityLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+availabilityBadge: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+},
+availabilityTextContainer: {
+  flex: 1,
+},
+availabilityStatus: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#1E293B',
+  marginBottom: 4,
+},
+availabilityDescription: {
+  fontSize: 14,
+  color: '#64748B',
+  lineHeight: 18,
+  marginBottom: 6,
+},
+activeTasksContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 4,
+},
+currentTasksText: {
+  fontSize: 13,
+  color: '#6366F1',
+  fontWeight: '500',
+  marginLeft: 6,
+},
+availabilityRight: {
+  marginLeft: 12,
+},
+availabilityArrow: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: '#F8FAFC',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+availabilityStatusBar: {
+  height: 4,
+  width: '100%',
+  opacity: 0.8,
+},
+
+// Header Layout
+// Header Layout
+profileHeaderContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 20,
+},
+
+// Profile Image Styles
+profileImageWrapper: {
+  position: 'relative',
+},
+profileImageContainer: {
+  position: 'relative',
+},
+profileImage: {
+  width: 100,
+  height: 100,
+  borderRadius: 50,
+  borderWidth: 3,
+  borderColor: '#FFFFFF',
+},
+editImageButton: {
+  position: 'absolute',
+  bottom: 0,
+  right: 0,
+  backgroundColor: '#6366F1',
+  borderRadius: 18,
+  width: 36,
+  height: 36,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#1A1F3B',
+},
+saveImageButton: {
+  marginTop: 8,
+  backgroundColor: '#6366F1',
+  borderRadius: 18,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  borderWidth: 2,
+  borderColor: '#1A1F3B',
+},
+saveImageButtonText: {
+  color: '#FFFFFF',
+  fontSize: 14,
+  fontWeight: '600',
+},
+saveImageButtonDisabled: {
+  backgroundColor: '#9CA3AF',
+  opacity: 0.6,
+},
+editIndicator: {
+  position: 'absolute',
+  top: -5,
+  right: -5,
+  backgroundColor: '#6366F1',
+  borderRadius: 10,
+  width: 20,
+  height: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#1A1F3B',
+},
+
+// Profile Info Styles
+profileInfo: {
+  flex: 1,
+  marginLeft: 16,
+},
+ratingVerificationContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 8,
+  gap: 8,
+},
+// Add these styles to your existing styles
+sectionContent: {
+  gap: 16,
+},
+formRow: {
+  flexDirection: 'row',
+  gap: 12,
+},
+formGroupHalf: {
+  flex: 1,
+},
+locationSection: {
+  gap: 8,
+},
+locationSectionLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#374151',
+  marginBottom: 4,
+},
+locationGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+},
+locationFieldCompact: {
+  flex: 1,
+  minWidth: '48%', // Two columns
+},
+
+// Compact field styles for ProfileField and LocationField components
+compactField: {
+  marginBottom: 0,
+},
+compactLabel: {
+  fontSize: 12,
+  marginBottom: 4,
+},
+compactInput: {
+  fontSize: 14,
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  minHeight: 44,
+},
+compactInputMultiline: {
+  minHeight: 80,
+  textAlignVertical: 'top',
+},
+
+// Character count for bio
+characterCount: {
+  fontSize: 12,
+  color: '#6B7280',
+  textAlign: 'right',
+  marginTop: 4,
+},
+characterCountWarning: {
+  color: '#EF4444',
+},
 });

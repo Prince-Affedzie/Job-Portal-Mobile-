@@ -14,6 +14,8 @@ import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
 import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
 import TaskDetailsScreen from "../screens/tasker/TaskDetails";
 import SplashScreen from "../screens/SplashScreen";
+import  ChatWindowScreen from "../screens/Messaging/ChatWindowScreen"
+import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 
 
 import TaskerOnboardingStack from './TaskerOnboardingStack'
@@ -46,7 +48,7 @@ export default function RootNavigator() {
 
  return (
    <SafeAreaProvider>
-     <NotificationProvider>
+    <NotificationProvider>
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
@@ -68,6 +70,12 @@ export default function RootNavigator() {
         {/* Shared/global routes */}
         <Stack.Screen name="TaskerOnboarding" component={TaskerOnboardingStack} />
         <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
+        <Stack.Screen 
+           name="ChatWindow" 
+           component={ChatWindowScreen}
+           options={{ headerShown: false }}
+         />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
     </NotificationProvider>

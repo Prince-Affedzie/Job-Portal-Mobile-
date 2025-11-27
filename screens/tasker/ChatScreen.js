@@ -14,7 +14,7 @@ import { NotificationContext } from '../../context/NotificationContext';
 import { AuthContext } from '../../context/AuthContext';
 import { getAllChatRooms } from '../../api/chatApi';
 import RoomList from '../../component/Messaging/RoomList';
-import ChatWindow from '../../component/Messaging/ChatWindow';
+import ChatWindowScreen from '../Messaging/ChatWindowScreen' // Updated import
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import Header from '../../component/tasker/Header';
 
@@ -111,32 +111,24 @@ const ChatScreen = () => {
     loadRooms();
   }, [loadRooms]);
 
-  // Handle room selection
+  
   const handleSelectRoom = (room) => {
-    setSelectedRoom(room);
-    setShowRoomList(false);
+    
+    navigation.navigate('ChatWindow', { 
+      roomId: room._id 
+    });
   };
 
-  // Handle back to room list
-  const handleBackToRoomList = () => {
-    setSelectedRoom(null);
-    setShowRoomList(true);
-  };
-
-  // Handle navigation back
+  
   const handleNavigationBack = () => {
-    if (selectedRoom && !showRoomList) {
-      handleBackToRoomList();
-    } else {
-      navigation.goBack();
-    }
+    navigation.goBack();
   };
 
   if (loading) {
     return (
       <View style={styles.container}>
-      <Header title='Chats'/>
-      <LoadingIndicator text='Loading Conversations'/>
+        <Header title='Chats'/>
+        <LoadingIndicator text='Loading Conversations'/>
       </View>
     );
   }
@@ -146,38 +138,16 @@ const ChatScreen = () => {
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* Room List View */}
-      {showRoomList && (
-        <RoomList
-          rooms={rooms}
-          onSelectRoom={handleSelectRoom}
-          selectedRoom={selectedRoom}
-          currentUserId={user?._id}
-          onlineUserIds={onlineUserIds}
-          loading={loading}
-          onRefresh={loadRooms}
-          socket={socket}
-        />
-      )}
-
-      {/* Chat Window View */}
-      {selectedRoom && !showRoomList && (
-        <ChatWindow
-          room={selectedRoom}
-          socket={socket}
-          currentUser={user}
-          onlineUserIds={onlineUserIds}
-          onBack={handleBackToRoomList}
-        />
-      )}
-
-      {/* Empty State when no room selected */}
-      {!selectedRoom && !showRoomList && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>
-            Select a conversation to start chatting
-          </Text>
-        </View>
-      )}
+      <RoomList
+        rooms={rooms}
+        onSelectRoom={handleSelectRoom}
+        selectedRoom={selectedRoom}
+        currentUserId={user?._id}
+        onlineUserIds={onlineUserIds}
+        loading={loading}
+        onRefresh={loadRooms}
+        socket={socket}
+      />
     </SafeAreaView>
   );
 };

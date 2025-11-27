@@ -105,6 +105,7 @@ const RoomList = ({
     if (!socket) return;
 
     const handleRoomUpdate = (updatedRoom) => {
+      console.log('Room updated:', updatedRoom);
       setRooms(prev => {
         const roomExists = prev.find(r => r._id.toString() === updatedRoom._id.toString());
         if (roomExists) {
@@ -118,7 +119,32 @@ const RoomList = ({
       });
     };
 
+    // Handle when a message is marked as seen
     const handleMessageSeen = ({ messageId, userId, roomId }) => {
+      console.log('Message seen event:', { messageId, userId, roomId, currentUserId });
+      
+      // Clear unread count for the room when ANY message is seen
+      // (because the backend should handle updating all messages)
+      setRooms(prev => 
+        prev.map(room => {
+          if (room._id === roomId) {
+            return {
+              ...room,
+              unreadCounts: {
+                ...room.unreadCounts,
+                [currentUserId]: 0
+              }
+            };
+          }
+          return room;
+        })
+      );
+    };
+
+    // Handle when entire room is marked as seen
+    const handleRoomSeen = ({ roomId, userId }) => {
+      console.log('Room marked as seen:', { roomId, userId });
+      
       if (userId === currentUserId) {
         setRooms(prev => 
           prev.map(room => {
@@ -139,10 +165,12 @@ const RoomList = ({
 
     socket.on("updatedRoom", handleRoomUpdate);
     socket.on("messageSeen", handleMessageSeen);
+    socket.on("roomSeen", handleRoomSeen);
 
     return () => {
       socket.off("updatedRoom", handleRoomUpdate);
       socket.off('messageSeen', handleMessageSeen);
+      socket.off('roomSeen', handleRoomSeen);
     };
   }, [socket, setRooms, currentUserId]);
 
@@ -192,11 +220,11 @@ const RoomList = ({
               >
                 {otherUser?.name || 'Unknown User'}
               </Text>
-              {room.job?.title && (
+              {(room.job?.title ||room.job?.type)  && (
                 <View style={styles.jobBadge}>
                   <Ionicons name="briefcase-outline" size={10} color="#6366F1" />
                   <Text style={styles.jobBadgeText} numberOfLines={1}>
-                    {room.job.title}
+                    {room.job.title || room.job.type}
                   </Text>
                 </View>
               )}
@@ -291,22 +319,6 @@ const RoomList = ({
         )}
       </Animated.View>
 
-      {/* Quick Actions 
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#EFF6FF' }]}>
-            <Ionicons name="person-add" size={18} color="#6366F1" />
-          </View>
-          <Text style={styles.quickActionText}>New Chat</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickAction}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#F0FDF4' }]}>
-            <Ionicons name="checkmark-done" size={18} color="#16A34A" />
-          </View>
-          <Text style={styles.quickActionText}>Archive</Text>
-        </TouchableOpacity>
-      </View>*/}
-
       {/* Room List */}
       <FlatList
         data={filteredRooms}
@@ -337,7 +349,7 @@ const RoomList = ({
                 ? 'No conversations match your search'
                 : user.role === 'client'
                   ? 'Assign a task to start chatting with Taskers'
-                  : 'Apply to tasks to start chatting with Clients'}
+                  : 'Once you are assigned to a Task, you can chat with the client Here.'}
             </Text>
             
           </View>

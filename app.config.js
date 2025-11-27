@@ -1,18 +1,18 @@
 import "dotenv/config";
 
 export default {
-  name: "mobile",
-  slug: "mobile",
+  name: "Workaflow",
+  slug: "Workaflow",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/WorkaFlowLogo.png",
+  icon: "./assets/WorkaflowAppIcon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
 
   splash: {
-    image: "./assets/Logo.png",
+    image: "./assets/logominimal.png",
     resizeMode: "contain",
-    backgroundColor: "#1A1F3B",
+    backgroundColor: "#2D1B69",
   },
 
   ios: { 
@@ -22,7 +22,7 @@ export default {
 
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
+      foregroundImage: "./assets/WorkaflowAppIcon.png",
       backgroundColor: "#ffffff",
     },
     package: "com.affedziep44.jobportalmobile",
@@ -33,7 +33,7 @@ export default {
   },
 
   web: { 
-    favicon: "./assets/favicon.png" 
+    favicon: "./assets/WorkaflowAppIcon.png" 
   },
 
   plugins: [

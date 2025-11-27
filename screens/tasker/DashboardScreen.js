@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Animated,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,8 +27,10 @@ const { width } = Dimensions.get('window');
 
 const TaskerDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
-  const { getAllEarnings, earnings } = useContext(TaskerContext);
+  const { getAllEarnings } = useContext(TaskerContext);
+  const [earnings, setEarnings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [stats, setStats] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
   const insets = useSafeAreaInsets();
@@ -41,13 +44,60 @@ const TaskerDashboard = () => {
   const [slideAnim] = useState(new Animated.Value(50));
   const [scaleAnim] = useState(new Animated.Value(0.95));
 
+  // Cache timestamp to prevent unnecessary reloads
+  const [lastLoadTime, setLastLoadTime] = useState(0);
+  const CACHE_DURATION = 60000; // 30 seconds cache
+
   useEffect(() => {
-    loadData();
-    getAllEarnings();
+    // Only load on initial mount
+    if (initialLoad) {
+      loadAllData();
+    }
   }, []);
 
-  const loadData = async () => {
+  const loadAllData = async () => {
+    // Check if we need to refresh based on cache time
+    const now = Date.now();
+    if (!initialLoad && (now - lastLoadTime < CACHE_DURATION)) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     setLoading(true);
+    setRefreshing(true);
+    
+    try {
+      // Fetch earnings first since stats depend on it
+      const earningsData = await fetchEarnings();
+      
+      // Then load tasks and calculate stats
+      await loadData(earningsData);
+      
+      setLastLoadTime(Date.now());
+      setInitialLoad(false);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const fetchEarnings = async () => {
+    try {
+      const response = await getAllEarnings();
+      const earningsData = response.data || [];
+      setEarnings(earningsData);
+      return earningsData;
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      Alert.alert('Error', 'Failed to load earnings data');
+      return [];
+    }
+  };
+
+  const loadData = async (earningsData = earnings) => {
     try {
       if (loadMyTasks) {
         const res = await loadMyTasks();
@@ -59,45 +109,44 @@ const TaskerDashboard = () => {
         setMyTasks(applications);
         setMyBids(bids);
 
-        // Calculate stats based on actual data
-        const calculatedStats = calculateStats(applications, bids);
+        // Use current earnings data directly
+        const calculatedStats = calculateStats(applications, bids, earningsData);
         setStats(calculatedStats);
         setRecentActivities(generateRecentActivities(applications, bids));
         
-        // Start animations
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scaleAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          })
-        ]).start();
+        // Start animations only if they haven't been started yet
+        if (fadeAnim._value === 0) {
+          Animated.parallel([
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 500,
+              useNativeDriver: true,
+            }),
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            })
+          ]).start();
+        }
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
   };
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    loadAllData(); // Use the coordinated function
   };
 
   // Calculate stats based on actual tasks data
-  const calculateStats = (applications = [], bids = []) => {
+  const calculateStats = (applications = [], bids = [], currentEarnings = []) => {
     if (!applications || !Array.isArray(applications)) {
       return getDefaultStats();
     }
@@ -130,8 +179,8 @@ const TaskerDashboard = () => {
       ? Math.round((completedTasks / acceptedApplications) * 100)
       : 0;
 
-    // Calculate earnings from completed tasks
-    const totalEarnings = earnings
+    // Calculate earnings from completed tasks - use currentEarnings parameter
+    const totalEarnings = currentEarnings
       .filter(earning => earning.status === "released")
       .reduce((sum, earning) => sum + (earning.amount || 0), 0);
 
@@ -284,9 +333,13 @@ const TaskerDashboard = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
+      // Only refresh if it's been more than 30 seconds since last load
+      const now = Date.now();
+      if (now - lastLoadTime > CACHE_DURATION) {
+        loadAllData();
+      }
       return () => {};
-    }, [])
+    }, [lastLoadTime])
   );
 
   const StatCard = ({ title, value, subtitle, icon, color, gradient, onPress, delay = 0 }) => {
@@ -462,7 +515,7 @@ const TaskerDashboard = () => {
     </Animated.View>
   );
 
-  if (loading) {
+  if (loading && initialLoad) {
     return (
     <SafeAreaView style={styles.container}>
     <Header title="Dashboard" showProfile={false} />
@@ -842,7 +895,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
@@ -884,7 +937,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
@@ -917,9 +970,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 8,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    elevation: 2,
   },
   activityItem: {
     flexDirection: 'row',

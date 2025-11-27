@@ -17,8 +17,15 @@ import ClientProfileScreen from "../screens/poster/ClientProfileScreen";
 import ChatScreen from "../screens/tasker/ChatScreen";
 import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 import EmployerHelpSupportScreen from "../screens/poster/ClientSupportScreen"
+import SearchTaskersScreen from "../screens/poster/SearchTaskersScreen"
+import  ServiceRequestFormScreen from "../screens/poster/ServiceRequestFormScreen"
+import ServiceRequestDetailScreen from "../screens/poster/ServiceRequestDetailScreen"
+import ServiceRequestOffersScreen from "../screens/poster/ServiceRequestOffersScreen"
+import EditServiceRequestScreen from "../screens/poster/EditServiceRequestScreen"
 import { Ionicons } from "@expo/vector-icons";
 
+
+//ServiceRequestDetail
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -37,9 +44,13 @@ function PosterStackNavigator() {
       <Stack.Screen name="ApplicantProfile" component={ApplicantProfileScreen} />
       <Stack.Screen name="TaskSubmissions" component={ClientViewSubmissionsScreen} />
       <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+     {/* <Stack.Screen name="Notifications" component={NotificationsScreen} />*/}
       <Stack.Screen name="Payments" component={PaymentsScreen} />
-       <Stack.Screen name="ClientSupport" component={EmployerHelpSupportScreen} />
+      <Stack.Screen name="ClientSupport" component={EmployerHelpSupportScreen} />
+      <Stack.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} />
+      <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
+      <Stack.Screen name="ServiceRequestOffers" component={ServiceRequestOffersScreen} />
+      <Stack.Screen name="EditServiceRequest" component={EditServiceRequestScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
@@ -74,30 +85,22 @@ function PosterTabs() {
         }}
       >
         {/* Direct Tab Screens */}
-        <Tab.Screen
-          name="Dashboard"
-          component={DashboardScreen}
+
+         <Tab.Screen
+          name="Taskers"
+          component={SearchTaskersScreen}
           options={{
-            tabBarLabel: 'Dashboard',
+            tabBarLabel: 'Taskers',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
-                name={focused ? "home" : "home-outline"}
+                name={focused ? "people-circle" : "people-circle-outline"}
                 color={color}
                 size={size}
               />
             ),
           }}
-          listeners={({ navigation }) => ({
-            tabPress: (e) => {
-              // Reset to top of dashboard when tab is pressed
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Dashboard' }],
-              });
-            },
-          })}
         />
-
+       
         <Tab.Screen
           name="PostedTasks"
           component={PostedTasksScreen}
@@ -137,7 +140,35 @@ function PosterTabs() {
           }}
         />
 
-        <Tab.Screen
+
+         <Tab.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? "home" : "home-outline"}
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of dashboard when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Dashboard' }],
+              });
+            },
+          })}
+        />
+
+
+        
+
+       { /*<Tab.Screen
           name="Notifications"
           component={NotificationsScreen}
           options={{
@@ -159,8 +190,8 @@ function PosterTabs() {
                 routes: [{ name: 'Notifications' }],
               });
             },
-          })}*/
-        />
+          })}
+        /> */}
 
         <Tab.Screen
           name="Profile"

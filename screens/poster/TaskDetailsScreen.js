@@ -23,9 +23,11 @@ import ReportForm from '../../component/common/reportForm';
 import { AuthContext } from '../../context/AuthContext';
 import { PosterContext } from '../../context/PosterContext';
 import { clientGetTaskInfo, markTaskAsDoneClient } from '../../api/miniTaskApi'
+import { startOrGetChatRoom } from '../../api/chatApi'
 import { navigate } from '../../services/navigationService'
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
+import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
 
 const { width, height } = Dimensions.get('window');
 
@@ -81,6 +83,30 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadTaskDetails();
+  };
+
+  // NEW: Message Tasker Functionality
+  const handleMessageTasker = async () => {
+    try {
+      if (!task?.assignedTo?._id) {
+        Alert.alert('Error', 'Tasker information not available');
+        return;
+      }
+
+      const res = await startOrGetChatRoom({ 
+        userId2: task.assignedTo._id, 
+        jobId: task._id 
+      });
+      
+      if (res.status === 200) {
+        const roomId = res.data._id;
+        toggleFAB(); // Close FAB menu
+        navigate('ChatWindow', { roomId: roomId });
+      }
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      Alert.alert('Error', 'Failed to start chat with tasker');
+    }
   };
 
   const handleEditTask = () => {
@@ -184,6 +210,9 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const isAssigned = task?.assignedTo && task.status !== 'Open' && task.status !== 'Pending';
   const isTaskCompleted = task?.status?.toLowerCase() === 'completed';
   const canMarkAsDone = isAssigned && !isTaskCompleted && task?.markedDoneByEmployer === false;
+  
+  // NEW: Check if client can message tasker
+  const canMessageTasker = isAssigned && !isTaskCompleted;
 
   // Header animation values
   const headerOpacity = headerScroll.interpolate({
@@ -325,7 +354,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           {/* Enhanced Task Header Card */}
           <View style={styles.heroCard}>
             <LinearGradient
-              colors={['#6366F1', '#4F46E5']}
+              colors={['#1A1F3B', '#2D1B69']}
               style={styles.heroGradient}
             >
               <View style={styles.heroHeader}>
@@ -362,12 +391,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                 </View>
                
                 <View style={styles.quickStat}>
-                  <Text style={styles.quickStatValue}>{task.metrics?.views || '0'}</Text>
+                  <Text style={styles.quickStatValue}>{task.metrics?.views || 'N/A'}</Text>
                   <Text style={styles.quickStatLabel}>Views</Text>
                 </View>
                 
                 <View style={styles.quickStat}>
-                  <Text style={styles.quickStatValue}>{task.metrics?.saves || '0'}</Text>
+                  <Text style={styles.quickStatValue}>{task.metrics?.saves || 'N/A'}</Text>
                   <Text style={styles.quickStatLabel}>Saves</Text>
                 </View>
               </View>
@@ -442,6 +471,8 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                     <Text style={styles.sectionTitle}>Task Description</Text>
                   </View>
                   <Text style={styles.taskDescription}>{task.description}</Text>
+                    {/* Media Display - NEW SECTION */}
+                    <MediaDisplay media={task.media} />
 
                   {/* Key Information Grid */}
                   <View style={styles.infoGrid}>
@@ -545,13 +576,13 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                       </Text>
                       <Text style={styles.taskerStatLabel}>Rating</Text>
                     </View>
-                    <View style={styles.taskerStat}>
+                    {/*<View style={styles.taskerStat}>
                       <Ionicons name="checkmark-done" size={16} color="#10B981" />
                       <Text style={styles.taskerStatValue}>
                         {task.assignedTo.completedTasks || '0'}
                       </Text>
                       <Text style={styles.taskerStatLabel}>Completed</Text>
-                    </View>
+                    </View>*/}
                     <View style={styles.taskerStat}>
                       <Ionicons name="trending-up" size={16} color="#6366F1" />
                       <Text style={styles.taskerStatValue}>
@@ -659,7 +690,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
       
       </ScrollView>
 
-      {/* Enhanced FAB with Better UX */}
+      {/* Enhanced FAB with Message Tasker Functionality */}
       <View style={styles.fabContainer}>
         {/* Backdrop */}
         {fabExpanded && (
@@ -683,12 +714,34 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             }
           ]}
         >
+          {/* NEW: Message Tasker Button - Top Priority */}
+          {canMessageTasker && (
+            <Animated.View style={{
+              transform: [{
+                translateY: fabAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              }],
+              opacity: fabAnimation
+            }}>
+              <TouchableOpacity
+                style={[styles.fabActionButton, styles.fabMessage]}
+                onPress={handleMessageTasker}
+              >
+                 <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
+                  <Text style={styles.fabMessageText}>Message Tasker</Text>
+                
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
           {hasApplicants && task.status !== "Completed" && (
             <Animated.View style={{
               transform: [{
                 translateY: fabAnimation.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [20, 0]
+                  outputRange: [25, 0]
                 })
               }],
               opacity: fabAnimation
@@ -712,7 +765,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             transform: [{
               translateY: fabAnimation.interpolate({
                 inputRange: [0, 1],
-                outputRange: [15, 0]
+                outputRange: [20, 0]
               })
             }],
             opacity: fabAnimation
@@ -734,7 +787,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               transform: [{
                 translateY: fabAnimation.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [10, 0]
+                  outputRange: [15, 0]
                 })
               }],
               opacity: fabAnimation
@@ -752,12 +805,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             </Animated.View>
           )}
 
-          {(task.status === "Assigned" || task.status === "In-progress") && (
+          {(task.status === "Assigned" || task.status === "In-progress" || task.status === "Review") && (
             <Animated.View style={{
               transform: [{
                 translateY: fabAnimation.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [5, 0]
+                  outputRange: [10, 0]
                 })
               }],
               opacity: fabAnimation
@@ -780,7 +833,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               transform: [{
                 translateY: fabAnimation.interpolate({
                   inputRange: [0, 1],
-                  outputRange: [0, 0]
+                  outputRange: [5, 0]
                 })
               }],
               opacity: fabAnimation
@@ -1468,6 +1521,26 @@ const styles = StyleSheet.create({
   fabComplete: {
     backgroundColor: '#F59E0B',
   },
+  fabMessage: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#1D4ED8',
+    borderWidth: 2,
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  fabMessageText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
   fabActionText: {
     color: '#FFFFFF',
     fontSize: 14,

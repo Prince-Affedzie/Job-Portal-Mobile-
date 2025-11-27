@@ -157,7 +157,7 @@ const quickActions = [
     title: "Urgent Support",
     description: "24/7 priority help",
     icon: "warning",
-    action: ()=>Linking.openURL(`https://wa.me/233597802841`) ,
+    action: ()=>Linking.openURL(`https://wa.me/233505671577`) ,
     color: "#e53e3e"
   },
   {
@@ -246,9 +246,9 @@ const quickActions = [
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          <View style={styles.heroIcon}>
+          {/*<View style={styles.heroIcon}>
             <Ionicons name="business" size={32} color="#667eea" />
-          </View>
+          </View>*/}
           <Text style={styles.heroTitle}>Client Support Center</Text>
           <Text style={styles.heroSubtitle}>
             Get help with posting tasks, hiring, payments, and managing your projects
@@ -446,7 +446,7 @@ const quickActions = [
             >
               <Ionicons name="mail" size={24} color="#667eea" />
               <Text style={styles.contactOptionText}>Email Support</Text>
-              <Text style={styles.contactOptionSubtext}>clients@novaedgeapp.com</Text>
+              <Text style={styles.contactOptionSubtext}>workaflow726@gmail.com</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -455,7 +455,7 @@ const quickActions = [
             >
               <Ionicons name="call" size={24} color="#48BB78" />
               <Text style={styles.contactOptionText}>Call Support</Text>
-              <Text style={styles.contactOptionSubtext}>+233597802841</Text>
+              <Text style={styles.contactOptionSubtext}>0505671577</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -463,7 +463,7 @@ const quickActions = [
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Client Support Hours: Mon-Fri, 7AM-9PM EST
+            Client Support Hours: Mon-Sat, 7AM-9PM EST
           </Text>
           <Text style={styles.footerHours}>
             Average response time: 1 hour for priority clients

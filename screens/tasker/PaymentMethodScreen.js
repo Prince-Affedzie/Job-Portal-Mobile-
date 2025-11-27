@@ -21,10 +21,38 @@ import PaymentMethodForm from '../../component/tasker/PaymentMethodForm';
 const { width } = Dimensions.get('window');
 
 const PAYMENT_PROVIDERS = [
-  { id: 'mtn_momo', name: 'MTN Mobile Money', icon: 'phone-portrait', color: '#FFC107', gradient: ['#FFC107', '#FF8C00'] },
-  { id: 'vodafone_cash', name: 'Vodafone Cash', icon: 'card', color: '#E60000', gradient: ['#E60000', '#CC0000'] },
-  { id: 'airtel_tigo', name: 'AirtelTigo Money', icon: 'cellular', color: '#FF0000', gradient: ['#FF0000', '#CC0000'] },
-  { id: 'bank_transfer', name: 'Bank Transfer', icon: 'business', color: '#2196F3', gradient: ['#2196F3', '#1976D2'] },
+  { 
+    id: 'mtn_momo', 
+    name: 'MTN Mobile Money', 
+    icon: 'phone-portrait', 
+    color: '#FFC107', 
+    gradient: ['#FFC107', '#FF8C00'],
+    description: 'Instant mobile payments'
+  },
+  { 
+    id: 'vodafone_cash', 
+    name: 'Vodafone Cash', 
+    icon: 'card', 
+    color: '#E60000', 
+    gradient: ['#E60000', '#CC0000'],
+    description: 'Fast and secure'
+  },
+  { 
+    id: 'airtel_tigo', 
+    name: 'AirtelTigo Money', 
+    icon: 'cellular', 
+    color: '#FF0000', 
+    gradient: ['#FF0000', '#CC0000'],
+    description: 'Reliable mobile money'
+  },
+  { 
+    id: 'bank_transfer', 
+    name: 'Bank Transfer', 
+    icon: 'business', 
+    color: '#2196F3', 
+    gradient: ['#2196F3', '#1976D2'],
+    description: 'Direct bank transfers'
+  },
 ];
 
 const PaymentMethodScreen = ({ navigation }) => {
@@ -169,13 +197,9 @@ const PaymentMethodScreen = ({ navigation }) => {
 
   const PaymentMethodCard = ({ method }) => {
     const providerInfo = getProviderInfo(method.provider);
-    const isSmallScreen = width < 375; // For smaller devices
 
     return (
-      <LinearGradient
-        colors={['#FFFFFF', '#F8FAFC']}
-        style={styles.paymentMethodCard}
-      >
+      <View style={styles.paymentMethodCard}>
         {/* Card Header */}
         <View style={styles.cardHeader}>
           <View style={styles.paymentMethodInfo}>
@@ -201,7 +225,7 @@ const PaymentMethodScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Action Buttons - Improved Layout */}
+        {/* Action Buttons - Minimal & Clean */}
         <View style={styles.paymentMethodActions}>
           <View style={styles.actionButtonsRow}>
             {!method.isDefault && (
@@ -210,10 +234,8 @@ const PaymentMethodScreen = ({ navigation }) => {
                 onPress={() => handleSetDefault(method._id)}
                 disabled={loading}
               >
-                <Ionicons name="star-outline" size={16} color="#6366F1" />
-                <Text style={styles.secondaryButtonText}>
-                  {isSmallScreen ? 'Default' : 'Set Default'}
-                </Text>
+                <Ionicons name="star-outline" size={14} color="#6366F1" />
+                <Text style={styles.secondaryButtonText}>Set Default</Text>
               </TouchableOpacity>
             )}
             
@@ -221,27 +243,24 @@ const PaymentMethodScreen = ({ navigation }) => {
               style={[styles.actionButton, styles.secondaryButton]}
               onPress={() => openEditModal(method)}
             >
-              <Ionicons name="create-outline" size={16} color="#6366F1" />
+              <Ionicons name="create-outline" size={14} color="#6366F1" />
               <Text style={styles.secondaryButtonText}>Edit</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.dangerButton]}
+              onPress={() => handleRemovePaymentMethod(method._id)}
+              disabled={removingMethodId === method._id}
+            >
+              {removingMethodId === method._id ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.dangerButton, styles.fullWidthButton]}
-            onPress={() => handleRemovePaymentMethod(method._id)}
-            disabled={removingMethodId === method._id}
-          >
-            {removingMethodId === method._id ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.dangerButtonText}>Remove Payment Method</Text>
-              </>
-            )}
-          </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
     );
   };
 
@@ -249,6 +268,7 @@ const PaymentMethodScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <Header 
         title="Payment Methods" 
+        showBackButton={true}
         rightComponent={
           <TouchableOpacity 
             style={styles.addButton}
@@ -279,35 +299,58 @@ const PaymentMethodScreen = ({ navigation }) => {
         }
       >
         {/* Hero Section */}
-        <LinearGradient
-          colors={['#6366F1', '#4F46E5']}
-          style={styles.heroSection}
-        >
-          <View style={styles.heroContent}>
-            <View style={styles.heroIcon}>
-              <Ionicons name="wallet-outline" size={32} color="#FFFFFF" />
+        <View style={styles.heroSection}>
+          <LinearGradient
+            colors={['#6366F1', '#4F46E5']}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroContent}>
+              <View style={styles.heroIcon}>
+                <Ionicons name="wallet-outline" size={32} color="#FFFFFF" />
+              </View>
+              <View style={styles.heroText}>
+                <Text style={styles.heroTitle}>Payment Methods</Text>
+                <Text style={styles.heroDescription}>
+                  Manage your payment methods for seamless transactions
+                </Text>
+              </View>
             </View>
-            <View style={styles.heroText}>
-              <Text style={styles.heroTitle}>Payment Methods</Text>
-              <Text style={styles.heroDescription}>
-                Manage your payment methods for seamless transactions
-              </Text>
-            </View>
+           {/*<View style={styles.heroStats}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{paymentMethods.length}</Text>
+                <Text style={styles.statLabel}>Methods</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {paymentMethods.filter(m => m.isDefault).length}
+                </Text>
+                <Text style={styles.statLabel}>Default</Text>
+              </View>
+            </View>*/}
+          </LinearGradient>
+        </View>
+
+        {/* Available Providers */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Available Providers</Text>
           </View>
-          <View style={styles.heroStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{paymentMethods.length}</Text>
-              <Text style={styles.statLabel}>Methods</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {paymentMethods.filter(m => m.isDefault).length}
-              </Text>
-              <Text style={styles.statLabel}>Default</Text>
-            </View>
+          <View style={styles.providersGrid}>
+            {PAYMENT_PROVIDERS.map(provider => (
+              <View key={provider.id} style={styles.providerCard}>
+                <LinearGradient
+                  colors={provider.gradient}
+                  style={styles.providerIconLarge}
+                >
+                  <Ionicons name={provider.icon} size={24} color="#FFFFFF" />
+                </LinearGradient>
+                <Text style={styles.providerCardName}>{provider.name}</Text>
+                <Text style={styles.providerCardDescription}>{provider.description}</Text>
+              </View>
+            ))}
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Payment Methods Section */}
         <View style={styles.section}>
@@ -334,12 +377,9 @@ const PaymentMethodScreen = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <LinearGradient
-                colors={['#F8FAFC', '#F1F5F9']}
-                style={styles.emptyIllustration}
-              >
+              <View style={styles.emptyIllustration}>
                 <Ionicons name="card-outline" size={48} color="#9CA3AF" />
-              </LinearGradient>
+              </View>
               <Text style={styles.emptyTitle}>No Payment Methods</Text>
               <Text style={styles.emptyDescription}>
                 You haven't added any payment methods yet. Add one to get started with secure payments.
@@ -361,39 +401,17 @@ const PaymentMethodScreen = ({ navigation }) => {
         </View>
 
         {/* Security Notice */}
-        <LinearGradient
-          colors={['#F0FDF4', '#DCFCE7']}
-          style={styles.securitySection}
-        >
+        <View style={styles.securitySection}>
           <View style={styles.securityIcon}>
             <Ionicons name="shield-checkmark" size={24} color="#10B981" />
           </View>
           <View style={styles.securityText}>
             <Text style={styles.securityTitle}>Secure & Encrypted</Text>
             <Text style={styles.securityDescription}>
-              Your payment information is securely encrypted and never shared with third parties. All transactions are protected.
+              Your payment information is securely encrypted and never shared with third parties.
             </Text>
           </View>
-        </LinearGradient>
-
-        {/* Quick Actions 
-        <View style={styles.quickActions}>
-          <Text style={styles.quickActionsTitle}>Need Help?</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickAction}>
-              <Ionicons name="help-circle-outline" size={24} color="#6366F1" />
-              <Text style={styles.quickActionText}>FAQ</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction}>
-              <Ionicons name="chatbubble-outline" size={24} color="#6366F1" />
-              <Text style={styles.quickActionText}>Support</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickAction}>
-              <Ionicons name="document-outline" size={24} color="#6366F1" />
-              <Text style={styles.quickActionText}>Guide</Text>
-            </TouchableOpacity>
-          </View>
-        </View>*/}
+        </View>
       </ScrollView>
 
       {/* Add Payment Method Modal */}
@@ -456,13 +474,16 @@ const styles = StyleSheet.create({
   heroSection: {
     marginHorizontal: 16,
     marginTop: 16,
-    padding: 24,
     borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#6366F1',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+  },
+  heroGradient: {
+    padding: 24,
   },
   heroContent: {
     flexDirection: 'row',
@@ -545,11 +566,48 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
 
-  // Payment Method Card - Improved Layout
+  // Providers Grid
+  providersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  providerCard: {
+    width: (width ) / 3, // 2 columns with gap
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  providerIconLarge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  providerCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  providerCardDescription: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+
+  // Payment Method Card
   paymentMethodCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -621,7 +679,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
-  // Improved Action Buttons Layout
+  // Action Buttons
   paymentMethodActions: {
     gap: 12,
   },
@@ -640,9 +698,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 44,
   },
-  fullWidthButton: {
-    flex: 1,
-  },
   secondaryButton: {
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
@@ -653,14 +708,12 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     fontWeight: '600',
   },
-  dangerButton: {
-    backgroundColor: '#EF4444',
-  },
-  dangerButtonText: {
+  
+  /*dangerButtonText: {
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '600',
-  },
+  },*/
 
   // Empty State
   emptyState: {
@@ -674,6 +727,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
+    backgroundColor: '#F8FAFC',
     borderWidth: 2,
     borderColor: '#F1F5F9',
   },
@@ -717,9 +771,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom:18,
+    marginBottom: 18,
     padding: 20,
     borderRadius: 16,
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
@@ -747,54 +802,57 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Quick Actions
-  quickActions: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  quickActionsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickAction: {
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    minWidth: 80,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '600',
-    marginTop: 8,
-  },
-
   // Refresh Button
   refreshButton: {
     padding: 8,
     backgroundColor: '#F1F5F9',
     borderRadius: 8,
   },
+  paymentMethodActions: {
+  marginTop: 12,
+  paddingTop: 12,
+  borderTopWidth: 1,
+  borderTopColor: '#F1F5F9',
+},
+
+actionButtonsRow: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  gap: 8,
+},
+
+actionButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 8,
+  gap: 4,
+},
+
+secondaryButton: {
+  backgroundColor: '#F8FAFC',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+},
+
+secondaryButtonText: {
+  fontSize: 12,
+  fontWeight: '500',
+  color: '#6366F1',
+},
+
+dangerButton: {
+  backgroundColor: '#EF4444',
+  borderWidth: 1,
+  borderColor: '#FECACA',
+},
+
+dangerButtonText: {
+  fontSize: 12,
+  fontWeight: '500',
+  color: '#EF4444',
+},
 });
 
 export default PaymentMethodScreen;

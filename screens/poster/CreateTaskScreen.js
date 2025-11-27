@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,25 +8,29 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Switch,
   Dimensions,
   StatusBar,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import Header from "../../component/tasker/Header";
 import { PosterContext } from '../../context/PosterContext';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
+import { taskMediaUpload } from '../../api/miniTaskApi';
+import { sendFileToS3 } from '../../api/commonApi';
 
 const { width } = Dimensions.get('window');
 
 const categories = [
   "Home Services",
-  "Delivery & Errands",
+  "Delivery & Errands", 
   "Digital Services",
   "Writing & Assistance",
   "Learning & Tutoring",
@@ -46,27 +50,88 @@ const subcategories = {
   "Others": ["General Tasks", "Miscellaneous"]
 };
 
-const InputField = ({ label, value, onChange, placeholder, error, multiline = false, numberOfLines = 1, required = false }) => (
+// Enhanced InputField with stable focus
+const InputField = React.memo(({ 
+  label, 
+  value, 
+  onChange, 
+  placeholder, 
+  error, 
+  multiline = false, 
+  numberOfLines = 1, 
+  required = false,
+  icon = null,
+  ...props 
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef(null);
+  
+  return (
     <View style={styles.inputContainer}>
       <Text style={styles.inputLabel}>
         {label} {required && <Text style={styles.required}>*</Text>}
       </Text>
-      <TextInput
+      <TouchableOpacity 
+        activeOpacity={1}
+        onPress={() => inputRef.current?.focus()}
         style={[
-          styles.textInput,
-          multiline && styles.textArea,
-          error && styles.inputError
+          styles.inputWrapper,
+          isFocused && styles.inputFocused,
+          error && styles.inputError,
+          multiline && styles.textAreaWrapper
         ]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        multiline={multiline}
-        numberOfLines={numberOfLines}
-        textAlignVertical={multiline ? 'top' : 'center'}
-      />
+      >
+        {icon && <Ionicons name={icon} size={20} color="#9CA3AF" style={styles.inputIcon} />}
+        <TextInput
+          ref={inputRef}
+          style={[
+            styles.textInput,
+            multiline && styles.textArea,
+            icon && styles.textInputWithIcon
+          ]}
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          textAlignVertical={multiline ? 'top' : 'center'}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholderTextColor="#9CA3AF"
+          {...props}
+        />
+      </TouchableOpacity>
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
+});
+
+// Chip component for skills and requirements
+const Chip = ({ text, onRemove, variant = 'default' }) => (
+  <View style={[
+    styles.chip,
+    variant === 'requirement' && styles.chipRequirement
+  ]}>
+    <Text style={styles.chipText}>{text}</Text>
+    <TouchableOpacity onPress={onRemove} style={styles.chipRemove}>
+      <Ionicons name="close" size={16} color="#EF4444" />
+    </TouchableOpacity>
+  </View>
+);
+
+// Section component for better organization
+const FormSection = ({ title, description, icon, children }) => (
+  <View style={styles.section}>
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionTitleRow}>
+        <Ionicons name={icon} size={22} color="#6366F1" />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {description && <Text style={styles.sectionDescription}>{description}</Text>}
+    </View>
+    {children}
+  </View>
+);
 
 const CreateTaskScreen = ({ navigation }) => {
   const { addTask, loading } = useContext(PosterContext);
@@ -77,25 +142,138 @@ const CreateTaskScreen = ({ navigation }) => {
     description: '',
     category: '',
     subcategory: '',
-    biddingType: 'fixed',
+    biddingType: 'open-bid',
     budget: '',
-    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default: 7 days from now
+    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     locationType: 'remote',
     skillsRequired: [],
-    requirements: [], // NEW: Requirements array
-    address: {
-      region: '',
-      city: '',
-      suburb: ''
-    },
-    verificationRequired: false
+    requirements: [],
+    address: { region: '', city: '', suburb: '' },
+    media: [] 
   });
 
   const [currentSkill, setCurrentSkill] = useState('');
-  const [currentRequirement, setCurrentRequirement] = useState(''); // NEW: Current requirement input
+  const [currentRequirement, setCurrentRequirement] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+
+  // Media functions
+  const pickImage = async () => {
+    if (task.media.length >= 3) {
+      Alert.alert('Limit Reached', 'Maximum 3 files allowed');
+      return;
+    }
+
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Sorry, we need camera roll permissions to upload images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleMediaSelection(result.assets[0], 'image');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const pickVideo = async () => {
+    if (task.media.length >= 3) {
+      Alert.alert('Limit Reached', 'Maximum 3 files allowed');
+      return;
+    }
+
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Sorry, we need camera roll permissions to upload videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await handleMediaSelection(result.assets[0], 'video');
+      }
+    } catch (error) {
+      console.error('Error picking video:', error);
+      Alert.alert('Error', 'Failed to pick video');
+    }
+  };
+
+  const handleMediaSelection = async (asset, type) => {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
+      const fileSizeMB = (fileInfo.size || asset.fileSize || 0) / (1024 * 1024);
+
+      if (fileSizeMB > 10) {
+        Alert.alert('File too large', 'Please select a file smaller than 10MB');
+        return;
+      }
+
+      setUploadingMedia(true);
+      
+      const file = {
+        name: asset.fileName || `media_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`,
+        uri: asset.uri,
+        type: type === 'image' ? 'image/jpeg' : 'video/mp4',
+        size: fileInfo.size || asset.fileSize || 0,
+      };
+
+      const fileInfoPayload = {
+        filename: file.name,
+        contentType: file.type,
+      };
+
+      const uploadResponse = await taskMediaUpload(fileInfoPayload);
+      if(uploadResponse.status ===200){
+        const { publicUrl, fileUrl } = uploadResponse.data;
+        
+        await sendFileToS3(fileUrl, file);
+
+        const newMedia = {
+          url: publicUrl,
+          type: type
+        };
+
+        setTask(prev => ({
+          ...prev,
+          media: [...prev.media, newMedia]
+        }));
+
+        Alert.alert('Success', `${type === 'image' ? 'Image' : 'Video'} uploaded successfully!`);
+      }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      Alert.alert('Upload Error', 'Failed to upload media. Please try again.');
+    } finally {
+      setUploadingMedia(false);
+    }
+  };
+
+  const removeMedia = (index) => {
+    setTask(prev => ({
+      ...prev,
+      media: prev.media.filter((_, i) => i !== index)
+    }));
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -108,12 +286,11 @@ const CreateTaskScreen = ({ navigation }) => {
     
     if (!task.category) newErrors.category = 'Category is required';
     
-    // Budget validation for both bidding types
-    if (!task.budget || isNaN(task.budget) || parseFloat(task.budget) <= 0) {
+    /*if (!task.budget || isNaN(task.budget) || parseFloat(task.budget) <= 0) {
       newErrors.budget = 'Valid budget is required';
-    }
-    if (parseFloat(task.budget) < 1) {
-      newErrors.budget = 'Minimum budget is ₵5';
+    }*/
+    if ( task.budget && parseFloat(task.budget) < 20) {
+      newErrors.budget = 'Minimum budget is ₵20';
     }
     
     if (!task.deadline) newErrors.deadline = 'Deadline is required';
@@ -139,30 +316,27 @@ const CreateTaskScreen = ({ navigation }) => {
         ...task,
         budget: parseFloat(task.budget),
         deadline: task.deadline.toISOString(),
-        employer: user?.id,
-        status: 'Open'
       };
 
-      // Remove address if it's a remote task
       if (task.locationType === 'remote') {
         delete taskData.address;
       }
 
       const result = await addTask(taskData);
       
-      if (result.status ===200) {
+      if (result.status === 200) {
         Alert.alert(
-       '🎉 Task Posted Successfully!',
-       'Your task is now under review and will be live shortly. We\'ll notify you once it\'s approved and open for applications.',
-    [
-      { 
-        text: 'Got It', 
-        onPress: () => navigate('MainTabs', { 
-          screen: 'PostedTasks' 
-        })
-      }
-    ]
-   );
+          '🎉 Task Posted Successfully!',
+          'Your task is now under review and will be live shortly.',
+          [
+            { 
+              text: 'Got It', 
+              onPress: () => navigate('MainTabs', { 
+                screen: 'PostedTasks' 
+              })
+            }
+          ]
+        );
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to create task. Please try again.');
@@ -189,7 +363,6 @@ const CreateTaskScreen = ({ navigation }) => {
     }));
   };
 
-  // NEW: Add requirement function
   const addRequirement = () => {
     if (currentRequirement.trim() && !task.requirements.includes(currentRequirement.trim())) {
       setTask(prev => ({
@@ -200,7 +373,6 @@ const CreateTaskScreen = ({ navigation }) => {
     }
   };
 
-  // NEW: Remove requirement function
   const removeRequirement = (requirementToRemove) => {
     setTask(prev => ({
       ...prev,
@@ -215,61 +387,69 @@ const CreateTaskScreen = ({ navigation }) => {
     }
   };
 
-  const SectionHeader = ({ title, icon, description }) => (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleContainer}>
-        <Ionicons name={icon} size={20} color="#6366F1" />
-        <Text style={styles.sectionTitle}>{title}</Text>
-      </View>
-      {description && <Text style={styles.sectionDescription}>{description}</Text>}
+  const MediaPreview = ({ media, index }) => (
+    <View style={styles.mediaPreview}>
+      {media.type === 'image' ? (
+        <Image source={{ uri: media.url }} style={styles.mediaImage} />
+      ) : (
+        <View style={styles.videoPlaceholder}>
+          <Ionicons name="videocam" size={24} color="#6366F1" />
+          <Text style={styles.videoText}>Video</Text>
+        </View>
+      )}
+      <TouchableOpacity 
+        style={styles.removeMediaButton}
+        onPress={() => removeMedia(index)}
+      >
+        <Ionicons name="close-circle" size={20} color="#EF4444" />
+      </TouchableOpacity>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1A1F3B" />
-      <Header title="Post New Task" showBackButton={true} />
+      <Header title="Create New Task" showBackButton={true} />
       
       <ScrollView 
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Basic Information Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Basic Information" 
-            icon="information-circle-outline"
-            description="Provide clear details about what you need done"
-          />
-          
+
+        {/* Basic Information */}
+        <FormSection 
+          title="Task Details" 
+          icon="document-text-outline"
+          description="What do you need help with?"
+        >
           <InputField
             label="Task Title"
             value={task.title}
             onChange={(text) => setTask(prev => ({ ...prev, title: text }))}
-            placeholder="e.g., Website Redesign, Home Cleaning, Document Translation"
+            placeholder="e.g., Website Design, Home Cleaning"
             error={errors.title}
             required={true}
+            
           />
 
           <InputField
-            label="Task Description"
+            label="Description"
             value={task.description}
             onChange={(text) => setTask(prev => ({ ...prev, description: text }))}
-            placeholder="Describe the task in detail. Be specific about requirements, expectations, and any special instructions..."
+            placeholder="Describe what needs to be done..."
             error={errors.description}
             multiline={true}
-            numberOfLines={6}
+            numberOfLines={4}
             required={true}
+           
           />
 
-          {/* Category & Subcategory */}
           <View style={styles.row}>
             <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.inputLabel}>
-                Category <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={[styles.pickerContainer, errors.category && styles.inputError]}>
+              <Text style={styles.inputLabel}>Category</Text>
+              <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={task.category}
                   onValueChange={(value) => setTask(prev => ({ 
@@ -277,7 +457,6 @@ const CreateTaskScreen = ({ navigation }) => {
                     category: value,
                     subcategory: '' 
                   }))}
-                  style={styles.picker}
                 >
                   <Picker.Item label="Select Category" value="" />
                   {categories.map(cat => (
@@ -285,7 +464,6 @@ const CreateTaskScreen = ({ navigation }) => {
                   ))}
                 </Picker>
               </View>
-              {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
             </View>
 
             <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
@@ -294,7 +472,6 @@ const CreateTaskScreen = ({ navigation }) => {
                 <Picker
                   selectedValue={task.subcategory}
                   onValueChange={(value) => setTask(prev => ({ ...prev, subcategory: value }))}
-                  style={styles.picker}
                   enabled={!!task.category}
                 >
                   <Picker.Item label="Select Subcategory" value="" />
@@ -305,226 +482,196 @@ const CreateTaskScreen = ({ navigation }) => {
               </View>
             </View>
           </View>
-        </View>
+        </FormSection>
 
-
-        {/* Skills & Requirements Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Required Skills" 
-            icon="construct-outline"
-            description="What skills are needed to complete this task?"
-          />
+        {/* Media - Simplified */}
+        <FormSection 
+          title="Photos & Videos(Recommended)" 
+          icon="images-outline"
+          description="Add images or maximum of 2 minutes videos of the task that needs to done (optional)"
+        >
+          <View style={styles.mediaLimit}>
+            <Text style={styles.mediaLimitText}>{task.media.length}/3 files</Text>
+          </View>
           
+          <View style={styles.mediaButtons}>
+            <TouchableOpacity 
+              style={[
+                styles.mediaButton,
+                (task.media.length >= 3 || uploadingMedia) && styles.mediaButtonDisabled
+              ]}
+              onPress={pickImage}
+              disabled={task.media.length >= 3 || uploadingMedia}
+            >
+              <Ionicons name="image-outline" size={20} color="#6366F1" />
+              <Text style={styles.mediaButtonText}>Add Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.mediaButton,
+                (task.media.length >= 3 || uploadingMedia) && styles.mediaButtonDisabled
+              ]}
+              onPress={pickVideo}
+              disabled={task.media.length >= 3 || uploadingMedia}
+            >
+              <Ionicons name="videocam-outline" size={20} color="#6366F1" />
+              <Text style={styles.mediaButtonText}>Add Video</Text>
+            </TouchableOpacity>
+          </View>
+
+          {uploadingMedia && (
+            <View style={styles.uploadingIndicator}>
+              <ActivityIndicator size="small" color="#6366F1" />
+              <Text style={styles.uploadingText}>Uploading...</Text>
+            </View>
+          )}
+
+          {task.media.length > 0 && (
+            <View style={styles.mediaPreviews}>
+              {task.media.map((media, index) => (
+                <MediaPreview key={index} media={media} index={index} />
+              ))}
+            </View>
+          )}
+        </FormSection>
+
+        {/* Skills & Requirements - Combined */}
+        <FormSection 
+          title="Requirements" 
+          icon="checkmark-done-outline"
+          description="What skills and deliverables are needed?"
+        >
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Skills Needed</Text>
-            <View style={styles.skillInputContainer}>
+            <Text style={styles.inputLabel}>Required Skills</Text>
+            <View style={styles.chipInputContainer}>
               <TextInput
-                style={[styles.textInput, styles.skillInput]}
+                style={styles.chipInput}
                 value={currentSkill}
                 onChangeText={setCurrentSkill}
-                placeholder="Add a required skill (e.g., Web Design, Photography)"
+                placeholder="Add skills like Web Design, Photography..."
                 onSubmitEditing={addSkill}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
-              <TouchableOpacity style={styles.addSkillButton} onPress={addSkill}>
+              <TouchableOpacity style={styles.addChipButton} onPress={addSkill}>
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.skillHint}>
-              Press Enter or the + button to add skills
-            </Text>
           </View>
 
           {task.skillsRequired.length > 0 && (
-            <View style={styles.skillsContainer}>
+            <View style={styles.chipsContainer}>
               {task.skillsRequired.map((skill, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                  <TouchableOpacity 
-                    style={styles.removeSkillButton}
-                    onPress={() => removeSkill(skill)}
-                  >
-                    <Ionicons name="close" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
+                <Chip 
+                  key={index} 
+                  text={skill} 
+                  onRemove={() => removeSkill(skill)}
+                />
               ))}
             </View>
           )}
-        </View>
 
-        {/* NEW: Requirements Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Task Requirements" 
-            icon="list-outline"
-            description="List specific requirements and deliverables for this task"
-          />
-          
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Requirements & Deliverables</Text>
-            <View style={styles.skillInputContainer}>
+            <Text style={styles.inputLabel}>Deliverables</Text>
+            <View style={styles.chipInputContainer}>
               <TextInput
-                style={[styles.textInput, styles.skillInput]}
+                style={styles.chipInput}
                 value={currentRequirement}
                 onChangeText={setCurrentRequirement}
-                placeholder="Add a requirement (e.g., Responsive design, Source files included)"
+                placeholder="Add deliverables like Source files, Documentation..."
                 onSubmitEditing={addRequirement}
                 returnKeyType="done"
+                blurOnSubmit={false}
               />
-              <TouchableOpacity style={styles.addSkillButton} onPress={addRequirement}>
+              <TouchableOpacity style={styles.addChipButton} onPress={addRequirement}>
                 <Ionicons name="add" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.skillHint}>
-              Press Enter or the + button to add requirements
-            </Text>
           </View>
 
           {task.requirements.length > 0 && (
-            <View style={styles.skillsContainer}>
+            <View style={styles.chipsContainer}>
               {task.requirements.map((requirement, index) => (
-                <View key={index} style={[styles.skillTag]}>
-                  <Text style={[styles.skillText]}>{requirement}</Text>
-                  <TouchableOpacity 
-                    style={styles.removeSkillButton}
-                    onPress={() => removeRequirement(requirement)}
-                  >
-                    <Ionicons name="close" size={16} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
+                <Chip 
+                  key={index} 
+                  text={requirement} 
+                  onRemove={() => removeRequirement(requirement)}
+                  variant="requirement"
+                />
               ))}
             </View>
           )}
+        </FormSection>
 
-          <View style={styles.requirementsTips}>
-            <Text style={styles.requirementsTipsTitle}>💡 Tips for Good Requirements:</Text>
-            <Text style={styles.requirementsTipsText}>
-              • Be specific about what needs to be delivered{'\n'}
-              • Include technical specifications if applicable{'\n'}
-              • Mention file formats, sizes, or other details{'\n'}
-              • Set clear expectations for quality standards
-            </Text>
-          </View>
-        </View>
-
-        {/* Budget & Pricing Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Budget & Pricing" 
-            icon="cash-outline"
-            description="Set your budget for this task"
-          />
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>
-              Bidding Type <Text style={styles.required}>*</Text>
-            </Text>
-            <View style={styles.radioGroup}>
+        {/* Budget - Simplified */}
+        <FormSection 
+          title="Budget(Optional)" 
+          icon="cash-outline"
+          description="Set your budget for this task"
+        >
+          {/*<View style={styles.radioGroup}>
+            {['fixed', 'open-bid'].map((type) => (
               <TouchableOpacity
+                key={type}
                 style={[
-                  styles.radioButton,
-                  task.biddingType === 'fixed' && styles.radioButtonActive
+                  styles.radioOption,
+                  task.biddingType === type && styles.radioOptionActive
                 ]}
-                onPress={() => setTask(prev => ({ ...prev, biddingType: 'fixed' }))}
+                onPress={() => setTask(prev => ({ ...prev, biddingType: type }))}
               >
                 <View style={[
-                  styles.radioCircle,
-                  task.biddingType === 'fixed' && styles.radioCircleActive
-                ]}>
-                  {task.biddingType === 'fixed' && <View style={styles.radioInnerCircle} />}
-                </View>
+                  styles.radioDot,
+                  task.biddingType === type && styles.radioDotActive
+                ]} />
                 <View style={styles.radioContent}>
-                  <Text style={styles.radioText}>Fixed Price</Text>
-                  <Text style={styles.radioDescription}>Set a specific budget for the task</Text>
+                  <Text style={styles.radioLabel}>
+                    {type === 'fixed' ? 'Fixed Price' : 'Open for Bids'}
+                  </Text>
+                  <Text style={styles.radioDescription}>
+                    {type === 'fixed' 
+                      ? 'Set a specific amount' 
+                      : 'Taskers propose prices'
+                    }
+                  </Text>
                 </View>
               </TouchableOpacity>
+            ))}
+          </View>*/}
 
-              <TouchableOpacity
-                style={[
-                  styles.radioButton,
-                  task.biddingType === 'open-bid' && styles.radioButtonActive
-                ]}
-                onPress={() => setTask(prev => ({ ...prev, biddingType: 'open-bid' }))}
-              >
-                <View style={[
-                  styles.radioCircle,
-                  task.biddingType === 'open-bid' && styles.radioCircleActive
-                ]}>
-                  {task.biddingType === 'open-bid' && <View style={styles.radioInnerCircle} />}
-                </View>
-                <View style={styles.radioContent}>
-                  <Text style={styles.radioText}>Open for Bids</Text>
-                  <Text style={styles.radioDescription}>Taskers propose their prices</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Single Budget Input for both types */}
           <InputField
-            label={
-              task.biddingType === 'fixed' 
-                ? "Task Budget (GHS)" 
-                : "Expected Budget (GHS)"
-            }
+            label="Budget Amount (GHS)"
             value={task.budget}
             onChange={(text) => setTask(prev => ({ ...prev, budget: text }))}
             placeholder="0.00"
             keyboardType="decimal-pad"
             error={errors.budget}
-            required={true}
+            //required={true}
+            icon="cash-outline"
           />
 
-          {/* Budget Explanation */}
-          <View style={styles.budgetExplanation}>
-            <Text style={styles.budgetExplanationTitle}>
-              {task.biddingType === 'fixed' ? '💰 Fixed Price' : '💰 Open Bidding'}
-            </Text>
-            <Text style={styles.budgetExplanationText}>
-              {task.biddingType === 'fixed' 
-                ? 'This is the exact amount you will pay for the task. Taskers will apply knowing the fixed price.'
-                : 'This is your expected budget range. Taskers will submit bids within or around this amount.'
-              }
-            </Text>
+          <View style={styles.tipBox}>
+            <Ionicons name="information-circle" size={16} color="#6366F1" />
+            <Text style={styles.tipText}>Minimum budget is ₵20. Higher budgets attract more experienced taskers.</Text>
           </View>
+        </FormSection>
 
-          {/* Budget Tips */}
-          <View style={styles.budgetTips}>
-            <Text style={styles.budgetTipsTitle}>💡 Budget Tips:</Text>
-            <Text style={styles.budgetTipsText}>
-              • Research similar tasks to set a competitive price{'\n'}
-              • Consider task complexity and time required{'\n'}
-              • Higher budgets attract more experienced taskers{'\n'}
-              • Minimum budget is ₵5 for all tasks
+        {/* Timeline & Location - Combined */}
+        <FormSection 
+          title="When & Where" 
+          icon="location-outline"
+          description="Timeline and location details"
+        >
+          <TouchableOpacity 
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+            <Text style={styles.dateText}>
+              Deadline: {task.deadline.toLocaleDateString()}
             </Text>
-          </View>
-        </View>
-
-        {/* Timeline Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Timeline" 
-            icon="calendar-outline"
-            description="When do you need this task completed?"
-          />
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>
-              Deadline <Text style={styles.required}>*</Text>
-            </Text>
-            <TouchableOpacity 
-              style={[styles.dateButton, errors.deadline && styles.inputError]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#6366F1" />
-              <Text style={styles.dateText}>
-                {task.deadline ? task.deadline.toLocaleDateString() : 'Select deadline'}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color="#6366F1" />
-            </TouchableOpacity>
-            {errors.deadline && <Text style={styles.errorText}>{errors.deadline}</Text>}
-          </View>
+            <Ionicons name="chevron-down" size={16} color="#6366F1" />
+          </TouchableOpacity>
 
           {showDatePicker && (
             <DateTimePicker
@@ -535,106 +682,79 @@ const CreateTaskScreen = ({ navigation }) => {
               minimumDate={new Date()}
             />
           )}
-        </View>
 
-        {/* Location Section */}
-        <View style={styles.sectionCard}>
-          <SectionHeader 
-            title="Location" 
-            icon="location-outline"
-            description="Where does this task need to be done?"
-          />
-          
           <View style={styles.radioGroup}>
-            <TouchableOpacity
-              style={[
-                styles.radioButton,
-                task.locationType === 'remote' && styles.radioButtonActive
-              ]}
-              onPress={() => setTask(prev => ({ ...prev, locationType: 'remote' }))}
-            >
-              <View style={[
-                styles.radioCircle,
-                task.locationType === 'remote' && styles.radioCircleActive
-              ]}>
-                {task.locationType === 'remote' && <View style={styles.radioInnerCircle} />}
-              </View>
-              <View style={styles.radioContent}>
-                <Text style={styles.radioText}>Remote</Text>
-                <Text style={styles.radioDescription}>Can be done from anywhere</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.radioButton,
-                task.locationType === 'on-site' && styles.radioButtonActive
-              ]}
-              onPress={() => setTask(prev => ({ ...prev, locationType: 'on-site' }))}
-            >
-              <View style={[
-                styles.radioCircle,
-                task.locationType === 'on-site' && styles.radioCircleActive
-              ]}>
-                {task.locationType === 'on-site' && <View style={styles.radioInnerCircle} />}
-              </View>
-              <View style={styles.radioContent}>
-                <Text style={styles.radioText}>On-site</Text>
-                <Text style={styles.radioDescription}>Requires physical presence</Text>
-              </View>
-            </TouchableOpacity>
+            {['remote', 'on-site'].map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.radioOption,
+                  task.locationType === type && styles.radioOptionActive
+                ]}
+                onPress={() => setTask(prev => ({ ...prev, locationType: type }))}
+              >
+                <View style={[
+                  styles.radioDot,
+                  task.locationType === type && styles.radioDotActive
+                ]} />
+                <View style={styles.radioContent}>
+                  <Text style={styles.radioLabel}>
+                    {type === 'remote' ? 'Remote Work' : 'On-site Work'}
+                  </Text>
+                  <Text style={styles.radioDescription}>
+                    {type === 'remote' 
+                      ? 'Can be done from anywhere' 
+                      : 'Requires physical presence'
+                    }
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
 
           {task.locationType === 'on-site' && (
             <>
               <View style={styles.row}>
                 <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.inputLabel}>
-                    Region <Text style={styles.required}>*</Text>
-                  </Text>
+                  <Text style={styles.inputLabel}>Region</Text>
                   <TextInput
-                    style={[styles.textInput, errors.address && styles.inputError]}
+                    style={styles.chipInput}
                     value={task.address.region}
                     onChangeText={(text) => setTask(prev => ({
                       ...prev,
                       address: { ...prev.address, region: text }
                     }))}
-                    placeholder="e.g., Greater Accra"
+                    placeholder="Greater Accra"
                   />
                 </View>
-
                 <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.inputLabel}>
-                    City <Text style={styles.required}>*</Text>
-                  </Text>
+                  <Text style={styles.inputLabel}>City</Text>
                   <TextInput
-                    style={[styles.textInput, errors.address && styles.inputError]}
+                    style={styles.chipInput}
                     value={task.address.city}
                     onChangeText={(text) => setTask(prev => ({
                       ...prev,
                       address: { ...prev.address, city: text }
                     }))}
-                    placeholder="e.g., Accra"
+                    placeholder="Accra"
                   />
                 </View>
               </View>
-
-              <InputField
-                label="Suburb (Optional)"
-                value={task.address.suburb}
-                onChange={(text) => setTask(prev => ({
-                  ...prev,
-                  address: { ...prev.address, suburb: text }
-                }))}
-                placeholder="e.g., East Legon"
-              />
-
-              {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Town/Suburb/Street</Text>
+                <TextInput
+                  style={styles.chipInput}
+                  value={task.address.suburb}
+                  onChangeText={(text) => setTask(prev => ({
+                    ...prev,
+                    address: { ...prev.address, suburb: text }
+                  }))}
+                  placeholder="e.g East Legon Hills"
+                />
+              </View>
             </>
           )}
-        </View>
-
-        
+        </FormSection>
 
         {/* Submit Button */}
         <TouchableOpacity
@@ -643,27 +763,23 @@ const CreateTaskScreen = ({ navigation }) => {
           disabled={isSubmitting}
         >
           <LinearGradient
-            colors={['#1A1F3B', '#2D325D']}
+            colors={['#6366F1', '#4F46E5']}
             style={styles.submitGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
           >
             {isSubmitting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <Ionicons name="add-circle-outline" size={20} color="#FFFFFF" />
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
                 <Text style={styles.submitButtonText}>Post Task</Text>
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            By posting this task, you agree to our Terms of Service and Privacy Policy
-          </Text>
-        </View>
+        <Text style={styles.footerText}>
+          By posting, you agree to our Terms and Privacy Policy
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -676,147 +792,295 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#F8FAFC'
   },
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
   },
-  sectionCard: {
+  section: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionHeader: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  sectionTitleContainer: {
+  sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
     gap: 8,
+    marginBottom: 4,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1E293B',
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 18,
+    color: '#64748B',
+    lineHeight: 20,
   },
   inputContainer: {
     marginBottom: 16,
   },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  required: {
-    color: '#EF4444',
-  },
-  textInput: {
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    color: '#1F2937',
   },
-  textArea: {
-    minHeight: 120,
-    textAlignVertical: 'top',
+  inputFocused: {
+    borderColor: '#6366F1',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   inputError: {
     borderColor: '#EF4444',
     backgroundColor: '#FEF2F2',
   },
+  inputIcon: {
+    marginLeft: 12,
+  },
+  textInput: {
+    flex: 1,
+    padding: 16,
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  textInputWithIcon: {
+    marginLeft: 8,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  inputLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  required: {
+    color: '#EF4444',
+  },
   errorText: {
     color: '#EF4444',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 13,
+    marginTop: 6,
   },
   row: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
-  picker: {
-    height: 50,
+  // Chips
+  chipInputContainer: {
+    flexDirection: 'row',
+    gap: 8,
   },
+  chipInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    color: '#1F2937',
+  },
+  addChipButton: {
+    backgroundColor: '#6366F1',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6,
+  },
+  chipRequirement: {
+    backgroundColor: '#F0FDF4',
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#1E293B',
+    fontWeight: '500',
+  },
+  chipRemove: {
+    padding: 2,
+  },
+  // Radio options
   radioGroup: {
     gap: 12,
+    marginBottom: 16,
   },
-  radioButton: {
+  radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
   },
-  radioButtonActive: {
+  radioOptionActive: {
     borderColor: '#6366F1',
     backgroundColor: '#EEF2FF',
   },
-  radioCircle: {
+  radioDot: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: '#D1D5DB',
     marginRight: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  radioCircleActive: {
+  radioDotActive: {
     borderColor: '#6366F1',
-  },
-  radioInnerCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
     backgroundColor: '#6366F1',
   },
   radioContent: {
     flex: 1,
   },
-  radioText: {
-    fontSize: 14,
+  radioLabel: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 2,
   },
   radioDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
   },
+  // Media
+  mediaLimit: {
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  mediaLimitText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  mediaButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  mediaButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  mediaButtonDisabled: {
+    opacity: 0.5,
+  },
+  mediaButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  uploadingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    gap: 8,
+    marginBottom: 16,
+  },
+  uploadingText: {
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '500',
+  },
+  mediaPreviews: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  mediaPreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    position: 'relative',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  videoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E5E7EB',
+  },
+  videoText: {
+    fontSize: 12,
+    color: '#6366F1',
+    fontWeight: '500',
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  // Date
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 16,
     backgroundColor: '#FFFFFF',
+    marginBottom: 16,
   },
   dateText: {
     fontSize: 16,
@@ -824,151 +1088,52 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
-  skillInputContainer: {
+  // Tips
+  tipBox: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  skillInput: {
-    flex: 1,
-  },
-  skillHint: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  addSkillButton: {
-    backgroundColor: '#6366F1',
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
- skillsContainer: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  gap: 8,
-  marginBottom: 16,
-},
-skillTag: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#EEF2FF',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 16,
-  gap: 6,
-  maxWidth: '100%', // Prevent overflow
-  flexShrink: 1, // Allow shrinking if needed
-},
-requirementTag: {
-  backgroundColor: '#F0FDF4',
-},
-skillText: {
-  fontSize: 12,
-  color: '#1E293B',
-  fontWeight: '500',
-  flexShrink: 1, // Allow text to shrink
-  flexWrap: 'wrap', // Allow text wrapping
-},
-  
-  removeSkillButton: {
-    padding: 2,
-  },
-  budgetExplanation: {
-    marginTop: 12,
-    padding: 12,
     backgroundColor: '#F0F9FF',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0EA5E9',
-  },
-  budgetExplanationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0369A1',
-    marginBottom: 4,
-  },
-  budgetExplanationText: {
-    fontSize: 12,
-    color: '#0369A1',
-    lineHeight: 16,
-  },
-  budgetTips: {
-    marginTop: 12,
     padding: 12,
-    backgroundColor: '#FFFBEB',
     borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F59E0B',
+    gap: 8,
+    alignItems: 'flex-start',
   },
-  budgetTipsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 4,
+  tipText: {
+    fontSize: 13,
+    color: '#0369A1',
+    flex: 1,
+    lineHeight: 18,
   },
-  budgetTipsText: {
-    fontSize: 12,
-    color: '#92400E',
-    lineHeight: 16,
-  },
-  // NEW: Requirements tips styles
-  requirementsTips: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#F0FDF4',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#16A34A',
-  },
-  requirementsTipsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#166534',
-    marginBottom: 4,
-  },
-  requirementsTipsText: {
-    fontSize: 12,
-    color: '#166534',
-    lineHeight: 16,
-  },
+  // Submit
   submitButton: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 16,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 18,
     gap: 8,
   },
   submitButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   submitButtonDisabled: {
     opacity: 0.7,
   },
-  footer: {
-    alignItems: 'center',
-    marginTop: 16,
-    padding: 16,
-  },
   footerText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
 });
 

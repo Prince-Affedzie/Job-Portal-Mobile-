@@ -16,10 +16,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getMiniTaskInfo, applyToMiniTask, bidOnMiniTask } from '../../api/miniTaskApi';
+import { 
+  getMiniTaskInfo, 
+  applyToMiniTask, 
+  bidOnMiniTask, 
+  negotiateMiniTask 
+} from '../../api/miniTaskApi';
 import moment from 'moment';
 import { BidModal } from '../../component/tasker/BidModal';
+import { NegotiationModal } from '../../component/tasker/NegotiationModal'; 
 import { ScamAlertModal } from '../../component/tasker/ScamAlertModal';
+import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
 const HANDYMAN_AVATAR = require('../../assets/HandyManAvatar.png');
 import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
@@ -33,6 +40,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   const [applying, setApplying] = useState(false);
   const [showScamAlert, setShowScamAlert] = useState(false);
   const [showBidModal, setShowBidModal] = useState(false);
+  const [showNegotiationModal, setShowNegotiationModal] = useState(false); // New state
   const [applyClicked, setApplyClicked] = useState(false);
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -41,6 +49,13 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     amount: '',
     message: '',
     timeline: '',
+  });
+
+  const [negotiationData, setNegotiationData] = useState({ // New state
+    preferred: '',
+    mid: '',
+    lowest: '',
+    message: '',
   });
 
   useEffect(() => {
@@ -74,6 +89,13 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       setShowBidModal(true);
       return;
     }
+    
+    if (task?.biddingType === 'negotiation') {
+      setShowNegotiationModal(true);
+      return;
+    }
+    
+    // Fixed bidding type
     await handleFixedApplication();
   };
 
@@ -108,6 +130,31 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         setApplyClicked(true);
         setShowBidModal(false);
         Alert.alert('Success', 'Your bid has been submitted successfully!');
+      } else {
+        Alert.alert('Error', 'An error occurred. Please try again later.');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const submitNegotiation = async () => {
+    if (!negotiationData.preferred || !negotiationData.mid || !negotiationData.lowest) {
+      Alert.alert('Error', 'Please provide all three price points for negotiation');
+      return;
+    }
+
+    setApplying(true);
+    
+    try {
+      const response = await negotiateMiniTask(taskId, negotiationData);
+      if (response.status === 200) {
+        setApplyClicked(true);
+        setShowNegotiationModal(false);
+        Alert.alert('Success', 'Your negotiation offer has been submitted successfully!');
       } else {
         Alert.alert('Error', 'An error occurred. Please try again later.');
       }
@@ -155,18 +202,44 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   const getButtonText = () => {
     if (applying) return 'Processing...';
-    if (applyClicked) return task?.biddingType === 'open-bid' ? 'Bid Sent!' : 'Interest Sent!';
-    if (task?.biddingType === 'open-bid') return 'Place a Bid';
-    return 'Show Interest';
+    if (applyClicked) {
+      switch (task?.biddingType) {
+        case 'open-bid': return 'Bid Sent!';
+        case 'negotiation': return 'Offer Sent!';
+        default: return 'Interest Sent!';
+      }
+    }
+    
+    switch (task?.biddingType) {
+      case 'open-bid': return 'Place a Bid';
+      case 'negotiation': return 'Start Negotiation';
+      default: return 'Show Interest';
+    }
+  };
+
+  const getBiddingTypeIcon = () => {
+    switch (task?.biddingType) {
+      case 'open-bid': return 'pricetags-outline';
+      case 'negotiation': return 'chatbubble-ellipses-outline';
+      default: return 'lock-closed-outline';
+    }
+  };
+
+  const getBiddingTypeText = () => {
+    switch (task?.biddingType) {
+      case 'open-bid': return 'Open for Bids';
+      case 'negotiation': return 'Open for Negotiation';
+      default: return 'Fixed Budget';
+    }
   };
 
   if (loading) {
     return (
-    <SafeAreaView style={styles.container}>
-    <Header title="Task Details" showBackButton={true} />
-    <LoadingIndicator text="Loading task details..." logoStyle="glow" />
-    </SafeAreaView> 
-  );
+      <SafeAreaView style={styles.container}>
+        <Header title="Task Details" showBackButton={true} />
+        <LoadingIndicator text="Loading task details..." logoStyle="glow" />
+      </SafeAreaView> 
+    );
   }
 
   if (!task) {
@@ -186,26 +259,26 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-       <Header title="Task Details" showBackButton={true} />
+      <Header title="Task Details" showBackButton={true} />
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-       
-        
         {/* Hero Section */}
         <LinearGradient colors={['#1A1F3B', '#2D1B69']} style={styles.heroSection}>
           <View style={styles.heroContent}>
-            <View style={styles.avatarContainer}>
+            {/*<View style={styles.avatarContainer}>
               <Image source={HANDYMAN_AVATAR} style={styles.taskAvatar} resizeMode="contain" />
-            </View>
+            </View>*/}
             <View style={styles.heroTextContainer}>
               <Text style={styles.heroTitle}>{task.title}</Text>
               <View style={styles.heroBadges}>
                 <View style={styles.budgetBadge}>
                   <Ionicons name="cash" size={16} color="#FFFFFF" />
-                  <Text style={styles.budgetText}>₵{task.budget}</Text>
+                  <Text style={styles.budgetText}>
+                    {task.biddingType === 'negotiation' ? 'Negotiable' : `₵${task.budget}`}
+                  </Text>
                 </View>
                 <View style={[
                   styles.statusBadge,
@@ -227,11 +300,8 @@ const TaskDetailsScreen = ({ route, navigation }) => {
               <Text style={styles.metaText}>{calculateTimeLeft()}</Text>
             </View>
             <View style={styles.metaItem}>
-              <Ionicons name={task.biddingType === 'open-bid' ? 'pricetags-outline' : 'lock-closed-outline'} 
-                       size={18} color="#6366F1" />
-              <Text style={styles.metaText}>
-                {task.biddingType === 'open-bid' ? 'Open for Bids' : 'Fixed Budget'}
-              </Text>
+              <Ionicons name={getBiddingTypeIcon()} size={18} color="#6366F1" />
+              <Text style={styles.metaText}>{getBiddingTypeText()}</Text>
             </View>
           </View>
 
@@ -243,6 +313,9 @@ const TaskDetailsScreen = ({ route, navigation }) => {
             </View>
             <Text style={styles.description}>{task.description}</Text>
           </View>
+
+          {/* Media Display - NEW SECTION */}
+          <MediaDisplay media={task.media} />
 
           {/* Requirements */}
           <View style={styles.section}>
@@ -312,7 +385,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
                   <View style={styles.clientMeta}>
                     <View style={styles.rating}>
                       <Ionicons name="star" size={14} color="#F59E0B" />
-                      <Text style={styles.ratingText}>Rating: {task.employer.rating}</Text>
+                      <Text style={styles.ratingText}>Rating: {Math.floor(task.employer.rating)}</Text>
                     </View>
                     {task.employer?.isVerified && (
                       <View style={styles.verifiedBadge}>
@@ -369,8 +442,11 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           ) : (
             <>
               <Ionicons 
-                name={applyClicked ? 'checkmark-circle' : 
-                      task?.biddingType === 'open-bid' ? 'pricetag' : 'hand-right'} 
+                name={
+                  applyClicked ? 'checkmark-circle' : 
+                  task?.biddingType === 'open-bid' ? 'pricetag' : 
+                  task?.biddingType === 'negotiation' ? 'chatbubbles' : 'hand-right'
+                } 
                 size={22} 
                 color="#FFFFFF" 
               />
@@ -390,9 +466,18 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         onSubmit={submitBid}
         isProcessing={applying}
       />
+      <NegotiationModal
+        visible={showNegotiationModal}
+        onClose={() => setShowNegotiationModal(false)}
+        negotiationData={negotiationData}
+        setNegotiationData={setNegotiationData}
+        onSubmit={submitNegotiation}
+        isProcessing={applying}
+      />
     </SafeAreaView>
   );
 };
+
 
 export const styles = StyleSheet.create({
   container: {

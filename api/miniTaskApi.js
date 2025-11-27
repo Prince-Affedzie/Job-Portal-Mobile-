@@ -32,8 +32,8 @@ export const removeAppliedMiniTaskFromDashboard = (ids) =>
   API.put("/api/h1/v2/remove_mini_task_from_dashboard", ids);
 
 // Work submission
-export const submitWorkForReview = (taskId, data) =>
-  API.post(`/api/submit_task_work/${taskId}`, data);
+export const submitWorkForReview = (taskId,type, data) =>
+  API.post(`/api/submit_task_work/${taskId}/${type}`, data);
 
 export const getMyWorkSubmissions = (taskId) =>
   API.get(`/api/get_mysubmissions/${taskId}`);
@@ -62,7 +62,9 @@ export const raiseDispute = (reportForm) =>
 
 
 export const applyToMiniTask =(Id)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`)
+export const taskMediaUpload = (data)=>API.post('/api/h1/v2/generate_task_media_upload_url',data)
 export const bidOnMiniTask =(Id,bidData)=>API.post(`/api/h1/v2/mini_task/apply/${Id}`,bidData)
+export const negotiateMiniTask = (Id,data)=>API.post(`/api/h1/v2/mini_task/negotiate/${Id}`,data)
 export const getTasksNearby = ()=>API.get('/api/h1/v2/get_nearby_tasks')
 
 //MarkTaskAsDone 
