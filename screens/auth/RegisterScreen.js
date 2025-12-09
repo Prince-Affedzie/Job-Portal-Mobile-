@@ -244,8 +244,10 @@ const RegisterScreen = ({ navigation }) => {
       }
     } catch (error) {
       setStatus("error");
-      const errorMessage = error.response?.data?.message || 
-        "An account with this email already exists. Please login instead.";
+      const errorMessage =
+              error.response?.data?.message ||
+              error.response?.data?.error ||
+              "An unexpected error occurred";
       setStatusMessage(errorMessage);
       
       // Error shake animation

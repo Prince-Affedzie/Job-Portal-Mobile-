@@ -2,7 +2,7 @@ import "dotenv/config";
 
 export default {
   name: "Workaflow",
-  slug: "Workaflow",
+  slug: "mobile",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/WorkaflowAppIcon.png",
