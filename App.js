@@ -12,6 +12,7 @@ import NotificationPopup from "./component/common/NotificationPopUp";
 import usePushNotifications from "./hooks/usePushNotifications";
 import { PaystackProvider } from "react-native-paystack-webview";
 import { StatusBar } from "react-native";
+import * as Updates from 'expo-updates';
 const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
 
 
@@ -22,18 +23,22 @@ function PushNotificationInitializer() {
 
 export default function App() {
 
- /* useEffect(() => {
-    (async () => {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,  // ← LOUDSPEAKER
-        staysActiveInBackground: false,
-      });
-      console.log('AUDIO MODE: LOUDSPEAKER FORCED');
-    })();
-  }, []);*/
+
+  useEffect(() => {
+    async function checkUpdates() {
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch (e) {
+        console.log("Update error:", e);
+      }
+    }
+
+    checkUpdates();
+  }, []);
   
   return (
      <SafeAreaProvider>

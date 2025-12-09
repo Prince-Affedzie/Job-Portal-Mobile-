@@ -5,7 +5,7 @@ export default {
   slug: "mobile",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/WorkaflowAppIcon.png",
+  icon: "./assets/APPIcon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
 
@@ -59,6 +59,7 @@ export default {
     "expo-font",
     
     "expo-notifications",
+     "expo-asset",
   ],
 
   extra: {
