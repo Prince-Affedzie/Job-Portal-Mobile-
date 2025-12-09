@@ -172,6 +172,7 @@ const RegisterScreen = ({ navigation }) => {
   };
 
   const validateForm = () => {
+    const specialCharacterRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
     if (!formData.name.trim()) {
       Alert.alert("Error", "Please enter your full name");
       return false;
@@ -201,6 +202,11 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert("Error", "Password must contain at least one number");
       return false;
     }
+
+    if (!specialCharacterRegex.test(formData.password)) {
+    Alert.alert("Error", "Password must contain at least one special character (e.g., !@#$%)");
+    return false;
+}
     
     return true;
   };
@@ -250,7 +256,6 @@ const RegisterScreen = ({ navigation }) => {
               "An unexpected error occurred";
       setStatusMessage(errorMessage);
       
-      // Error shake animation
       Animated.sequence([
         Animated.timing(slideAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
         Animated.timing(slideAnim, { toValue: -10, duration: 50, useNativeDriver: true }),

@@ -9,6 +9,13 @@ export default {
   userInterfaceStyle: "light",
   newArchEnabled: true,
 
+  updates: { 
+   url: "https://u.expo.dev/38cbca8b-5afa-4729-b17d-20982d184c73"
+  }, 
+   runtimeVersion: {
+  policy: "appVersion"
+ },
+
   splash: {
     image: "./assets/logominimal.png",
     resizeMode: "contain",
@@ -27,10 +34,11 @@ export default {
     },
     package: "com.affedziep44.jobportalmobile",
     edgeToEdgeEnabled: true,
-
-    
+ 
     googleServicesFile: "./google-services.json",
   },
+
+  
 
   web: { 
     favicon: "./assets/WorkaflowAppIcon.png" 
