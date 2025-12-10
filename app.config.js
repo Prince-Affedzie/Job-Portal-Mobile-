@@ -52,7 +52,7 @@ export default {
           minSdkVersion: 24,
           compileSdkVersion: 36,
           targetSdkVersion: 36,
-          kotlinVersion: "2.2.20",
+          
         },
       },
     ],

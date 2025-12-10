@@ -250,10 +250,8 @@ const RegisterScreen = ({ navigation }) => {
       }
     } catch (error) {
       setStatus("error");
-      const errorMessage =
-              error.response?.data?.message ||
-              error.response?.data?.error ||
-              "An unexpected error occurred";
+      const errorMessage = error.response?.data?.message || 
+        "An account with this email already exists. Please login instead.";
       setStatusMessage(errorMessage);
       
       Animated.sequence([
