@@ -5,7 +5,7 @@ export default {
   slug: "mobile",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/APPIcon.png",
+  icon: "./assets/AppIcon-original.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
 
