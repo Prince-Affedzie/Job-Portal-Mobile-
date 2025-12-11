@@ -25,6 +25,9 @@ import {requestPayment} from '../../api/paymentApi'
 
 const { width, height } = Dimensions.get('window');
 
+// Commission constants
+const COMMISSION_PERCENTAGE = 0.12; // 12%
+
 const EarningScreen = ({ navigation }) => {
   const { user } = useContext(AuthContext);
   const { getAllEarnings } = useContext(TaskerContext);
@@ -36,6 +39,18 @@ const EarningScreen = ({ navigation }) => {
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [statsAnim] = useState(new Animated.Value(0));
   const [requestingPayment, setRequestingPayment] = useState(false);
+
+  // Calculate commission and net amount
+  const calculateCommission = (amount) => {
+    const commission = Math.round(amount * COMMISSION_PERCENTAGE);
+    const netAmount = amount - commission;
+    return {
+      gross: amount,
+      commission,
+      net: netAmount,
+      percentage: COMMISSION_PERCENTAGE
+    };
+  };
 
   // Smart time filtering that works with future dates
   const filterPaymentsByTimeRange = (payments, range) => {
@@ -134,6 +149,12 @@ const EarningScreen = ({ navigation }) => {
     const totalEscrow = filteredEscrow.reduce((sum, payment) => sum + payment.amount, 0);
     const totalEarnings = totalReleased + totalEscrow;
     
+    // Calculate net amounts after commission
+    const netReleased = calculateCommission(totalReleased).net;
+    const netEscrow = calculateCommission(totalEscrow).net;
+    const netTotal = calculateCommission(totalEarnings).net;
+    const totalCommission = calculateCommission(totalEarnings).commission;
+    
     const completedTasks = filteredReleased.length;
     const pendingTasks = filteredEscrow.length;
     const totalTasks = completedTasks + pendingTasks;
@@ -182,6 +203,10 @@ const EarningScreen = ({ navigation }) => {
       totalReleased,
       totalEscrow,
       totalEarnings,
+      netReleased,
+      netEscrow,
+      netTotal,
+      totalCommission,
       completedTasks,
       pendingTasks,
       totalTasks,
@@ -232,11 +257,16 @@ const EarningScreen = ({ navigation }) => {
     }
   };
 
-  // Function to confirm payment request
+  // Function to confirm payment request with commission breakdown
   const confirmPaymentRequest = (payment) => {
+    const commissionBreakdown = calculateCommission(payment.amount);
+    
     Alert.alert(
       'Request Payment',
-      `Are you sure you want to request payment of ₵${payment.amount.toLocaleString()} for "${payment.taskId?.title || 'Task Completed'}" job?`,
+      `Request payment for "${payment.taskId?.title || 'Task Completed'}" job?\n\n` +
+      `Gross Amount: ₵${payment.amount.toLocaleString()}\n` +
+      `Platform Fee (12%): -₵${commissionBreakdown.commission.toLocaleString()}\n` +
+      `Net Amount: ₵${commissionBreakdown.net.toLocaleString()}`,
       [
         {
           text: 'Cancel',
@@ -319,6 +349,7 @@ const EarningScreen = ({ navigation }) => {
 
     const statusConfig = getStatusConfig(payment.status);
     const canRequestPayment = payment.status === 'in_escrow';
+    const commissionBreakdown = calculateCommission(payment.amount);
 
     return (
       <Animated.View 
@@ -350,11 +381,24 @@ const EarningScreen = ({ navigation }) => {
                 <Text style={styles.paymentReference}>Ref: {payment.reference}</Text>
               )}
             </View>
+            {/* Commission breakdown */}
+            <View style={styles.commissionBreakdown}>
+              <Text style={styles.commissionLabel}>Platform Fee (12%):</Text>
+              <Text style={styles.commissionAmount}>-₵{commissionBreakdown.commission.toLocaleString()}</Text>
+            </View>
           </View>
         </View>
         
         <View style={styles.paymentRight}>
-          <Text style={styles.amountText}>₵{payment.amount.toLocaleString()}</Text>
+          {/* Show both gross and net amount */}
+          <View style={styles.amountContainer}>
+            <Text style={styles.grossAmount}>₵{payment.amount.toLocaleString()}</Text>
+            <Ionicons name="arrow-down" size={12} color="#9CA3AF" />
+            <Text style={styles.netAmount}>₵{commissionBreakdown.net.toLocaleString()}</Text>
+          </View>
+          <View style={styles.netLabelContainer}>
+            <Text style={styles.netLabel}>You receive</Text>
+          </View>
           <View style={styles.paymentActions}>
             <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
               <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
@@ -376,7 +420,7 @@ const EarningScreen = ({ navigation }) => {
                 ) : (
                   <>
                     <Ionicons name="arrow-down-circle" size={14} color="#FFFFFF" />
-                    <Text style={styles.requestButtonText}>Request</Text>
+                    <Text style={styles.requestButtonText}>Withdraw</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -425,28 +469,37 @@ const EarningScreen = ({ navigation }) => {
     );
   };
 
-  const WithdrawalButton = () => (
-    <TouchableOpacity 
-      style={styles.withdrawButton}
-      onPress={() => {
-        if (earningsStats.totalReleased > 0) {
-          Alert.alert(
-            'Withdraw Funds',
-            `You can withdraw ₵${earningsStats.totalReleased.toLocaleString()} of released funds.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Proceed', onPress: () => Alert.alert('Success', 'Withdrawal request submitted!') }
-            ]
-          );
-        } else {
-          Alert.alert('No Funds', 'You have no released funds available for withdrawal.');
-        }
-      }}
-    >
-      <Ionicons name="arrow-down-circle" size={20} color="#FFFFFF" />
-      <Text style={styles.withdrawText}>Withdraw</Text>
-    </TouchableOpacity>
-  );
+  const WithdrawalButton = () => {
+    const netReleased = calculateCommission(earningsStats.totalReleased).net;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.withdrawButton}
+        onPress={() => {
+          if (earningsStats.totalReleased > 0) {
+            const commissionBreakdown = calculateCommission(earningsStats.totalReleased);
+            
+            Alert.alert(
+              'Withdraw Funds',
+              `Available for withdrawal:\n\n` +
+              `Gross Balance: ₵${earningsStats.totalReleased.toLocaleString()}\n` +
+              `Platform Fee (12%): -₵${commissionBreakdown.commission.toLocaleString()}\n` +
+              `Net Amount: ₵${commissionBreakdown.net.toLocaleString()}`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Proceed to Withdraw', onPress: () => Alert.alert('Success', 'Withdrawal request submitted!') }
+              ]
+            );
+          } else {
+            Alert.alert('No Funds', 'You have no released funds available for withdrawal.');
+          }
+        }}
+      >
+        <Ionicons name="arrow-down-circle" size={20} color="#FFFFFF" />
+        <Text style={styles.withdrawText}>Withdraw</Text>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -466,7 +519,7 @@ const EarningScreen = ({ navigation }) => {
       <Header 
         title="My Earnings" 
         showBackButton={true}
-        rightComponent={<WithdrawalButton />}
+       // rightComponent={<WithdrawalButton />}
       />
       
       <Animated.ScrollView 
@@ -487,7 +540,7 @@ const EarningScreen = ({ navigation }) => {
           style={styles.earningsHeader}
         >
           <View style={styles.earningsOverview}>
-            <Text style={styles.earningsLabel}>Total Balance</Text>
+            <Text style={styles.earningsLabel}>Total Earnings</Text>
             <Text style={styles.earningsAmount}>
               ₵{earningsStats.totalEarnings.toLocaleString()}
             </Text>
@@ -496,13 +549,13 @@ const EarningScreen = ({ navigation }) => {
               <View style={styles.balanceItem}>
                 <View style={[styles.balanceDot, { backgroundColor: '#10B981' }]} />
                 <Text style={styles.balanceText}>
-                  Released: ₵{earningsStats.totalReleased.toLocaleString()}
+                  Total PaidOut: ₵{calculateCommission(earningsStats.totalReleased).net.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.balanceItem}>
                 <View style={[styles.balanceDot, { backgroundColor: '#F59E0B' }]} />
                 <Text style={styles.balanceText}>
-                  In Escrow: ₵{earningsStats.totalEscrow.toLocaleString()}
+                  Net in Escrow: ₵{calculateCommission(earningsStats.totalEscrow).net.toLocaleString()}
                 </Text>
               </View>
             </View>
@@ -513,6 +566,17 @@ const EarningScreen = ({ navigation }) => {
           </View>
         </LinearGradient>
 
+        {/* Commission Notice */}
+        <View style={styles.commissionNotice}>
+          <Ionicons name="information-circle" size={20} color="#6366F1" />
+          <View style={styles.commissionTextContainer}>
+            <Text style={styles.commissionTitle}>Platform Fee: 12%</Text>
+            <Text style={styles.commissionText}>
+              A 12% platform fee applies to all completed jobs. Amounts shown are gross earnings.
+            </Text>
+          </View>
+        </View>
+
         {/* Time Range Filter */}
         <TimeRangeFilter />
 
@@ -520,9 +584,9 @@ const EarningScreen = ({ navigation }) => {
         <View style={styles.statsGrid}>
           <View style={styles.statsRow}>
             <StatCard
-              title="Available Balance"
-              value={earningsStats.totalReleased}
-              subtitle="Ready to withdraw"
+              title="Total PaidOut Amount"
+              value={calculateCommission(earningsStats.totalReleased).net}
+              subtitle={`After 12% platform fee`}
               icon="wallet"
               color="#10B981"
               gradient={['#ECFDF5', '#F0FDF9']}
@@ -531,8 +595,8 @@ const EarningScreen = ({ navigation }) => {
             
             <StatCard
               title="In Escrow"
-              value={earningsStats.totalEscrow}
-              subtitle="Request payment when ready"
+              value={calculateCommission(earningsStats.totalEscrow).net}
+              subtitle={`After 12% platform fee`}
               icon="lock-closed"
               color="#F59E0B"
               gradient={['#FFFBEB', '#FEFCE8']}
@@ -552,8 +616,8 @@ const EarningScreen = ({ navigation }) => {
             
             <StatCard
               title="Avg per Task"
-              value={earningsStats.averageEarning.toFixed(0)}
-              subtitle="Completed tasks"
+              value={calculateCommission(earningsStats.averageEarning).net.toFixed(0)}
+              subtitle="After 12% platform fee"
               icon="trending-up"
               color="#8B5CF6"
               gradient={['#FAF5FF', '#F3E8FF']}
@@ -616,6 +680,43 @@ const EarningScreen = ({ navigation }) => {
           )}
         </View>
 
+        {/* Commission Breakdown */}
+        <View style={styles.commissionSection}>
+          <View style={styles.commissionHeader}>
+            <Ionicons name="pie-chart" size={20} color="#6366F1" />
+            <Text style={styles.commissionSectionTitle}>Commission Breakdown</Text>
+          </View>
+          
+          <View style={styles.commissionStats}>
+            <View style={styles.commissionStat}>
+              <Text style={styles.commissionStatLabel}>Total Gross Earnings</Text>
+              <Text style={styles.commissionStatValue}>
+                ₵{earningsStats.totalEarnings.toLocaleString()}
+              </Text>
+            </View>
+            
+            <View style={styles.commissionStat}>
+              <Text style={styles.commissionStatLabel}>Total Platform Fees</Text>
+              <Text style={[styles.commissionStatValue, styles.commissionFee]}>
+                -₵{calculateCommission(earningsStats.totalEarnings).commission.toLocaleString()}
+              </Text>
+            </View>
+            
+            <View style={styles.commissionDivider} />
+            
+            <View style={styles.commissionStat}>
+              <Text style={styles.commissionNetLabel}>Your Total Net Earnings</Text>
+              <Text style={styles.commissionNetValue}>
+                ₵{calculateCommission(earningsStats.totalEarnings).net.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.commissionNote}>
+            *12% platform fee applies to all completed jobs. This fee helps us maintain and improve the platform.
+          </Text>
+        </View>
+
         {/* Escrow Explanation */}
         <View style={styles.infoSection}>
           <View style={styles.infoHeader}>
@@ -625,6 +726,7 @@ const EarningScreen = ({ navigation }) => {
           <Text style={styles.infoText}>
             Your payments are held securely in escrow until tasks are completed and approved by clients. 
             You can request payment for earnings that are "In Escrow" once the task is completed and approved.
+            A 12% platform fee will be deducted when payment is released.
           </Text>
           <View style={styles.infoSteps}>
             <View style={styles.infoStep}>
@@ -649,7 +751,7 @@ const EarningScreen = ({ navigation }) => {
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>4</Text>
               </View>
-              <Text style={styles.stepText}>Request payment for release</Text>
+              <Text style={styles.stepText}>Request payment (12% fee applied)</Text>
             </View>
           </View>
         </View>
@@ -733,6 +835,34 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
+  },
+  // Commission Notice
+  commissionNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom:12,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  commissionTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  commissionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3730A3',
+    marginBottom: 4,
+  },
+  commissionText: {
+    fontSize: 14,
+    color: '#4F46E5',
+    lineHeight: 20,
   },
   timeFilter: {
     flexDirection: 'row',
@@ -837,8 +967,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-     elevation: 2,
-    
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -924,19 +1053,55 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
+  // Payment Item Commission Breakdown
+  commissionBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  commissionLabel: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginRight: 4,
+  },
+  commissionAmount: {
+    fontSize: 11,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
   paymentRight: {
     alignItems: 'flex-end',
+  },
+  // Amount Container
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  grossAmount: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+    textDecorationColor: '#9CA3AF',
+  },
+  netAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10B981',
+    marginTop: 2,
+  },
+  netLabelContainer: {
+    alignItems: 'flex-end',
+    marginTop: 2,
+  },
+  netLabel: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '600',
   },
   paymentActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginTop: 6,
-  },
-  amountText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#10B981',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -1002,6 +1167,72 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Commission Section
+  commissionSection: {
+    backgroundColor: '#FFFFFF',
+    margin: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  commissionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  commissionSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginLeft: 8,
+  },
+  commissionStats: {
+    marginBottom: 16,
+  },
+  commissionStat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  commissionStatLabel: {
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  commissionStatValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  commissionFee: {
+    color: '#EF4444',
+  },
+  commissionDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  commissionNetLabel: {
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '700',
+  },
+  commissionNetValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  commissionNote: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+    lineHeight: 16,
   },
   infoSection: {
     backgroundColor: '#FFFFFF',
