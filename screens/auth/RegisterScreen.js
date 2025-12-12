@@ -465,7 +465,7 @@ const RegisterScreen = ({ navigation }) => {
                 <View style={styles.roleContainer}>
                   <RoleOption
                     icon="search-outline"
-                    title="Become a Tasker"
+                    title="Seeking for Job"
                     value="job_seeker"
                     selected={formData.role === "job_seeker"}
                     handleChange={handleChange}
