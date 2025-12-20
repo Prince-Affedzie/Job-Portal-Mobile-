@@ -6,12 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Image,
-  ActivityIndicator,
   RefreshControl,
   Animated,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,7 +22,25 @@ import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
+// Theme Colors
+const THEME = {
+  primary: '#1A1F3B',
+  secondary: '#2D1B69',
+  white: '#FFFFFF',
+  lightBg: '#F8FAFC',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  textPrimary: '#1E293B',
+  textSecondary: '#64748B',
+  accent: '#6366F1',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6'
+};
+
 const TaskerDashboard = () => {
+  // States
   const [refreshing, setRefreshing] = useState(false);
   const { getAllEarnings } = useContext(TaskerContext);
   const [earnings, setEarnings] = useState([]);
@@ -35,7 +50,7 @@ const TaskerDashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const { loadMyTasks } = useContext(TaskerContext);
   const [myTasks, setMyTasks] = useState([]);
   const [myBids, setMyBids] = useState([]);
@@ -43,20 +58,16 @@ const TaskerDashboard = () => {
   // Animation values
   const [slideAnim] = useState(new Animated.Value(50));
   const [scaleAnim] = useState(new Animated.Value(0.95));
-
-  // Cache timestamp to prevent unnecessary reloads
   const [lastLoadTime, setLastLoadTime] = useState(0);
-  const CACHE_DURATION = 60000; // 30 seconds cache
+  const CACHE_DURATION = 60000;
 
   useEffect(() => {
-    // Only load on initial mount
     if (initialLoad) {
       loadAllData();
     }
   }, []);
 
   const loadAllData = async () => {
-    // Check if we need to refresh based on cache time
     const now = Date.now();
     if (!initialLoad && (now - lastLoadTime < CACHE_DURATION)) {
       setLoading(false);
@@ -68,10 +79,7 @@ const TaskerDashboard = () => {
     setRefreshing(true);
     
     try {
-      // Fetch earnings first since stats depend on it
       const earningsData = await fetchEarnings();
-      
-      // Then load tasks and calculate stats
       await loadData(earningsData);
       
       setLastLoadTime(Date.now());
@@ -92,7 +100,6 @@ const TaskerDashboard = () => {
       return earningsData;
     } catch (error) {
       console.error('Error fetching payments:', error);
-      Alert.alert('Error', 'Failed to load earnings data');
       return [];
     }
   };
@@ -101,20 +108,16 @@ const TaskerDashboard = () => {
     try {
       if (loadMyTasks) {
         const res = await loadMyTasks();
-       
-        // Extract applications and bids from the response
         const applications = res.data?.applications || [];
         const bids = res.data?.bids || [];
         
         setMyTasks(applications);
         setMyBids(bids);
 
-        // Use current earnings data directly
         const calculatedStats = calculateStats(applications, bids, earningsData);
         setStats(calculatedStats);
         setRecentActivities(generateRecentActivities(applications, bids));
         
-        // Start animations only if they haven't been started yet
         if (fadeAnim._value === 0) {
           Animated.parallel([
             Animated.timing(fadeAnim, {
@@ -142,16 +145,15 @@ const TaskerDashboard = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadAllData(); // Use the coordinated function
+    loadAllData();
   };
 
-  // Calculate stats based on actual tasks data
+  // Calculate stats
   const calculateStats = (applications = [], bids = [], currentEarnings = []) => {
     if (!applications || !Array.isArray(applications)) {
       return getDefaultStats();
     }
 
-    // Calculate task statistics
     const completedTasks = applications.filter(task => task.status === "Completed").length;
     const inProgressTasks = applications.filter(task => 
       ["Assigned", "In-progress", "Review"].includes(task.status)
@@ -160,7 +162,6 @@ const TaskerDashboard = () => {
       ["Pending", "Open"].includes(task.status)
     ).length;
 
-    // Calculate application statistics
     const submittedApplications = applications.length;
     const acceptedApplications = applications.filter(task => 
       task.status !== "Open" && task.status !== "Rejected" && task.status !== "Pending"
@@ -169,22 +170,18 @@ const TaskerDashboard = () => {
       task.status === "Open" || task.status === "Pending"
     ).length;
 
-    // Calculate acceptance rate
     const acceptanceRate = submittedApplications > 0 
       ? Math.round((acceptedApplications / submittedApplications) * 100) 
       : 0;
 
-    // Calculate success rate (completed vs total accepted)
     const successRate = acceptedApplications > 0 
       ? Math.round((completedTasks / acceptedApplications) * 100)
       : 0;
 
-    // Calculate earnings from completed tasks - use currentEarnings parameter
     const totalEarnings = currentEarnings
       .filter(earning => earning.status === "released")
       .reduce((sum, earning) => sum + (earning.amount || 0), 0);
 
-    // Calculate bids statistics
     const submittedBids = bids.length;
     const acceptedBids = bids.filter(bid => 
       bid.bid?.status === "Accepted"
@@ -193,7 +190,6 @@ const TaskerDashboard = () => {
       bid.bid?.status === "Pending"
     ).length;
 
-    // Calculate response rate (based on recent activity)
     const responseRate = calculateResponseRate(applications);
 
     return {
@@ -267,7 +263,6 @@ const TaskerDashboard = () => {
   const generateRecentActivities = (applications, bids) => {
     const activities = [];
     
-    // Recent completed tasks
     const recentCompleted = applications
       .filter(app => app.status === "Completed")
       .slice(0, 2);
@@ -280,12 +275,11 @@ const TaskerDashboard = () => {
         description: `${task.title} - ₵${task.budget}`,
         time: '2 hours ago',
         icon: 'checkmark-circle',
-        color: '#10B981',
-        gradient: ['#10B981', '#059669'],
+        color: THEME.success,
+        bgColor: '#F0FDF4',
       });
     });
 
-    // Recent applications
     const recentApplications = applications.slice(0, 2);
     recentApplications.forEach(app => {
       activities.push({
@@ -295,12 +289,11 @@ const TaskerDashboard = () => {
         description: `Applied for ${app.title}`,
         time: '1 day ago',
         icon: 'document-text',
-        color: '#6366F1',
-        gradient: ['#6366F1', '#4F46E5'],
+        color: THEME.accent,
+        bgColor: '#EEF2FF',
       });
     });
 
-    // Add some sample activities if not enough real ones
     if (activities.length < 4) {
       activities.push(
         {
@@ -310,10 +303,9 @@ const TaskerDashboard = () => {
           description: 'Add more skills to increase your visibility',
           time: '1 day ago',
           icon: 'bulb',
-          color: '#F59E0B',
-          gradient: ['#F59E0B', '#D97706'],
-        },
-       
+          color: THEME.warning,
+          bgColor: '#FFFBEB',
+        }
       );
     }
 
@@ -333,7 +325,6 @@ const TaskerDashboard = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      // Only refresh if it's been more than 30 seconds since last load
       const now = Date.now();
       if (now - lastLoadTime > CACHE_DURATION) {
         loadAllData();
@@ -342,390 +333,321 @@ const TaskerDashboard = () => {
     }, [lastLoadTime])
   );
 
-  const StatCard = ({ title, value, subtitle, icon, color, gradient, onPress, delay = 0 }) => {
-    const [cardAnim] = useState(new Animated.Value(0));
-    
-    useEffect(() => {
-      setTimeout(() => {
-        Animated.spring(cardAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }).start();
-      }, delay);
-    }, []);
+  // Component: Stats Card
+  const StatCard = ({ title, value, subtitle, icon, color, onPress }) => (
+    <TouchableOpacity 
+      style={styles.statCard} 
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <View style={styles.statCardContent}>
+        <View style={[styles.statIcon, { backgroundColor: `${color}20` }]}>
+          <Ionicons name={icon} size={20} color={color} />
+        </View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle}>{title}</Text>
+        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+      </View>
+    </TouchableOpacity>
+  );
 
-    return (
-      <Animated.View
-        style={{
-          transform: [
-            { scale: cardAnim },
-            { translateY: cardAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [30, 0]
-            })}
-          ]
-        }}
-      >
-        <TouchableOpacity 
-          style={styles.statCard} 
-          onPress={onPress}
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={gradient || [color + '20', color + '10']}
-            style={styles.statGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.statHeader}>
-              <View style={[styles.statIcon, { backgroundColor: color + '30' }]}>
-                <Ionicons name={icon} size={20} color={color} />
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={color} style={{ opacity: 0.7 }} />
-            </View>
-            <Text style={styles.statValue}>{value}</Text>
-            <Text style={styles.statTitle}>{title}</Text>
-            {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  const QuickAction = ({ title, description, icon, color, onPress, delay = 0 }) => {
-    const [actionAnim] = useState(new Animated.Value(0));
-    
-    useEffect(() => {
-      setTimeout(() => {
-        Animated.spring(actionAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 8,
-          useNativeDriver: true,
-        }).start();
-      }, delay);
-    }, []);
-
-    return (
-      <Animated.View
-        style={{
-          transform: [
-            { translateX: actionAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-50, 0]
-            })}
-          ],
-          opacity: actionAnim
-        }}
-      >
-        <TouchableOpacity 
-          style={styles.quickAction} 
-          onPress={onPress}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: color + '15' }]}>
-            <Ionicons name={icon} size={24} color={color} />
-          </View>
-          <View style={styles.actionContent}>
-            <Text style={styles.actionTitle}>{title}</Text>
-            <Text style={styles.actionDescription}>{description}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#64748B" />
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  const ActivityItem = ({ item, index }) => (
-    <Animated.View
-      style={[
-        styles.activityItem,
-        {
-          transform: [
-            { translateX: slideAnim },
-            { scale: scaleAnim }
-          ],
-          opacity: fadeAnim
-        }
-      ]}
+  // Component: Quick Action Card
+  const QuickActionCard = ({ title, description, icon, color, onPress }) => (
+    <TouchableOpacity 
+      style={styles.quickActionCard} 
+      onPress={onPress}
+      activeOpacity={0.8}
     >
       <LinearGradient
-        colors={item.gradient || [item.color + '20', item.color + '10']}
-        style={[styles.activityIcon, { backgroundColor: item.color + '20' }]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={[`${color}10`, `${color}05`]}
+        style={styles.quickActionGradient}
       >
-        <Ionicons name={item.icon} size={18} color={item.color} />
+        <View style={[styles.quickActionIcon, { backgroundColor: `${color}20` }]}>
+          <Ionicons name={icon} size={24} color={color} />
+        </View>
+        <View style={styles.quickActionContent}>
+          <Text style={styles.quickActionTitle}>{title}</Text>
+          <Text style={styles.quickActionDescription}>{description}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={THEME.textSecondary} />
       </LinearGradient>
+    </TouchableOpacity>
+  );
+
+  // Component: Activity Item
+  const ActivityItem = ({ item }) => (
+    <View style={styles.activityItem}>
+      <View style={[styles.activityIcon, { backgroundColor: item.bgColor }]}>
+        <Ionicons name={item.icon} size={18} color={item.color} />
+      </View>
       <View style={styles.activityContent}>
         <Text style={styles.activityTitle}>{item.title}</Text>
         <Text style={styles.activityDescription}>{item.description}</Text>
         <Text style={styles.activityTime}>{item.time}</Text>
       </View>
-      <View style={styles.activityArrow}>
-        <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-      </View>
-    </Animated.View>
+    </View>
   );
 
-  const ProfileCompletion = ({ completion }) => (
-    <Animated.View 
-      style={[
-        styles.profileCompletion,
-        {
-          transform: [
-            { translateY: slideAnim },
-            { scale: scaleAnim }
-          ],
-          opacity: fadeAnim
+  // Component: Profile Progress
+  const ProfileProgress = ({ completion }) => (
+    <View style={styles.profileProgress}>
+      <View style={styles.progressHeader}>
+        <Text style={styles.progressTitle}>Profile Strength</Text>
+        <Text style={styles.progressPercent}>{completion}%</Text>
+      </View>
+      <View style={styles.progressBar}>
+        <View 
+          style={[
+            styles.progressFill, 
+            { width: `${completion}%`, backgroundColor: completion >= 80 ? THEME.success : THEME.warning }
+          ]} 
+        />
+      </View>
+      <Text style={styles.progressHint}>
+        {completion < 80 
+          ? `Complete your profile to get more job invitations` 
+          : 'Great job! Keep your profile updated'
         }
-      ]}
+      </Text>
+    </View>
+  );
+
+  // Component: Stats Overview Card
+  const StatsOverview = () => (
+    <View style={styles.statsOverview}>
+      <View style={styles.statsOverviewHeader}>
+        <Text style={styles.statsOverviewTitle}>Work Summary</Text>
+        <TouchableOpacity onPress={() => navigate('MyTasks')}>
+          <Text style={styles.viewDetailsText}>View Details</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.statsGrid}>
+        <View style={styles.statItem}>
+          <Text style={styles.statItemValue}>{stats?.tasks.inProgress || 0}</Text>
+          <Text style={styles.statItemLabel}>In Progress</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statItemValue}>{stats?.tasks.completed || 0}</Text>
+          <Text style={styles.statItemLabel}>Completed</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statItemValue}>{stats?.applications.pending || 0}</Text>
+          <Text style={styles.statItemLabel}>Pending Review</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Component: Earnings Card
+  const EarningsCard = () => (
+    <LinearGradient
+      colors={[THEME.primary, THEME.secondary]}
+      style={styles.earningsCard}
     >
-      <View style={styles.completionHeader}>
-        <View style={styles.completionTitleContainer}>
-          <Ionicons name="person-circle" size={20} color="#6366F1" />
-          <Text style={styles.completionTitle}>Profile Strength</Text>
+      <View style={styles.earningsContent}>
+        <View>
+          <Text style={styles.earningsLabel}>Total Earnings</Text>
+          <Text style={styles.earningsAmount}>₵{stats?.earnings.total?.toLocaleString() || '0'}</Text>
+          <View style={styles.earningsTrend}>
+            <Ionicons name="trending-up" size={14} color={THEME.success} />
+            <Text style={styles.earningsTrendText}>{stats?.earnings.trend || '+0%'}</Text>
+          </View>
         </View>
-        <View style={styles.completionScore}>
-          <Text style={styles.completionPercent}>{completion}%</Text>
-          <View style={[
-            styles.completionDot,
-            { backgroundColor: completion >= 80 ? '#10B981' : '#F59E0B' }
-          ]} />
+        <View style={styles.earningsIcon}>
+          <Ionicons name="wallet" size={36} color="rgba(255, 255, 255, 0.8)" />
         </View>
       </View>
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <LinearGradient
-            colors={completion >= 80 ? ['#10B981', '#059669'] : ['#F59E0B', '#D97706']}
-            style={[styles.progressFill, { width: `${completion}%` }]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        </View>
-        <Text style={styles.completionHint}>
-          {completion < 80 
-            ? `${100 - completion}% to complete your profile` 
-            : 'Profile complete! 🎉'
-          }
-        </Text>
-      </View>
-    </Animated.View>
+      <TouchableOpacity 
+        style={styles.viewEarningsButton}
+        onPress={() => navigate('EarningScreen')}
+      >
+        <Text style={styles.viewEarningsText}>View Earnings</Text>
+        <Ionicons name="arrow-forward" size={16} color={THEME.white} />
+      </TouchableOpacity>
+    </LinearGradient>
   );
 
   if (loading && initialLoad) {
     return (
-    <SafeAreaView style={styles.container}>
-    <Header title="Dashboard" showProfile={false} />
-    <LoadingIndicator text='Loading your Dashboard...'/>
-    </SafeAreaView>
-  );
+      <SafeAreaView style={styles.container}>
+        <Header title="Dashboard" showBack={false} />
+        <LoadingIndicator text='Loading your Dashboard...'/>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Dashboard" showProfile={false} />
+      <Header 
+        title="Dashboard" 
+        showBack={false}
+        onRightPress={() => navigate('Notifications')}
+      />
       
       <Animated.ScrollView
-        style={{ 
-          opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }}
+        style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#6366F1']}
-            tintColor="#6366F1"
+            colors={[THEME.accent]}
+            tintColor={THEME.accent}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Animated.Text 
-            style={[
-              styles.welcomeText,
-              {
-                transform: [{ translateY: slideAnim }],
-                opacity: fadeAnim
-              }
-            ]}
+        {/* Welcome Header */}
+        <View style={styles.welcomeHeader}>
+          <View>
+            <Text style={styles.welcomeTitle}>Welcome back,</Text>
+            <Text style={styles.welcomeName}>{user?.name || 'Tasker'} 👋</Text>
+            <Text style={styles.welcomeSubtitle}>Here's your performance overview</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigate('Profile')}
           >
-            Hey, {user?.name || 'Tasker'}! 👋
-          </Animated.Text>
-          <Text style={styles.welcomeSubtitle}>
-            Here's your performance overview
-          </Text>
+            <Ionicons name="person-circle" size={24} color={THEME.accent} />
+          </TouchableOpacity>
         </View>
 
-        {/* Performance Overview */}
-        <View style={styles.performanceSection}>
-          <Text style={styles.sectionTitle}>Performance Overview</Text>
+        {/* Earnings Card */}
+        <EarningsCard />
+
+        {/* Performance Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Performance</Text>
           <View style={styles.performanceGrid}>
             <StatCard
-              title="Job Success"
+              title="Success Rate"
               value={stats?.tasks.successRate || '0%'}
-              subtitle="Completed tasks"
-              icon="trending-up"
-              color="#10B981"
-              gradient={['#FAF5FF', '#F3E8FF']}
-              onPress={() => navigate('MyTasks')}
-              delay={100}
-            />
-            <StatCard
-              title="Total Earnings"
-              value={`₵${stats?.earnings.total || 0}`}
-              subtitle="Lifetime earnings"
-              icon="cash"
-              color="#10B981"
-              gradient={['#ECFDF5', '#F0FDF9']}
-              onPress={() => navigate('EarningScreen')}
-              delay={200}
-            />
-            <StatCard
-              title="Acceptance Rate"
-              value={stats?.applications.acceptanceRate || '0%'}
-              subtitle="Applications accepted"
+              subtitle="Task completion"
               icon="checkmark-circle"
-              color="#6366F1"
-              gradient={['#EEF2FF', '#F0F4FF']}
+              color={THEME.success}
               onPress={() => navigate('MyTasks')}
-              delay={300}
             />
             <StatCard
-              title="Active Tasks"
-              value={stats?.tasks.inProgress || 0}
-              subtitle="In progress"
-              icon="time"
-              color="#F59E0B"
-              gradient={['#FFFBEB', '#FEFCE8']}
+              title="Acceptance"
+              value={stats?.applications.acceptanceRate || '0%'}
+              subtitle="Applications"
+              icon="trending-up"
+              color={THEME.accent}
               onPress={() => navigate('MyTasks')}
-              delay={400}
+            />
+            <StatCard
+              title="Response Rate"
+              value={stats?.performance.responseRate || '0%'}
+              subtitle="Client responses"
+              icon="time"
+              color={THEME.info}
+              onPress={() => navigate('AvailableTasks')}
+            />
+            <StatCard
+              title="Rating"
+              value={stats?.ratings.average?.toFixed(1) || '0.0'}
+              subtitle={`${stats?.ratings.total || 0} reviews`}
+              icon="star"
+              color={THEME.warning}
+              onPress={() => navigate('Profile')}
             />
           </View>
         </View>
 
-        {/* Profile Completion */}
+        {/* Profile Progress */}
         {stats?.performance.profileCompletion < 100 && (
           <View style={styles.section}>
-            <ProfileCompletion completion={stats?.performance.profileCompletion || 0} />
+            <ProfileProgress completion={stats?.performance.profileCompletion || 0} />
           </View>
         )}
 
         {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
-            <QuickAction
-              title="Find Available Tasks"
-              description="Browse and apply for new opportunities"
+          <View style={styles.quickActionsGrid}>
+            <QuickActionCard
+              title="Find Tasks"
+              description="Browse available tasks"
               icon="search"
-              color="#6366F1"
+              color={THEME.accent}
               onPress={() => navigate('AvailableTasks')}
-              delay={100}
             />
-            <QuickAction
-              title="View Earnings"
-              description="Check your payments and history"
-              icon="wallet"
-              color="#10B981"
-              onPress={() => navigate('EarningScreen')}
-              delay={200}
-            />
-            <QuickAction
-              title="Manage Applications"
-              description="Track your submitted applications"
-              icon="document-text"
-              color="#8B5CF6"
+            <QuickActionCard
+              title="My Tasks"
+              description="Manage your applications"
+              icon="list"
+              color={THEME.success}
               onPress={() => navigate('MyTasks')}
-              delay={300}
             />
-            <QuickAction
-              title="Boost Profile"
-              description="Improve your visibility to clients"
-              icon="rocket"
-              color="#F59E0B"
+            <QuickActionCard
+              title="Messages"
+              description="Chat with clients"
+              icon="chatbubbles"
+              color="#8B5CF6"
+              onPress={() => navigate('Chat')}
+            />
+            <QuickActionCard
+              title="Update Profile"
+              description="Improve visibility"
+              icon="person"
+              color={THEME.warning}
               onPress={() => navigate('Profile')}
-              delay={400}
             />
           </View>
         </View>
 
-        {/* Active Work Stats */}
+        {/* Work Summary */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Work Summary</Text>
-            <TouchableOpacity onPress={() => navigate('MyTasks')}>
-              <Text style={styles.viewAllText}>View Details</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.activeWorkGrid}>
-            <View style={styles.workStat}>
-              <Text style={styles.workStatValue}>{stats?.tasks.inProgress || 0}</Text>
-              <Text style={styles.workStatLabel}>In Progress</Text>
-            </View>
-            <View style={styles.workStatDivider} />
-            <View style={styles.workStat}>
-              <Text style={styles.workStatValue}>{stats?.applications.pending || 0}</Text>
-              <Text style={styles.workStatLabel}>Pending Review</Text>
-            </View>
-            <View style={styles.workStatDivider} />
-            <View style={styles.workStat}>
-              <Text style={styles.workStatValue}>{stats?.bids.pending || 0}</Text>
-              <Text style={styles.workStatLabel}>Active Bids</Text>
-            </View>
-          </View>
+          <StatsOverview />
         </View>
 
         {/* Recent Activity */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => navigate('MyTasks')}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.activitiesList}>
-            {recentActivities.map((item, index) => (
-              <ActivityItem key={item.id} item={item} index={index} />
+          <View style={styles.activitiesContainer}>
+            {recentActivities.map((item) => (
+              <ActivityItem key={item.id} item={item} />
             ))}
           </View>
         </View>
 
-        {/* Pro Tips Card */}
+        {/* Pro Tip */}
         <View style={styles.section}>
-          <LinearGradient
-            colors={['#6366F1', '#4F46E5']}
-            style={styles.tipsCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.tipsHeader}>
-              <Ionicons name="sparkles" size={24} color="#FFFFFF" />
-              <Text style={styles.tipsTitle}>Pro Tip</Text>
+          <View style={styles.tipCard}>
+            <View style={styles.tipHeader}>
+              <Ionicons name="sparkles" size={20} color={THEME.accent} />
+              <Text style={styles.tipTitle}>Pro Tip</Text>
             </View>
-            <Text style={styles.tipsText}>
+            <Text style={styles.tipText}>
               {stats?.performance.profileCompletion >= 80 
-                ? "Respond within 30 minutes to new task notifications - quick responses increase hiring chances by 60%!"
-                : "Complete your profile with work portfolio images to get 3x more client invitations!"
+                ? "Respond quickly to new task notifications - fast responses increase hiring chances!"
+                : "Complete your profile with portfolio images to get more client invitations!"
               }
             </Text>
             <TouchableOpacity 
-              style={styles.tipsButton} 
+              style={styles.tipButton}
               onPress={() => 
                 stats?.performance.profileCompletion >= 80 
                   ? navigate('AvailableTasks') 
                   : navigate('Profile')
               }
             >
-              <Text style={styles.tipsButtonText}>
-                {stats?.performance.profileCompletion >= 80 ? "Find Tasks Now" : "Complete Profile"}
+              <Text style={styles.tipButtonText}>
+                {stats?.performance.profileCompletion >= 80 ? "Find Tasks" : "Complete Profile"}
               </Text>
-              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
         </View>
+
+        {/* Bottom Padding */}
+        <View style={styles.bottomPadding} />
       </Animated.ScrollView>
     </SafeAreaView>
   );
@@ -734,48 +656,116 @@ const TaskerDashboard = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: THEME.lightBg,
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 30,
   },
-  welcomeSection: {
+  welcomeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-  welcomeSubtitle: {
+  welcomeTitle: {
     fontSize: 16,
-    color: '#64748B',
+    color: THEME.textSecondary,
     fontWeight: '500',
   },
-  performanceSection: {
+  welcomeName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: THEME.textPrimary,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+  },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${THEME.accent}10`,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  earningsCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 24,
+    borderRadius: 24,
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  earningsContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
-    paddingHorizontal: 20,
+  },
+  earningsLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  earningsAmount: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: THEME.white,
+    marginBottom: 8,
+  },
+  earningsTrend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  earningsTrendText: {
+    fontSize: 14,
+    color: THEME.success,
+    fontWeight: '600',
+  },
+  earningsIcon: {
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+  },
+  viewEarningsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  viewEarningsText: {
+    color: THEME.white,
+    fontSize: 15,
+    fontWeight: '600',
   },
   section: {
-    marginBottom: 24,
     paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: THEME.textPrimary,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 16,
-    letterSpacing: -0.5,
   },
   performanceGrid: {
     flexDirection: 'row',
@@ -784,280 +774,247 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: (width - 52) / 2,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
   },
-  statGradient: {
+  statCardContent: {
+    backgroundColor: THEME.cardBg,
     padding: 20,
     borderRadius: 20,
-  },
-  statHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1E293B',
+    color: THEME.textPrimary,
     marginBottom: 4,
-    letterSpacing: -0.5,
   },
   statTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#374151',
+    fontWeight: '600',
+    color: THEME.textPrimary,
     marginBottom: 2,
   },
   statSubtitle: {
     fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
+    color: THEME.textSecondary,
   },
-  profileCompletion: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
+  profileProgress: {
+    backgroundColor: THEME.cardBg,
+    padding: 20,
     borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  completionHeader: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  completionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
   },
-  completionTitle: {
+  progressPercent: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E293B',
-  },
-  completionScore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  completionPercent: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
-  completionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  progressContainer: {
-    gap: 8,
+    color: THEME.textPrimary,
   },
   progressBar: {
-    height: 12,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 6,
+    height: 8,
+    backgroundColor: THEME.border,
+    borderRadius: 4,
+    marginBottom: 8,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 4,
   },
-  completionHint: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
+  progressHint: {
+    fontSize: 13,
+    color: THEME.textSecondary,
   },
-  quickActions: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+  quickActionsGrid: {
+    gap: 12,
+  },
+  quickActionCard: {
+    backgroundColor: THEME.cardBg,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
-  quickAction: {
+  quickActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    padding: 16,
   },
-  actionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
-  actionContent: {
+  quickActionContent: {
     flex: 1,
   },
-  actionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
+  quickActionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 2,
   },
-  actionDescription: {
+  quickActionDescription: {
     fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
+    color: THEME.textSecondary,
   },
-  activeWorkGrid: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+  statsOverview: {
+    backgroundColor: THEME.cardBg,
+    padding: 20,
     borderRadius: 20,
-    padding: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
-  workStat: {
+  statsOverviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  statsOverviewTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: THEME.textPrimary,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    color: THEME.accent,
+    fontWeight: '600',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
     flex: 1,
     alignItems: 'center',
   },
-  workStatDivider: {
-    width: 1,
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 8,
-  },
-  workStatValue: {
+  statItemValue: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 6,
+    color: THEME.textPrimary,
+    marginBottom: 4,
   },
-  workStatLabel: {
+  statItemLabel: {
     fontSize: 13,
-    color: '#64748B',
+    color: THEME.textSecondary,
     textAlign: 'center',
-    fontWeight: '600',
   },
-  activitiesList: {
-    backgroundColor: '#FFFFFF',
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: THEME.border,
+  },
+  activitiesContainer: {
+    backgroundColor: THEME.cardBg,
     borderRadius: 20,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    elevation: 2,
+    overflow: 'hidden',
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: THEME.border,
   },
   activityIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   activityContent: {
     flex: 1,
   },
   activityTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: '600',
+    color: THEME.textPrimary,
     marginBottom: 2,
   },
   activityDescription: {
     fontSize: 14,
-    color: '#64748B',
+    color: THEME.textSecondary,
     marginBottom: 4,
-    lineHeight: 20,
   },
   activityTime: {
     fontSize: 12,
     color: '#94A3B8',
-    fontWeight: '500',
   },
-  activityArrow: {
-    paddingLeft: 8,
+  viewAllText: {
+    fontSize: 14,
+    color: THEME.accent,
+    fontWeight: '600',
   },
-  tipsCard: {
-    padding: 24,
+  tipCard: {
+    backgroundColor: '#EEF2FF',
+    padding: 20,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
   },
-  tipsHeader: {
+  tipHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    gap: 8,
   },
-  tipsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginLeft: 8,
-  },
-  tipsText: {
+  tipTitle: {
     fontSize: 16,
-    color: '#FFFFFF',
-    marginBottom: 20,
-    lineHeight: 24,
-    fontWeight: '500',
+    fontWeight: '700',
+    color: THEME.accent,
   },
-  tipsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  tipText: {
+    fontSize: 15,
+    color: '#4F46E5',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  tipButton: {
+    backgroundColor: THEME.accent,
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
     alignSelf: 'flex-start',
-    gap: 8,
   },
-  tipsButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  viewAllText: {
-    color: '#6366F1',
-    fontSize: 15,
+  tipButtonText: {
+    color: THEME.white,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  bottomPadding: {
+    height: 20,
   },
 });
 

@@ -360,73 +360,75 @@ const EarningScreen = ({ navigation }) => {
             transform: [{
               translateX: fadeAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [50, 0]
+                outputRange: [30, 0]
               })
             }]
           }
         ]}
       >
-        <View style={styles.paymentLeft}>
-          <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
-            <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
+        {/* Header Row */}
+        <View style={styles.paymentHeaderRow}>
+          <View style={styles.paymentTaskContainer}>
+            <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
+              <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
+            </View>
+            <View style={styles.paymentTaskInfo}>
+              <Text style={styles.paymentTask} numberOfLines={2}>
+                {payment.taskId?.title || 'Task Completed'}
+              </Text>
+              <View style={styles.paymentMeta}>
+                <Text style={styles.paymentDate}>
+                  {moment(payment.createdAt).format('MMM D, YYYY')}
+                </Text>
+                {payment.reference && (
+                  <Text style={styles.paymentReference}>Ref: {payment.reference}</Text>
+                )}
+              </View>
+            </View>
           </View>
           
-          <View style={styles.paymentInfo}>
-            <Text style={styles.paymentTask}>{payment.taskId?.title || 'Task Completed'}</Text>
-            <View style={styles.paymentMeta}>
-              <Text style={styles.paymentDate}>
-                {moment(payment.createdAt).format('MMM D, YYYY')}
-              </Text>
-              {payment.reference && (
-                <Text style={styles.paymentReference}>Ref: {payment.reference}</Text>
-              )}
-            </View>
-            {/* Commission breakdown */}
-            <View style={styles.commissionBreakdown}>
-              <Text style={styles.commissionLabel}>Platform Fee (12%):</Text>
-              <Text style={styles.commissionAmount}>-₵{commissionBreakdown.commission.toLocaleString()}</Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.paymentRight}>
-          {/* Show both gross and net amount */}
           <View style={styles.amountContainer}>
             <Text style={styles.grossAmount}>₵{payment.amount.toLocaleString()}</Text>
-            <Ionicons name="arrow-down" size={12} color="#9CA3AF" />
             <Text style={styles.netAmount}>₵{commissionBreakdown.net.toLocaleString()}</Text>
-          </View>
-          <View style={styles.netLabelContainer}>
             <Text style={styles.netLabel}>You receive</Text>
           </View>
-          <View style={styles.paymentActions}>
-            <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-              <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
-              <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                {statusConfig.label}
-              </Text>
-            </View>
-            {canRequestPayment && (
-              <TouchableOpacity 
-                style={[
-                  styles.requestButton,
-                  requestingPayment && styles.requestButtonDisabled
-                ]}
-                onPress={() => confirmPaymentRequest(payment)}
-                disabled={requestingPayment}
-              >
-                {requestingPayment ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="arrow-down-circle" size={14} color="#FFFFFF" />
-                    <Text style={styles.requestButtonText}>Withdraw</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
+        </View>
+
+        {/* Status and Actions Row */}
+        <View style={styles.paymentActionsRow}>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+            <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
+            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+              {statusConfig.label}
+            </Text>
+          </View>
+          
+          <View style={styles.commissionBreakdown}>
+            <Text style={styles.commissionLabel}>Platform Fee (12%): </Text>
+            <Text style={styles.commissionAmount}>-₵{commissionBreakdown.commission.toLocaleString()}</Text>
           </View>
         </View>
+
+        {/* Withdraw Button */}
+        {canRequestPayment && (
+          <TouchableOpacity 
+            style={[
+              styles.requestButton,
+              requestingPayment && styles.requestButtonDisabled
+            ]}
+            onPress={() => confirmPaymentRequest(payment)}
+            disabled={requestingPayment}
+          >
+            {requestingPayment ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="arrow-down-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.requestButtonText}>Request Payment</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </Animated.View>
     );
   };
@@ -519,7 +521,6 @@ const EarningScreen = ({ navigation }) => {
       <Header 
         title="My Earnings" 
         showBackButton={true}
-       // rightComponent={<WithdrawalButton />}
       />
       
       <Animated.ScrollView 
@@ -841,9 +842,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#EEF2FF',
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginTop: 16,
-    marginBottom:12,
+    marginBottom: 12,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
@@ -866,10 +867,10 @@ const styles = StyleSheet.create({
   },
   timeFilter: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
     backgroundColor: '#FFFFFF',
     marginTop: -20,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -882,8 +883,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderRadius: 12,
     marginHorizontal: 4,
     backgroundColor: '#F8FAFC',
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   statsGrid: {
-    padding: 16,
+    padding: 12,
     gap: 12,
   },
   statsRow: {
@@ -960,7 +961,7 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#FFFFFF',
-    margin: 16,
+    margin: 12,
     borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -973,7 +974,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
@@ -1002,20 +1003,33 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
   paymentsList: {
-    padding: 4,
+    padding: 8,
   },
+  // Updated Payment Item Styles - Wider Layout
   paymentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    marginBottom: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  paymentLeft: {
+  paymentHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  paymentTaskContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 2,
+    marginRight: 12,
   },
   paymentIcon: {
     width: 40,
@@ -1024,28 +1038,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    flexShrink: 0,
   },
-  paymentInfo: {
+  paymentTaskInfo: {
     flex: 1,
   },
   paymentTask: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 20,
   },
   paymentMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   paymentDate: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
   },
   paymentReference: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#9CA3AF',
     fontWeight: '500',
     backgroundColor: '#F3F4F6',
@@ -1053,91 +1070,92 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
   },
-  // Payment Item Commission Breakdown
-  commissionBreakdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  commissionLabel: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginRight: 4,
-  },
-  commissionAmount: {
-    fontSize: 11,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
-  paymentRight: {
-    alignItems: 'flex-end',
-  },
-  // Amount Container
   amountContainer: {
     alignItems: 'flex-end',
+    flex: 1,
+    minWidth: 100,
   },
   grossAmount: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
     textDecorationColor: '#9CA3AF',
+    marginBottom: 2,
   },
   netAmount: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
     color: '#10B981',
-    marginTop: 2,
-  },
-  netLabelContainer: {
-    alignItems: 'flex-end',
-    marginTop: 2,
+    marginBottom: 2,
   },
   netLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#10B981',
     fontWeight: '600',
   },
-  paymentActions: {
+  paymentActionsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
+    marginBottom: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  requestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#10B981',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
     gap: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  commissionBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  commissionLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginRight: 4,
+  },
+  commissionAmount: {
+    fontSize: 12,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  requestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+    width: '100%',
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   requestButtonDisabled: {
     backgroundColor: '#9CA3AF',
   },
   requestButtonText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
@@ -1171,7 +1189,7 @@ const styles = StyleSheet.create({
   // Commission Section
   commissionSection: {
     backgroundColor: '#FFFFFF',
-    margin: 16,
+    margin: 12,
     borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
@@ -1236,7 +1254,7 @@ const styles = StyleSheet.create({
   },
   infoSection: {
     backgroundColor: '#FFFFFF',
-    margin: 16,
+    margin: 12,
     borderRadius: 20,
     padding: 20,
     shadowColor: '#000',

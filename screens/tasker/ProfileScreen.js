@@ -4,63 +4,75 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   SafeAreaView,
   Image,
   ActivityIndicator,
   Switch,
   TextInput,
+  StyleSheet,
   Alert,
   Dimensions,
   Animated,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TaskerContext } from '../../context/TaskerContext';
 import * as ImagePicker from 'expo-image-picker';
-import { AuthContext } from '../../context/AuthContext';
-import { navigate } from '../../services/navigationService';
-import Header from "../../component/tasker/Header";
-import ReviewsComponent from '../../component/common/ReviewsComponent';
-import { ProfileField } from '../../component/tasker/ProfileField';
-import { LocationField } from '../../component/tasker/LocationField';
-import { styles } from '../../styles/auth/ProfileScreen.Styles';
-import { sendFileToS3 } from '../../api/commonApi';
-import { uploadProfileImage } from '../../api/authApi';
-import { updateAvailability } from '../../api/authApi'; 
-
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-const { width } = Dimensions.get('window');
+// Context & API
+import { AuthContext } from '../../context/AuthContext';
+import { TaskerContext } from '../../context/TaskerContext';
+import { navigate,reset } from '../../services/navigationService';
+import { sendFileToS3 } from '../../api/commonApi';
+import { uploadProfileImage, updateAvailability, switchAccount } from '../../api/authApi';
+import ReviewsComponent from '../../component/common/ReviewsComponent';
+import { createNavigationContainerRef } from '@react-navigation/native';
 
-// Default profile image
+
+// Components
+import Header from "../../component/tasker/Header";
+import { ProfileField } from '../../component/tasker/ProfileField';
+import { LocationField } from '../../component/tasker/LocationField';
+
+// Constants
+const { width } = Dimensions.get('window');
 const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
-// Availability options
+// Theme Colors
+const THEME = {
+  primary: '#1A1F3B',    // Dark blue
+  secondary: '#2D1B69',   // Purple
+  white: '#FFFFFF',
+  lightBg: '#F8FAFC',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  textPrimary: '#1E293B',
+  textSecondary: '#64748B',
+  accent: '#6366F1',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6'
+};
+
 const AVAILABILITY_OPTIONS = [
-  { value: 'available', label: 'Available', color: '#10B981', icon: 'checkmark-circle', description: 'Ready for new tasks' },
-  { value: 'busy', label: 'Busy', color: '#F59E0B', icon: 'time', description: 'Working on tasks' },
-  { value: 'away', label: 'Away', color: '#6366F1', icon: 'bed', description: 'Temporarily unavailable' },
+  { value: 'available', label: 'Available', color: THEME.success, icon: 'checkmark-circle', description: 'Ready for new tasks' },
+  { value: 'busy', label: 'Busy', color: THEME.warning, icon: 'time', description: 'Working on tasks' },
+  { value: 'away', label: 'Away', color: THEME.info, icon: 'bed', description: 'Temporarily unavailable' },
   { value: 'offline', label: 'Offline', color: '#6B7280', icon: 'power', description: 'Not accepting tasks' },
 ];
 
 const TaskerProfileScreen = ({ navigation }) => {
-  // Section editing states
-  const [editingSections, setEditingSections] = useState({
-    personalInfo: false,
-    skills: false,
-    workExperience: false,
-    availability: false,
-    notifications: false,
-    profileImage: false,
-  });
-
+ // const navigation = useNavigation()
+  // States
+  const [editingSections, setEditingSections] = useState({});
   const [originalData, setOriginalData] = useState({});
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const { user, logout, updateProfile } = useContext(AuthContext);
+  const { user, logout, updateProfile,setUser } = useContext(AuthContext);
   const [newSkill, setNewSkill] = useState('');
   const [showExperienceModal, setShowExperienceModal] = useState(false);
   const [editingExperience, setEditingExperience] = useState(null);
@@ -77,9 +89,69 @@ const TaskerProfileScreen = ({ navigation }) => {
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [showNextAvailablePicker, setShowNextAvailablePicker] = useState(false);
   const [updatingAvailability, setUpdatingAvailability] = useState(false);
-  const insets = useSafeAreaInsets();
   const [fadeAnim] = useState(new Animated.Value(0));
 
+   const navigationRef = createNavigationContainerRef();
+
+
+  const insets = useSafeAreaInsets();
+
+  // Initialize profile data
+  useEffect(() => {
+    if (user) {
+      const userAvailability = user.availability || {};
+      const initialData = {
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        location: user.location || {
+          region: '', city: '', town: '', street: ''
+        },
+        Bio: user.Bio || '',
+        skills: user.skills || [],
+        hourlyRate: user.hourlyRate || 0,
+        availability: {
+          status: userAvailability.status || 'available',
+          nextAvailableAt: userAvailability.nextAvailableAt || '',
+          lastActiveAt: userAvailability.lastActiveAt || new Date().toISOString(),
+          manuallySet: userAvailability.manuallySet || false,
+          workingHours: userAvailability.workingHours || {
+            timezone: 'Africa/Accra',
+            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+            startTime: '09:00',
+            endTime: '17:00'
+          },
+          maxConcurrentTasks: userAvailability.maxConcurrentTasks || 3,
+          currentTaskCount: userAvailability.currentTaskCount || 0
+        },
+        profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
+        workExperience: user.workExperience || [],
+        education: user.education || [],
+        workPortfolio: user.workPortfolio || [],
+        rating: user.rating || 0,
+        isVerified: user.isVerified || false,
+        performance: user.performance || {},
+        numberOfRatings: user.numberOfRatings || 0,
+        ratingsReceived: user.ratingsReceived || [],
+        createdAt: user.createdAt || new Date().toISOString(),
+        ...user
+      };
+
+      setProfileData(initialData);
+      setOriginalData(initialData);
+      setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Date handlers
   const onStartDateChange = (event, selectedDate) => {
     setShowStartDatePicker(false);
     if (selectedDate) {
@@ -113,7 +185,7 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
-  // Format date for display
+  // Format helpers
   const formatDisplayDate = (dateString) => {
     if (!dateString) return 'Select Date';
     try {
@@ -127,7 +199,6 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
-  // Format time for display
   const formatDisplayTime = (dateString) => {
     if (!dateString) return '';
     try {
@@ -150,97 +221,38 @@ const TaskerProfileScreen = ({ navigation }) => {
     currentlyWorking: false,
   });
 
-  // Initialize profile data with user data and proper schema structure
-  useEffect(() => {
-    if (user) {
-      const userAvailability = user.availability || {};
-      const initialData = {
-        name: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        location: user.location || {
-          region: '',
-          city: '',
-          town: '',
-          street: ''
-        },
-        Bio: user.Bio || '',
-        skills: user.skills || [],
-        hourlyRate: user.hourlyRate || 0,
-        availability: {
-          status: userAvailability.status || 'available',
-          nextAvailableAt: userAvailability.nextAvailableAt || '',
-          lastActiveAt: userAvailability.lastActiveAt || new Date().toISOString(),
-          manuallySet: userAvailability.manuallySet || false,
-          workingHours: userAvailability.workingHours || {
-            timezone: 'Africa/Accra',
-            days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-            startTime: '09:00',
-            endTime: '17:00'
-          },
-          maxConcurrentTasks: userAvailability.maxConcurrentTasks || 3,
-          currentTaskCount: userAvailability.currentTaskCount || 0
-        },
-        profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
-        workExperience: user.workExperience || [],
-        education: user.education || [],
-        workPortfolio: user.workPortfolio || [],
-        // Add other schema fields as needed
-        ...user
-      };
-
-      setProfileData(initialData);
-      setOriginalData(initialData);
-      // Store original profile image to detect changes
-      setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
-    }
-  }, [user]);
-
-  React.useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  // Section editing handlers
+  // Editing handlers
   const startEditingSection = (section) => {
-    setEditingSections(prev => ({
-      ...prev,
-      [section]: true
-    }));
+    setEditingSections(prev => ({ ...prev, [section]: true }));
   };
 
   const cancelEditingSection = (section) => {
-  
-  if (section === 'profileImage') {
-    setProfileData(prev => ({
+    if (section === 'profileImage') {
+      setProfileData(prev => ({
+        ...prev,
+        profileImage: originalProfileImage
+      }));
+    } else {
+      setProfileData(prev => ({
+        ...prev,
+        ...getSectionOriginalData(section)
+      }));
+    }
+    
+    setEditingSections(prev => ({
       ...prev,
-      profileImage: originalProfileImage
+      [section]: false
     }));
-  } else {
-    setProfileData(prev => ({
-      ...prev,
-      ...getSectionOriginalData(section)
-    }));
-  }
-  
-  setEditingSections(prev => ({
-    ...prev,
-    [section]: false
-  }));
 
-  
-  if (section === 'skills') {
-    setNewSkill('');
-  }
-};
+    if (section === 'skills') {
+      setNewSkill('');
+    }
+  };
 
   const getSectionOriginalData = (section) => {
     switch (section) {
       case 'profileImage':
-      return { profileImage: originalProfileImage };
+        return { profileImage: originalProfileImage };
       case 'personalInfo':
         return {
           name: originalData.name,
@@ -256,49 +268,37 @@ const TaskerProfileScreen = ({ navigation }) => {
         return { workExperience: [...originalData.workExperience] };
       case 'availability':
         return { availability: { ...originalData.availability } };
-      case 'notifications':
-        return {}; // Notifications are handled separately
       default:
         return {};
     }
   };
 
-  // Upload image to S3
-  const uploadImageToS3 = async(imageUri) => {
+  // Image upload
+  const uploadImageToS3 = async (imageUri) => {
     try {
       setImageUploading(true);
-      
-      // Extract file info from URI
       const filename = imageUri.split('/').pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
       
-      // Create file object
       const file = {
         uri: imageUri,
         name: filename,
         type: type,
       };
 
-      // Get pre-signed URL from backend
       const res = await uploadProfileImage({ 
         filename: file.name, 
         contentType: file.type 
       });
 
-      console.log(res)
-      
       if (res.status !== 200) {
         throw new Error('Failed to get upload URL');
       }
 
       const { fileKey, fileUrl, publicUrl } = res.data;
-      
-      // Upload file to S3 using the pre-signed URL
       await sendFileToS3(fileUrl, file);
-      
       return publicUrl;
-      
     } catch (error) {
       console.error('Image upload error:', error);
       throw new Error('Failed to upload image');
@@ -307,11 +307,10 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
-  // Update availability status
+  // Availability update
   const handleUpdateAvailability = async (newStatus) => {
     try {
       setUpdatingAvailability(true);
-      
       const availabilityData = {
         status: newStatus,
         nextAvailableAt: profileData.availability.nextAvailableAt
@@ -320,7 +319,6 @@ const TaskerProfileScreen = ({ navigation }) => {
       const res = await updateAvailability(availabilityData);
       
       if (res.status === 200) {
-        // Update local state
         setProfileData({
           ...profileData,
           availability: {
@@ -331,7 +329,6 @@ const TaskerProfileScreen = ({ navigation }) => {
           }
         });
 
-        // Update original data
         setOriginalData(prev => ({
           ...prev,
           availability: {
@@ -343,7 +340,6 @@ const TaskerProfileScreen = ({ navigation }) => {
         }));
         
         setShowAvailabilityModal(false);
-        setEditingSections(prev => ({ ...prev, availability: false }));
         Alert.alert('Success', 'Availability updated successfully!');
       }
     } catch (error) {
@@ -354,114 +350,102 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Save section
   const handleSaveSection = async (section) => {
-  setLoading(true);
-  try {
-    let finalProfileImage = profileData.profileImage;
-    
-    // Check if profile image has changed and needs to be uploaded
-    const hasImageChanged = profileData.profileImage !== originalProfileImage && 
+    setLoading(true);
+    try {
+      let finalProfileImage = profileData.profileImage;
+      
+      const hasImageChanged = profileData.profileImage !== originalProfileImage && 
                            (profileData.profileImage.startsWith('file://') || 
                             profileData.profileImage.startsWith('content://'));
-    
-    if (hasImageChanged) {
-      try {
-        finalProfileImage = await uploadImageToS3(profileData.profileImage);
-      } catch (error) {
-        Alert.alert('Upload Error', 'Failed to upload profile image. Please try again.');
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Prepare data for FormData
-    const formData = new FormData();
-    
-    // Handle profile image section specifically
-    if (section === 'profileImage') {
-      // Only update the profile image
-      formData.append('profileImage', finalProfileImage);
       
-    } else if (section === 'personalInfo' || section === 'skills') {
-      // Handle personal info and skills sections
-      formData.append('name', profileData.name);
-      formData.append('email', profileData.email);
-      formData.append('phone', profileData.phone);
-      formData.append('Bio', profileData.Bio);
-      formData.append('hourlyRate', profileData.hourlyRate.toString());
-      
-      // Add the profile image URL if it changed
       if (hasImageChanged) {
+        try {
+          finalProfileImage = await uploadImageToS3(profileData.profileImage);
+        } catch (error) {
+          Alert.alert('Upload Error', 'Failed to upload profile image. Please try again.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const formData = new FormData();
+      
+      if (section === 'profileImage') {
         formData.append('profileImage', finalProfileImage);
+      } else if (section === 'personalInfo' || section === 'skills') {
+        formData.append('name', profileData.name);
+        formData.append('email', profileData.email);
+        formData.append('phone', profileData.phone);
+        formData.append('Bio', profileData.Bio);
+        formData.append('hourlyRate', profileData.hourlyRate.toString());
+        
+        if (hasImageChanged) {
+          formData.append('profileImage', finalProfileImage);
+        }
+        
+        if (profileData.location) {
+          formData.append('location[region]', profileData.location.region || '');
+          formData.append('location[city]', profileData.location.city || '');
+          formData.append('location[town]', profileData.location.town || '');
+          formData.append('location[street]', profileData.location.street || '');
+        }
+        
+        if (profileData.skills) {
+          profileData.skills.forEach((skill, index) => {
+            formData.append(`skills[${index}]`, skill);
+          });
+        }
       }
-      
-      // Handle location object
-      if (profileData.location) {
-        formData.append('location[region]', profileData.location.region || '');
-        formData.append('location[city]', profileData.location.city || '');
-        formData.append('location[town]', profileData.location.town || '');
-        formData.append('location[street]', profileData.location.street || '');
-      }
-      
-      // Handle skills array
-      if (profileData.skills) {
-        profileData.skills.forEach((skill, index) => {
-          formData.append(`skills[${index}]`, skill);
+
+      if (section === 'workExperience' && profileData.workExperience) {
+        profileData.workExperience.forEach((exp, index) => {
+          formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
+          formData.append(`workExperience[${index}][company]`, exp.company || '');
+          
+          if (exp.startDate && exp.startDate instanceof Date) {
+            formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
+          } else if (exp.startDate && typeof exp.startDate === 'string') {
+            const date = new Date(exp.startDate);
+            if (!isNaN(date.getTime())) {
+              formData.append(`workExperience[${index}][startDate]`, date.toISOString());
+            }
+          }
+          
+          if (exp.endDate && exp.endDate instanceof Date) {
+            formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
+          } else if (exp.endDate && typeof exp.endDate === 'string') {
+            const date = new Date(exp.endDate);
+            if (!isNaN(date.getTime())) {
+              formData.append(`workExperience[${index}][endDate]`, date.toISOString());
+            }
+          }
+          
+          formData.append(`workExperience[${index}][description]`, exp.description || '');
         });
       }
-    }
 
-    // Handle work experience
-    if (section === 'workExperience' && profileData.workExperience) {
-      profileData.workExperience.forEach((exp, index) => {
-        formData.append(`workExperience[${index}][jobTitle]`, exp.jobTitle || '');
-        formData.append(`workExperience[${index}][company]`, exp.company || '');
-        
-        if (exp.startDate && exp.startDate instanceof Date) {
-          formData.append(`workExperience[${index}][startDate]`, exp.startDate.toISOString());
-        } else if (exp.startDate && typeof exp.startDate === 'string') {
-          const date = new Date(exp.startDate);
-          if (!isNaN(date.getTime())) {
-            formData.append(`workExperience[${index}][startDate]`, date.toISOString());
-          }
-        }
-        
-        if (exp.endDate && exp.endDate instanceof Date) {
-          formData.append(`workExperience[${index}][endDate]`, exp.endDate.toISOString());
-        } else if (exp.endDate && typeof exp.endDate === 'string') {
-          const date = new Date(exp.endDate);
-          if (!isNaN(date.getTime())) {
-            formData.append(`workExperience[${index}][endDate]`, date.toISOString());
-          }
-        }
-        
-        formData.append(`workExperience[${index}][description]`, exp.description || '');
-      });
+      const res = await updateProfile(formData);
+      if (res?.status === 200) {
+        setOriginalData(prev => ({
+          ...prev,
+          profileImage: finalProfileImage
+        }));
+        setOriginalProfileImage(finalProfileImage);
+        setEditingSections(prev => ({ ...prev, [section]: false }));
+        Alert.alert('Success', `${getSectionDisplayName(section)} updated successfully!`);
+      } else {
+        throw new Error('Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Update error:', error);
+      Alert.alert('Error', `Failed to update ${getSectionDisplayName(section).toLowerCase()}. Please try again.`);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    console.log('Saving section:', section);
-    console.log('FormData being sent:', formData);
-
-    const res = await updateProfile(formData);
-    if (res?.status === 200) {
-      // Update the original data and image reference
-      setOriginalData(prev => ({
-        ...prev,
-        profileImage: finalProfileImage
-      }));
-      setOriginalProfileImage(finalProfileImage);
-      setEditingSections(prev => ({ ...prev, [section]: false }));
-      Alert.alert('Success', `${getSectionDisplayName(section)} updated successfully!`);
-    } else {
-      throw new Error('Failed to update profile');
-    }
-  } catch (error) {
-    console.error('Update error:', error);
-    Alert.alert('Error', `Failed to update ${getSectionDisplayName(section).toLowerCase()}. Please try again.`);
-  } finally {
-    setLoading(false);
-  }
-};
   const getSectionDisplayName = (section) => {
     const names = {
       personalInfo: 'Personal information',
@@ -474,6 +458,7 @@ const TaskerProfileScreen = ({ navigation }) => {
     return names[section] || section;
   };
 
+  // Image picker
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -496,6 +481,7 @@ const TaskerProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Skills management
   const addSkill = () => {
     if (newSkill.trim() && !profileData.skills?.includes(newSkill.trim())) {
       setProfileData({
@@ -513,7 +499,7 @@ const TaskerProfileScreen = ({ navigation }) => {
     });
   };
 
-  // Work Experience Functions
+  // Work Experience functions
   const openExperienceModal = (experience = null) => {
     if (experience) {
       setExperienceForm({
@@ -632,11 +618,37 @@ const TaskerProfileScreen = ({ navigation }) => {
     );
   };
 
+  // Notifications
   const toggleNotification = (type) => {
     setNotifications({
       ...notifications,
       [type]: !notifications[type],
     });
+  };
+
+  // Account actions
+  const handleSwitchToClient = async() => {
+    Alert.alert(
+      'Switch to Client Mode',
+      'Are you sure you want to switch to client mode? You can switch back anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Switch', 
+          onPress: async() => {
+            const res = await switchAccount();
+            if(res.status === 200){
+              /*Alert.alert('Success', 'Switched to client mode');
+             navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'AuthStack' }],
+                });*/
+              setUser(res.data.user)
+          }
+        }
+      }
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -650,16 +662,7 @@ const TaskerProfileScreen = ({ navigation }) => {
     );
   };
 
-  const StatsCard = ({ value, label, icon, color }) => (
-    <View style={styles.statsCard}>
-      <View style={[styles.statsIcon, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={20} color="#FFFFFF" />
-      </View>
-      <Text style={styles.statsValue}>{value}</Text>
-      <Text style={styles.statsLabel}>{label}</Text>
-    </View>
-  );
-
+  // Helper functions
   const formatDate = (dateString) => {
     if (!dateString) return 'Present';
     try {
@@ -711,10 +714,10 @@ const TaskerProfileScreen = ({ navigation }) => {
   };
 
   const getRatingColor = (rating) => {
-    if (rating >= 4.5) return '#10B981';
-    if (rating >= 4.0) return '#F59E0B';
-    if (rating >= 3.0) return '#F59E0B';
-    return '#EF4444';
+    if (rating >= 4.5) return THEME.success;
+    if (rating >= 4.0) return THEME.warning;
+    if (rating >= 3.0) return THEME.warning;
+    return THEME.danger;
   };
 
   const getCurrentAvailability = () => {
@@ -729,22 +732,21 @@ const TaskerProfileScreen = ({ navigation }) => {
     return current.description;
   };
 
-  // Section Header Component with Edit/Save/Cancel buttons
-  const SectionHeader = ({ title, section, icon }) => (
+  // Component: Section Header
+  const SectionHeader = ({ title, section, icon, showEdit = true }) => (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitleContainer}>
-        <Ionicons name={icon} size={20} color="#6366F1" />
+        <Ionicons name={icon} size={20} color={THEME.accent} />
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
-      {!editingSections[section] ? (
+      {showEdit && !editingSections[section] ? (
         <TouchableOpacity 
           style={styles.sectionEditButton}
           onPress={() => startEditingSection(section)}
         >
-          <Ionicons name="create-outline" size={18} color="#6366F1" />
-          <Text style={styles.sectionEditButtonText}>Edit</Text>
+          <Ionicons name="create-outline" size={16} color={THEME.accent} />
         </TouchableOpacity>
-      ) : (
+      ) : showEdit && editingSections[section] && (
         <View style={styles.sectionActionButtons}>
           <TouchableOpacity 
             style={styles.sectionCancelButton}
@@ -759,7 +761,7 @@ const TaskerProfileScreen = ({ navigation }) => {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={THEME.white} />
             ) : (
               <Text style={styles.sectionSaveButtonText}>Save</Text>
             )}
@@ -771,276 +773,243 @@ const TaskerProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Simplified Header - No global edit button */}
-      <Header title="My Profile" />
+      <Header title="My Profile" showBack={false} />
 
       <Animated.ScrollView 
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        
-       
-       {/* Enhanced Profile Header with Edit/Save Buttons */}
-<LinearGradient
-  colors={['#1A1F3B', '#2D1B69']}
-  style={styles.profileHeader}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
->
-  <View style={styles.profileHeaderContent}>
-    {/* Profile Image Section */}
-    <View style={styles.profileImageWrapper}>
-      <View style={styles.profileImageContainer}>
-        <Image
-          source={{ uri: profileData.profileImage || DEFAULT_PROFILE_IMAGE }}
-          style={styles.profileImage}
-          defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
-        />
-        
-        {/* Show Edit button when NOT editing, Camera button when editing */}
-        {!editingSections.profileImage ? (
-          <TouchableOpacity 
-            style={styles.editImageButton} 
-            onPress={() => startEditingSection('profileImage')}
-          >
-            <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-          </TouchableOpacity>
-        ) : (
-          <>
-            {/* Camera Button - for picking image */}
-            <TouchableOpacity 
-              style={styles.editImageButton} 
-              onPress={pickImage}
-              disabled={imageUploading}
-            >
-              {imageUploading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="camera" size={18} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
+        {/* Enhanced Profile Header */}
+        <LinearGradient
+          colors={[THEME.primary, THEME.secondary]}
+          style={styles.profileHeader}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.profileHeaderContent}>
+            {/* Profile Image */}
+            <View style={styles.profileImageWrapper}>
+              <View style={styles.profileImageContainer}>
+                <Image
+                  source={{ uri: profileData.profileImage || DEFAULT_PROFILE_IMAGE }}
+                  style={styles.profileImage}
+                  defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
+                />
+                
+                {!editingSections.profileImage ? (
+                  <TouchableOpacity 
+                    style={styles.editImageButton} 
+                    onPress={() => startEditingSection('profileImage')}
+                  >
+                    <Ionicons name="camera" size={16} color={THEME.white} />
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    <TouchableOpacity 
+                      style={styles.editImageButton} 
+                      onPress={pickImage}
+                      disabled={imageUploading}
+                    >
+                      {imageUploading ? (
+                        <ActivityIndicator size="small" color={THEME.white} />
+                      ) : (
+                        <Ionicons name="camera" size={16} color={THEME.white} />
+                      )}
+                    </TouchableOpacity>
+                    
+                    {profileData.profileImage !== originalProfileImage && (
+                      <TouchableOpacity 
+                        style={styles.saveImageButton}
+                        onPress={() => handleSaveSection('profileImage')}
+                        disabled={loading || imageUploading}
+                      >
+                        {loading ? (
+                          <ActivityIndicator size="small" color={THEME.white} />
+                        ) : (
+                          <Ionicons name="checkmark" size={16} color={THEME.white} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </>
+                )}
+              </View>
+            </View>
             
-            {/* Save Button - shows when image has changed */}
-{profileData.profileImage !== originalProfileImage && (
-  <TouchableOpacity 
-    style={[
-      styles.saveImageButton,
-      (loading || imageUploading) && styles.saveImageButtonDisabled
-    ]}
-    onPress={() => handleSaveSection('profileImage')}
-    disabled={loading || imageUploading}
-  >
-    {loading ? (
-      <ActivityIndicator size="small" color="#FFFFFF" />
-    ) : (
-      <>
-        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-        <Text style={styles.saveImageButtonText}>Save</Text>
-      </>
-    )}
-  </TouchableOpacity>
-)}
-          </>
-        )}
-        
-        {/* Edit Indicator Badge */}
-        {editingSections.profileImage && (
-          <View style={styles.editIndicator}>
-            <Ionicons name="create-outline" size={12} color="#FFFFFF" />
+            {/* Profile Info */}
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{profileData.name || 'Tasker'}</Text>
+              <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
+              
+              <View style={styles.ratingVerificationContainer}>
+                {profileData.rating > 0 && (
+                  <View style={[styles.ratingContainer, { backgroundColor: getRatingColor(profileData.rating) }]}>
+                    <Ionicons name="star" size={12} color={THEME.white} />
+                    <Text style={styles.ratingText}>
+                      {parseFloat(profileData.rating || 0).toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                
+                {profileData.isVerified && (
+                  <View style={styles.verificationBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color={THEME.success} />
+                    <Text style={styles.verificationText}>Verified</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-        )}
-      </View>
-    </View>
-    
-    {/* Profile Info Section */}
-    <View style={styles.profileInfo}>
-      <Text style={styles.profileName}>{profileData.name || 'Tasker'}</Text>
-      <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
-      
-      {/* Rating and Verification */}
-      <View style={styles.ratingVerificationContainer}>
-        {profileData.rating > 0 && (
-          <View style={[styles.ratingContainer, { backgroundColor: getRatingColor(profileData.rating) }]}>
-            <Ionicons name="star" size={14} color="#FFFFFF" />
-            <Text style={styles.ratingText}>
-              {parseFloat(profileData.rating || 0).toFixed(1)}
-            </Text>
+
+          {/* Quick Stats */}
+          <View style={styles.headerStats}>
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{profileData.performance?.tasksCompleted || '0'}</Text>
+              <Text style={styles.headerStatLabel}>Completed</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{`${profileData.performance?.onTimeCompletionRate || '0'}%`}</Text>
+              <Text style={styles.headerStatLabel}>On Time</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>GHS {profileData.hourlyRate || '0'}</Text>
+              <Text style={styles.headerStatLabel}>Hourly Rate</Text>
+            </View>
           </View>
-        )}
-        
-        {profileData.isVerified && (
-          <View style={styles.verificationBadge}>
-            <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-            <Text style={styles.verificationText}>Verified</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  </View>
-</LinearGradient>
-        {/* Stats Overview */}
-        <View style={styles.statsContainer}>
-          <StatsCard 
-            value={profileData.performance?.tasksCompleted || '0'} 
-            label="Completed" 
-            icon="checkmark-done" 
-            color="#10B981" 
-          />
-          <StatsCard 
-            value={`${profileData.performance?.onTimeCompletionRate || '0'}%`}  
-            label="On Time" 
-            icon="trending-up" 
-            color="#6366F1" 
-          />
-          <StatsCard 
-            value={`GHS ${profileData.hourlyRate || '0'}`} 
-            label="Hourly Rate" 
-            icon="cash" 
-            color="#F59E0B" 
-          />
-        </View>
+        </LinearGradient>
+
+        {/* Switch to Client Button */}
+        <TouchableOpacity 
+          style={styles.switchAccountButton}
+          onPress={handleSwitchToClient}
+        >
+          <Ionicons name="swap-horizontal" size={18} color={THEME.primary} />
+          <Text style={styles.switchAccountText}>Switch to Client Mode</Text>
+          <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
+        </TouchableOpacity>
 
         {/* Personal Information Section */}
-       
-<View style={styles.section}>
-  <SectionHeader 
-    title="Personal Information" 
-    section="personalInfo" 
-    icon="person-outline" 
-  />
-  <View style={styles.sectionContent}>
-    {/* Name and Email in one row */}
-    <View style={styles.formRow}>
-      <View style={styles.formGroupHalf}>
-        <ProfileField
-          label="Full Name"
-          value={profileData.name}
-          editable={editingSections.personalInfo}
-          onChange={(text) => setProfileData({ ...profileData, name: text })}
-          placeholder="Your full name"
-          editing={editingSections.personalInfo}
-          setProfileData={setProfileData}
-          compact
-        />
-      </View>
-      <View style={styles.formGroupHalf}>
-        <ProfileField
-          label="Email"
-          value={profileData.email}
-          editable={editingSections.personalInfo}
-          onChange={(text) => setProfileData({ ...profileData, email: text })}
-          placeholder="Your email"
-          editing={editingSections.personalInfo}
-          setProfileData={setProfileData}
-          compact
-        />
-      </View>
-    </View>
+        <View style={styles.section}>
+          <SectionHeader 
+            title="Personal Information" 
+            section="personalInfo" 
+            icon="person-outline" 
+          />
+          
+          <View style={styles.formGrid}>
+            <ProfileField
+              label="Full Name"
+              value={profileData.name}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ ...profileData, name: text })}
+              placeholder="Your full name"
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              containerStyle={styles.formField}
+            />
+            
+            <ProfileField
+              label="Email"
+              value={profileData.email}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ ...profileData, email: text })}
+              placeholder="Your email"
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              containerStyle={styles.formField}
+            />
+            
+            <ProfileField
+              label="Phone"
+              value={profileData.phone}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ ...profileData, phone: text })}
+              placeholder="Phone number"
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              containerStyle={styles.formField}
+            />
+            
+            <ProfileField
+              label="Hourly Rate (₵)"
+              value={profileData.hourlyRate?.toString()}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ 
+                ...profileData, 
+                hourlyRate: text.replace(/[^0-9]/g, '') 
+              })}
+              placeholder="0"
+              editing={editingSections.personalInfo}
+              setProfileData={setProfileData}
+              keyboardType="numeric"
+              containerStyle={styles.formField}
+            />
+          </View>
 
-    {/* Phone and Hourly Rate in one row */}
-    <View style={styles.formRow}>
-      <View style={styles.formGroupHalf}>
-        <ProfileField
-          label="Phone"
-          value={profileData.phone}
-          editable={editingSections.personalInfo}
-          onChange={(text) => setProfileData({ ...profileData, phone: text })}
-          placeholder="Phone number"
-          editing={editingSections.personalInfo}
-          setProfileData={setProfileData}
-          profileData={profileData}
-          compact
-        />
-      </View>
-      <View style={styles.formGroupHalf}>
-        {/*<ProfileField
-          label="Hourly Rate (₵)"
-          value={profileData.hourlyRate?.toString()}
-          editable={editingSections.personalInfo}
-          onChange={(text) => setProfileData({ 
-            ...profileData, 
-            hourlyRate: text.replace(/[^0-9]/g, '') 
-          })}
-          placeholder="0"
-          editing={editingSections.personalInfo}
-          setProfileData={setProfileData}
-          keyboardType="numeric"
-          compact
-        />*/}
-      </View>
-    </View>
+          {/* Location Fields */}
+          <View style={styles.locationSection}>
+            <Text style={styles.sectionSubtitle}>Location</Text>
+            <View style={styles.locationGrid}>
+              <LocationField
+                label="Region"
+                field="region"
+                value={profileData.location?.region}
+                editable={editingSections.personalInfo}
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                profileData={profileData}
+                containerStyle={styles.locationField}
+              />
+              <LocationField
+                label="City"
+                field="city"
+                value={profileData.location?.city}
+                editable={editingSections.personalInfo}
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                profileData={profileData}
+                containerStyle={styles.locationField}
+              />
+              <LocationField
+                label="Town"
+                field="town"
+                value={profileData.location?.town}
+                editable={editingSections.personalInfo}
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                profileData={profileData}
+                containerStyle={styles.locationField}
+              />
+              <LocationField
+                label="Street"
+                field="street"
+                value={profileData.location?.street}
+                editable={editingSections.personalInfo}
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                profileData={profileData}
+                containerStyle={styles.locationField}
+              />
+            </View>
+          </View>
 
-    {/* Location Fields in a compact grid */}
-    <View style={styles.locationSection}>
-      <Text style={styles.locationSectionLabel}>Location</Text>
-      <View style={styles.locationGrid}>
-        <View style={styles.locationFieldCompact}>
-          <LocationField
-            label="Region"
-            field="region"
-            value={profileData.location?.region}
+          {/* Bio */}
+          <ProfileField
+            label="About Me"
+            value={profileData.Bio}
             editable={editingSections.personalInfo}
+            onChange={(text) => setProfileData({ ...profileData, Bio: text })}
+            multiline
+            placeholder="Tell clients about your skills and experience..."
             editing={editingSections.personalInfo}
             setProfileData={setProfileData}
-            profileData={profileData}
-            compact
+            characterCount
+            maxLength={500}
+            containerStyle={styles.bioField}
           />
         </View>
-        <View style={styles.locationFieldCompact}>
-          <LocationField
-            label="City"
-            field="city"
-            value={profileData.location?.city}
-            editable={editingSections.personalInfo}
-            editing={editingSections.personalInfo}
-            setProfileData={setProfileData}
-            profileData={profileData}
-            compact
-          />
-        </View>
-        <View style={styles.locationFieldCompact}>
-          <LocationField
-            label="Town"
-            field="town"
-            value={profileData.location?.town}
-            editable={editingSections.personalInfo}
-            editing={editingSections.personalInfo}
-            setProfileData={setProfileData}
-            profileData={profileData}
-            compact
-          />
-        </View>
-        <View style={styles.locationFieldCompact}>
-          <LocationField
-            label="Street"
-            field="street"
-            value={profileData.location?.street}
-            editable={editingSections.personalInfo}
-            editing={editingSections.personalInfo}
-            setProfileData={setProfileData}
-            profileData={profileData}
-            compact
-          />
-        </View>
-      </View>
-    </View>
-
-    {/* Bio - Full width */}
-    <ProfileField
-      label="About Me"
-      value={profileData.Bio}
-      editable={editingSections.personalInfo}
-      onChange={(text) => setProfileData({ ...profileData, Bio: text })}
-      multiline
-      placeholder="Tell clients about your skills, experience, and what makes you a great tasker..."
-      editing={editingSections.personalInfo}
-      setProfileData={setProfileData}
-      characterCount
-      maxLength={500}
-    />
-  </View>
-</View>
 
         {/* Skills Section */}
         <View style={styles.section}>
@@ -1060,13 +1029,13 @@ const TaskerProfileScreen = ({ navigation }) => {
                       style={styles.removeSkillButton}
                       onPress={() => removeSkill(skill)}
                     >
-                      <Ionicons name="close" size={14} color="#EF4444" />
+                      <Ionicons name="close" size={12} color={THEME.danger} />
                     </TouchableOpacity>
                   )}
                 </View>
               ))
             ) : (
-              <Text style={styles.noSkillsText}>No skills added yet</Text>
+              <Text style={styles.emptyText}>No skills added yet</Text>
             )}
           </View>
           
@@ -1078,14 +1047,14 @@ const TaskerProfileScreen = ({ navigation }) => {
                 onChangeText={setNewSkill}
                 placeholder="Add a new skill..."
                 onSubmitEditing={addSkill}
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={THEME.textSecondary}
               />
               <TouchableOpacity 
                 style={[styles.addSkillButton, !newSkill.trim() && styles.addSkillButtonDisabled]} 
                 onPress={addSkill}
                 disabled={!newSkill.trim()}
               >
-                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Ionicons name="add" size={18} color={THEME.white} />
               </TouchableOpacity>
             </View>
           )}
@@ -1112,13 +1081,13 @@ const TaskerProfileScreen = ({ navigation }) => {
                             style={styles.experienceActionButton}
                             onPress={() => openExperienceModal(experience)}
                           >
-                            <Ionicons name="create-outline" size={16} color="#6366F1" />
+                            <Ionicons name="create-outline" size={16} color={THEME.accent} />
                           </TouchableOpacity>
                           <TouchableOpacity 
                             style={styles.experienceActionButton}
                             onPress={() => removeExperience(experience)}
                           >
-                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            <Ionicons name="trash-outline" size={16} color={THEME.danger} />
                           </TouchableOpacity>
                         </View>
                       )}
@@ -1156,139 +1125,89 @@ const TaskerProfileScreen = ({ navigation }) => {
 
           {editingSections.workExperience && (
             <TouchableOpacity 
-              style={styles.addFirstExperienceButton}
+              style={styles.addExperienceButton}
               onPress={() => openExperienceModal()}
             >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
-              <Text style={styles.addFirstExperienceText}>Add Experience</Text>
+              <Ionicons name="add" size={20} color={THEME.white} />
+              <Text style={styles.addExperienceText}>Add Experience</Text>
             </TouchableOpacity>
           )}
         </View>
 
-         {/* Work Samples Section */}
-<View style={styles.section}> 
-   <View style={styles.sectionHeader}>
-    <View style={styles.sectionTitleContainer}>
-      <Ionicons name="images-outline" size={20} color="#6366F1" />
-      <Text style={styles.sectionTitle}>Work Samples</Text>
-    </View>
-    <TouchableOpacity 
-      style={styles.viewAllButton}
-      onPress={() => navigate('WorkSamples')}
-    >
-      <Text style={styles.viewAllText}>
-        {profileData.workPortfolio && profileData.workPortfolio.length > 0 ? 'View All' : 'Add'}
-      </Text>
-      <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-    </TouchableOpacity>
-  </View>
-  <TouchableOpacity 
-    style={styles.workSamplesContainer}
-    onPress={() => navigate('WorkSamples')}
-  >
-    <View style={styles.workSamplesContent}>
-      <View style={styles.workSamplesIconContainer}>
-        <Ionicons name="images-outline" size={24} color="#6366F1" />
-      </View>
-      <View style={styles.workSamplesTextContainer}>
-        <Text style={styles.workSamplesTitle}>Showcase Your Work to Convince Clients</Text>
-        <Text style={styles.workSamplesDescription}>
-          {profileData.workPortfolio && profileData.workPortfolio.length > 0 
-            ? `${profileData.workPortfolio.length} sample${profileData.workPortfolio.length !== 1 ? 's' : ''} uploaded`
-            : 'Add photos of your completed projects'
-          }
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-    </View>
-  </TouchableOpacity>
-</View>
-
-
-        {/* Enhanced Availability Section */}
-       <View style={styles.section}>
-  {/* Enhanced Section Header */}
-  <View style={styles.availabilityHeader}>
-    <View style={styles.availabilityHeaderLeft}>
-      <View style={styles.availabilityIconContainer}>
-        <Ionicons name="time-outline" size={22} color="#6366F1" />
-      </View>
-      <View>
-        <Text style={styles.availabilityHeaderTitle}>Availability Status</Text>
-        <Text style={styles.availabilityHeaderSubtitle}>
-          Update your current availability for clients
-        </Text>
-      </View>
-    </View>
-    <TouchableOpacity 
-      style={styles.availabilityEditButton}
-      onPress={() => setShowAvailabilityModal(true)}
-      disabled={updatingAvailability}
-    >
-      {updatingAvailability ? (
-        <ActivityIndicator size="small" color="#6366F1" />
-      ) : (
-        <Ionicons name="create-outline" size={18} color="#6366F1" />
-      )}
-    </TouchableOpacity>
-  </View>
-  
-  {/* Enhanced Availability Container */}
-  <TouchableOpacity 
-    style={[
-      styles.availabilityContainer,
-      updatingAvailability && styles.availabilityContainerDisabled
-    ]}
-    onPress={() => setShowAvailabilityModal(true)}
-    disabled={updatingAvailability}
-  >
-    <View style={styles.availabilityContent}>
-      <View style={styles.availabilityLeft}>
-        <View style={[styles.availabilityBadge, { backgroundColor: getCurrentAvailability().color }]}>
-          <Ionicons name={getCurrentAvailability().icon} size={20} color="#FFFFFF" />
-        </View>
-        <View style={styles.availabilityTextContainer}>
-          <Text style={styles.availabilityStatus}>{getCurrentAvailability().label}</Text>
-          <Text style={styles.availabilityDescription}>
-            {getAvailabilityDescription()}
-          </Text>
-          {profileData.availability?.currentTaskCount > 0 && (
-            <View style={styles.activeTasksContainer}>
-              <Ionicons name="list-outline" size={14} color="#6366F1" />
-              <Text style={styles.currentTasksText}>
-                {profileData.availability.currentTaskCount} active task{profileData.availability.currentTaskCount !== 1 ? 's' : ''}
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-      
-      <View style={styles.availabilityRight}>
-        {updatingAvailability ? (
-          <ActivityIndicator size="small" color="#6366F1" />
-        ) : (
-          <View style={styles.availabilityArrow}>
-            <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-          </View>
-        )}
-      </View>
-    </View>
-    
-    {/* Status Indicator Bar */}
-    <View 
-      style={[
-        styles.availabilityStatusBar,
-        { backgroundColor: getCurrentAvailability().color }
-      ]} 
-    />
-  </TouchableOpacity>
-</View>
-
-        {/* Reviews & Ratings Section */}
+        {/* Availability Status */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <Ionicons name="star-outline" size={20} color="#6366F1" />
+              <Ionicons name="time-outline" size={20} color={THEME.accent} />
+              <Text style={styles.sectionTitle}>Availability Status</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.sectionEditButton}
+              onPress={() => setShowAvailabilityModal(true)}
+            >
+              <Ionicons name="create-outline" size={16} color={THEME.accent} />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.availabilityCard}
+            onPress={() => setShowAvailabilityModal(true)}
+          >
+            <View style={styles.availabilityContent}>
+              <View style={[styles.availabilityIcon, { backgroundColor: getCurrentAvailability().color }]}>
+                <Ionicons name={getCurrentAvailability().icon} size={20} color={THEME.white} />
+              </View>
+              <View style={styles.availabilityText}>
+                <Text style={styles.availabilityStatus}>{getCurrentAvailability().label}</Text>
+                <Text style={styles.availabilityDescription}>{getAvailabilityDescription()}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={THEME.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Work Samples Preview */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="images-outline" size={20} color={THEME.accent} />
+              <Text style={styles.sectionTitle}>Work Samples</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.viewAllButton}
+              onPress={() => navigate('WorkSamples')}
+            >
+              <Text style={styles.viewAllText}>
+                {profileData.workPortfolio?.length > 0 ? 'View All' : 'Add'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.accent} />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.workSamplesCard}
+            onPress={() => navigate('WorkSamples')}
+          >
+            <View style={styles.workSamplesContent}>
+              <Ionicons name="images-outline" size={24} color={THEME.accent} />
+              <View style={styles.workSamplesText}>
+                <Text style={styles.workSamplesTitle}>Showcase Your Work</Text>
+                <Text style={styles.workSamplesDescription}>
+                  {profileData.workPortfolio?.length > 0 
+                    ? `${profileData.workPortfolio.length} sample${profileData.workPortfolio.length !== 1 ? 's' : ''}`
+                    : 'Add photos of your completed projects'
+                  }
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Reviews & Ratings */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="star-outline" size={20} color={THEME.accent} />
               <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
             </View>
             {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
@@ -1302,16 +1221,16 @@ const TaskerProfileScreen = ({ navigation }) => {
                 })}
               >
                 <Text style={styles.viewAllText}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+                <Ionicons name="chevron-forward" size={16} color={THEME.accent} />
               </TouchableOpacity>
             )}
           </View>
           
-          <ReviewsComponent 
+         <ReviewsComponent 
             reviews={profileData.ratingsReceived || []}
             averageRating={profileData.rating || 0}
             totalReviews={profileData.numberOfRatings || 0}
-            onViewAll={()=>navigation.navigate('AllReviews', { 
+            onViewAll={() => navigation.navigate('AllReviews', { 
               reviews: profileData.ratingsReceived || [],
               userName: profileData.name,
               averageRating: profileData.rating || 0,
@@ -1320,7 +1239,7 @@ const TaskerProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Notification Settings */}
+        {/* Notification Settings *
         <View style={styles.section}>
           <SectionHeader 
             title="Notifications" 
@@ -1331,7 +1250,7 @@ const TaskerProfileScreen = ({ navigation }) => {
           <View style={styles.notificationList}>
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <Ionicons name="briefcase-outline" size={20} color="#6366F1" />
+                <Ionicons name="briefcase-outline" size={20} color={THEME.accent} />
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Task Alerts</Text>
                   <Text style={styles.notificationDescription}>New tasks and updates</Text>
@@ -1341,13 +1260,13 @@ const TaskerProfileScreen = ({ navigation }) => {
                 value={notifications.taskAlerts}
                 onValueChange={() => toggleNotification('taskAlerts')}
                 trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.taskAlerts ? '#4F46E5' : '#9CA3AF'}
+                thumbColor={notifications.taskAlerts ? THEME.accent : '#9CA3AF'}
               />
             </View>
             
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6366F1" />
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={THEME.accent} />
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Messages</Text>
                   <Text style={styles.notificationDescription}>New messages from clients</Text>
@@ -1357,55 +1276,50 @@ const TaskerProfileScreen = ({ navigation }) => {
                 value={notifications.messageNotifications}
                 onValueChange={() => toggleNotification('messageNotifications')}
                 trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.messageNotifications ? '#4F46E5' : '#9CA3AF'}
+                thumbColor={notifications.messageNotifications ? THEME.accent : '#9CA3AF'}
               />
             </View>
           </View>
-        </View>
+        </View>*/}
 
-        {/* Account Actions */}
+        {/* Account Settings */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="settings-outline" size={20} color="#6366F1" />
-              <Text style={styles.sectionTitle}>Account</Text>
-            </View>
-          </View>
+          <SectionHeader 
+            title="Account Settings" 
+            section="account" 
+            icon="settings-outline" 
+            showEdit={false}
+          />
           
-          <View style={styles.accountActions}>
-            <TouchableOpacity style={styles.accountButton}  onPress={()=>navigate('EarningScreen')}>
-              <Ionicons name="lock-closed-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Earnings</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          <View style={styles.settingsList}>
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('EarningScreen')}>
+              <Ionicons name="cash-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>Earnings</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton} onPress={() => navigate("PaymentMethodScreen")}>
-              <Ionicons name="card-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Payment Methods</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate("PaymentMethodScreen")}>
+              <Ionicons name="card-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>Payment Methods</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity onPress={()=>navigate('SupportScreen')} style={styles.accountButton}>
-              <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
-              <Text style={styles.accountButtonText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('SupportScreen')}>
+              <Ionicons name="help-circle-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.accountButton, styles.logoutButton]}
-              onPress={handleLogout}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              <Text style={[styles.accountButtonText, styles.logoutText]}>Log Out</Text>
+            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color={THEME.danger} />
+              <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Member since {formatMemberSince()}
-          </Text>
+          <Text style={styles.footerText}>Member since {formatMemberSince()}</Text>
         </View>
       </Animated.ScrollView>
 
@@ -1421,7 +1335,7 @@ const TaskerProfileScreen = ({ navigation }) => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Availability</Text>
               <TouchableOpacity onPress={() => setShowAvailabilityModal(false)}>
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close" size={24} color={THEME.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -1447,14 +1361,14 @@ const TaskerProfileScreen = ({ navigation }) => {
                   }}
                 >
                   <View style={[styles.availabilityOptionIcon, { backgroundColor: option.color }]}>
-                    <Ionicons name={option.icon} size={20} color="#FFFFFF" />
+                    <Ionicons name={option.icon} size={20} color={THEME.white} />
                   </View>
                   <View style={styles.availabilityOptionText}>
                     <Text style={styles.availabilityOptionLabel}>{option.label}</Text>
                     <Text style={styles.availabilityOptionDescription}>{option.description}</Text>
                   </View>
                   {profileData.availability?.status === option.value && (
-                    <Ionicons name="checkmark" size={20} color="#10B981" />
+                    <Ionicons name="checkmark" size={20} color={THEME.success} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -1476,7 +1390,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                         : 'Select date and time'
                       }
                     </Text>
-                    <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                    <Ionicons name="calendar-outline" size={20} color={THEME.accent} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -1484,7 +1398,7 @@ const TaskerProfileScreen = ({ navigation }) => {
               {/* Current Tasks Info */}
               {profileData.availability?.currentTaskCount > 0 && (
                 <View style={styles.currentTasksContainer}>
-                  <Ionicons name="information-circle" size={20} color="#6366F1" />
+                  <Ionicons name="information-circle" size={20} color={THEME.accent} />
                   <Text style={styles.currentTasksInfo}>
                     You have {profileData.availability.currentTaskCount} active task{profileData.availability.currentTaskCount !== 1 ? 's' : ''}. 
                     Changing to 'Offline' won't affect current tasks.
@@ -1516,7 +1430,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                 disabled={updatingAvailability}
               >
                 {updatingAvailability ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={THEME.white} />
                 ) : (
                   <Text style={styles.saveButtonText}>Update Availability</Text>
                 )}
@@ -1540,7 +1454,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                 {editingExperience ? 'Edit Experience' : 'Add Work Experience'}
               </Text>
               <TouchableOpacity onPress={closeExperienceModal}>
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close" size={24} color={THEME.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -1552,7 +1466,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                   value={experienceForm.jobTitle}
                   onChangeText={(text) => setExperienceForm({ ...experienceForm, jobTitle: text })}
                   placeholder="e.g., Freelance Handyman"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={THEME.textSecondary}
                 />
               </View>
 
@@ -1563,11 +1477,10 @@ const TaskerProfileScreen = ({ navigation }) => {
                   value={experienceForm.company}
                   onChangeText={(text) => setExperienceForm({ ...experienceForm, company: text })}
                   placeholder="e.g., Self-Employed or ABC Properties"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={THEME.textSecondary}
                 />
               </View>
 
-              {/* Updated Date Fields with Pickers */}
               <View style={styles.formRow}>
                 <View style={styles.formGroupHalf}>
                   <Text style={styles.formLabel}>Start Date *</Text>
@@ -1581,7 +1494,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                     ]}>
                       {formatDisplayDate(experienceForm.startDate)}
                     </Text>
-                    <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                    <Ionicons name="calendar-outline" size={20} color={THEME.accent} />
                   </TouchableOpacity>
                 </View>
                 
@@ -1603,7 +1516,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                       {experienceForm.currentlyWorking ? 'Present' : formatDisplayDate(experienceForm.endDate)}
                     </Text>
                     {!experienceForm.currentlyWorking && (
-                      <Ionicons name="calendar-outline" size={20} color="#6366F1" />
+                      <Ionicons name="calendar-outline" size={20} color={THEME.accent} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1620,7 +1533,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                 >
                   <View style={[styles.checkbox, experienceForm.currentlyWorking && styles.checkboxChecked]}>
                     {experienceForm.currentlyWorking && (
-                      <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      <Ionicons name="checkmark" size={16} color={THEME.white} />
                     )}
                   </View>
                   <Text style={styles.checkboxLabel}>I currently work here</Text>
@@ -1634,7 +1547,7 @@ const TaskerProfileScreen = ({ navigation }) => {
                   value={experienceForm.description}
                   onChangeText={(text) => setExperienceForm({ ...experienceForm, description: text })}
                   placeholder="Describe your responsibilities, skills used, and achievements..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={THEME.textSecondary}
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
@@ -1686,5 +1599,719 @@ const TaskerProfileScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: THEME.lightBg,
+  },
+  scrollContent: {
+    paddingBottom: 30,
+  },
+  profileHeader: {
+    padding: 20,
+    borderRadius: 34,
+    marginHorizontal: 12,
+    marginTop: 12,
+  },
+  profileHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  profileImageWrapper: {
+    marginRight: 16,
+  },
+  profileImageContainer: {
+    position: 'relative',
+  },
+  profileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: THEME.white,
+  },
+  editImageButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: THEME.accent,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: THEME.white,
+  },
+  saveImageButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: THEME.success,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: THEME.white,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: THEME.white,
+    marginBottom: 4,
+  },
+  profileTitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 8,
+  },
+  ratingVerificationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  ratingText: {
+    color: THEME.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  verificationText: {
+    color: THEME.success,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  headerStats: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+  },
+  headerStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: THEME.white,
+    marginBottom: 4,
+  },
+  headerStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: 8,
+  },
+  switchAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.white,
+    marginHorizontal: 16,
+    marginTop: -20,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  switchAccountText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.primary,
+    marginLeft: 12,
+  },
+  section: {
+    backgroundColor: THEME.cardBg,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginLeft: 12,
+  },
+  sectionEditButton: {
+    padding: 8,
+  },
+  sectionActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionCancelButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  sectionCancelButtonText: {
+    color: THEME.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  sectionSaveButton: {
+    backgroundColor: THEME.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  sectionSaveButtonText: {
+    color: THEME.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  formGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  formField: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  locationSection: {
+    marginTop: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 12,
+  },
+  locationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  locationField: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  bioField: {
+    marginTop: 8,
+  },
+  skillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  skillTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  skillText: {
+    fontSize: 14,
+    color: THEME.textPrimary,
+  },
+  removeSkillButton: {
+    marginLeft: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+    fontStyle: 'italic',
+  },
+  addSkillContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  skillInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: THEME.textPrimary,
+    marginRight: 8,
+  },
+  addSkillButton: {
+    backgroundColor: THEME.accent,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addSkillButtonDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  // Work Experience Styles
+  experienceList: {
+    marginBottom: 16,
+  },
+  experienceItem: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  experienceContent: {
+    flex: 1,
+  },
+  experienceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  experienceJobTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    flex: 1,
+  },
+  experienceActions: {
+    flexDirection: 'row',
+    marginLeft: 8,
+  },
+  experienceActionButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  experienceCompany: {
+    fontSize: 14,
+    color: THEME.accent,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  experienceMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  experienceDuration: {
+    fontSize: 13,
+    color: THEME.textSecondary,
+  },
+  experienceLength: {
+    fontSize: 13,
+    color: THEME.textSecondary,
+    fontWeight: '500',
+  },
+  experienceDescription: {
+    fontSize: 14,
+    color: THEME.textPrimary,
+    lineHeight: 20,
+  },
+  emptyExperience: {
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  emptyExperienceText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyExperienceSubtext: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+    textAlign: 'center',
+  },
+  addExperienceButton: {
+    backgroundColor: THEME.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+  },
+  addExperienceText: {
+    color: THEME.white,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  // Availability Styles
+  availabilityCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+  },
+  availabilityContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  availabilityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  availabilityText: {
+    flex: 1,
+  },
+  availabilityStatus: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 4,
+  },
+  availabilityDescription: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+  },
+  // Work Samples Styles
+  workSamplesCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 16,
+  },
+  workSamplesContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  workSamplesText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  workSamplesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 4,
+  },
+  workSamplesDescription: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: THEME.accent,
+    fontWeight: '500',
+    marginRight: 4,
+  },
+  // Notification Styles
+  notificationList: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.border,
+  },
+  notificationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  notificationText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  notificationLabel: {
+    fontSize: 16,
+    color: THEME.textPrimary,
+    fontWeight: '500',
+  },
+  notificationDescription: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+    marginTop: 2,
+  },
+  // Settings Styles
+  settingsList: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.border,
+  },
+  settingText: {
+    flex: 1,
+    fontSize: 16,
+    color: THEME.textPrimary,
+    marginLeft: 12,
+  },
+  logoutItem: {
+    borderBottomWidth: 0,
+  },
+  logoutText: {
+    color: THEME.danger,
+  },
+  // Footer
+  footer: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  footerText: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: THEME.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+  },
+  modalForm: {
+    padding: 20,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 16,
+  },
+  availabilityOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#F8FAFC',
+  },
+  availabilityOptionSelected: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: THEME.accent,
+  },
+  availabilityOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  availabilityOptionText: {
+    flex: 1,
+  },
+  availabilityOptionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 4,
+  },
+  availabilityOptionDescription: {
+    fontSize: 14,
+    color: THEME.textSecondary,
+  },
+  nextAvailableContainer: {
+    marginTop: 20,
+  },
+  currentTasksContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  currentTasksInfo: {
+    flex: 1,
+    fontSize: 14,
+    color: THEME.textPrimary,
+    marginLeft: 8,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: THEME.textPrimary,
+  },
+  formRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  formGroupHalf: {
+    width: '48%',
+  },
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: THEME.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: THEME.textPrimary,
+  },
+  dateInputDisabled: {
+    backgroundColor: '#F1F5F9',
+  },
+  placeholderText: {
+    color: THEME.textSecondary,
+  },
+  disabledText: {
+    color: '#94A3B8',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: THEME.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: THEME.accent,
+    borderColor: THEME.accent,
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: THEME.textPrimary,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: THEME.border,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.border,
+    marginRight: 12,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+  },
+  saveButton: {
+    flex: 2,
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: THEME.accent,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#A5B4FC',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.white,
+  },
+});
 
 export default TaskerProfileScreen;

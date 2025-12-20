@@ -148,7 +148,7 @@ const ReviewsComponent = ({ reviews, averageRating, totalReviews, onViewAll }) =
 
   return (
     <View style={styles.container}>
-      <RatingSummary />
+     {/*<RatingSummary />*/}
       
       <View style={styles.reviewsList}>
         <Text style={styles.reviewsTitle}>Recent Reviews</Text>

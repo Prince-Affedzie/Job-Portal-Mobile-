@@ -1,4 +1,4 @@
-import React, { useState, useContext,useEffect } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Image,
   ActivityIndicator,
   Switch,
-  TextInput,
   Alert,
   Dimensions,
   Animated,
@@ -18,26 +17,47 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+
+// Context & API
 import { AuthContext } from '../../context/AuthContext';
 import { PosterContext } from '../../context/PosterContext';
-import { ProfileField } from '../../component/tasker/ProfileField';
-import { LocationField } from '../../component/tasker/LocationField';
 import { navigate } from '../../services/navigationService';
+import { sendFileToS3 } from '../../api/commonApi';
+import { uploadProfileImage, switchAccount } from '../../api/authApi';
+
+// Components
 import Header from "../../component/tasker/Header";
 import ReviewsComponent from '../../component/common/ReviewsComponent';
-import { sendFileToS3 } from '../../api/commonApi';
-import { uploadProfileImage } from '../../api/authApi';
+import { ProfileField } from '../../component/tasker/ProfileField';
+import { LocationField } from '../../component/tasker/LocationField';
 
+// Constants
 const { width } = Dimensions.get('window');
-
-// Default profile image
 const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
+// Theme Colors
+const THEME = {
+  primary: '#1A1F3B',
+  secondary: '#2D1B69',
+  white: '#FFFFFF',
+  lightBg: '#F8FAFC',
+  cardBg: '#FFFFFF',
+  border: '#E2E8F0',
+  textPrimary: '#1E293B',
+  textSecondary: '#64748B',
+  accent: '#6366F1',
+  success: '#10B981',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  info: '#3B82F6'
+};
+
 const ClientProfileScreen = ({ navigation }) => {
-  const [editing, setEditing] = useState(false);
+  // States
+  const [editingSections, setEditingSections] = useState({});
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const { user, logout, updateProfile } = useContext(AuthContext);
+  const { user, logout, updateProfile, setUser } = useContext(AuthContext);
   const { postedTasks, payments } = useContext(PosterContext);
   const [profileData, setProfileData] = useState({});
   const [originalProfileImage, setOriginalProfileImage] = useState('');
@@ -47,10 +67,15 @@ const ClientProfileScreen = ({ navigation }) => {
     messageNotifications: true,
     paymentAlerts: true,
   });
-  const insets = useSafeAreaInsets();
+  const [preferences, setPreferences] = useState({
+    verifiedOnly: false,
+    highRatedOnly: false,
+  });
   const [fadeAnim] = useState(new Animated.Value(0));
   
-  // Calculate client-specific stats
+  const insets = useSafeAreaInsets();
+
+  // Calculate client stats
   const totalTasksPosted = postedTasks?.length || 0;
   const activeTasks = postedTasks?.filter(task => 
     ['Open', 'Assigned', 'In-progress'].includes(task.status)
@@ -58,14 +83,13 @@ const ClientProfileScreen = ({ navigation }) => {
   const completedTasks = postedTasks?.filter(task => 
     ['Completed', 'Closed'].includes(task.status)
   ).length || 0;
-  const totalSpent = payments
-            .filter(payment => payment.status === 'in_escrow')
-            .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const totalSpent = payments?.filter(payment => payment.status === 'released')
+    .reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
 
-  // Initialize profile data with user data and fallbacks
+  // Initialize profile data
   useEffect(() => {
     if (user) {
-      setProfileData({
+      const initialData = {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
@@ -76,14 +100,22 @@ const ClientProfileScreen = ({ navigation }) => {
           street: ''
         },
         profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
+        Bio: user.Bio || '',
+        verified: user.verified || false,
+        rating: user.rating || 0,
+        numberOfRatings: user.numberOfRatings || 0,
+        ratingsReceived: user.ratingsReceived || [],
+        memberSince: user.createdAt || new Date().toISOString(),
         ...user
-      });
-      // Store original profile image to detect changes
+      };
+
+      setProfileData(initialData);
       setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
+      setPreferences(user.preferences || preferences);
     }
   }, [user]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 500,
@@ -91,44 +123,32 @@ const ClientProfileScreen = ({ navigation }) => {
     }).start();
   }, []);
 
-  // Upload image to S3
+  // Image upload
   const uploadImageToS3 = async (imageUri) => {
     try {
       setImageUploading(true);
-      
-      // Extract file info from URI
       const filename = imageUri.split('/').pop();
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
       
-      // Create file object
       const file = {
         uri: imageUri,
         name: filename,
         type: type,
       };
 
-      // Get pre-signed URL from backend
       const res = await uploadProfileImage({ 
         filename: file.name, 
         contentType: file.type 
       });
-      
+
       if (res.status !== 200) {
         throw new Error('Failed to get upload URL');
       }
 
       const { fileKey, fileUrl, publicUrl } = res.data;
-      
-      if (!fileUrl) {
-        throw new Error('No upload URL in response');
-      }
-      
-      // Upload file to S3 using the pre-signed URL
       await sendFileToS3(fileUrl, file);
-      
       return publicUrl;
-      
     } catch (error) {
       console.error('Image upload error:', error);
       throw new Error('Failed to upload image');
@@ -137,16 +157,42 @@ const ClientProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleSave = async () => {
+  // Account switching
+  const handleSwitchToTasker = async () => {
+    Alert.alert(
+      'Switch to Tasker Mode',
+      'Are you sure you want to switch to tasker mode? You can switch back anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Switch', 
+          onPress: async () => {
+            try {
+              const res = await switchAccount();
+              if (res.status === 200) {
+                setUser(res.data.user);
+              }
+            } catch (error) {
+              console.error('Switch account error:', error);
+              Alert.alert('Error', 'Failed to switch account');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Save section
+  const handleSaveSection = async (section) => {
     setLoading(true);
     try {
       let finalProfileImage = profileData.profileImage;
       
-      // Check if profile image has changed and needs to be uploaded
       const hasImageChanged = profileData.profileImage !== originalProfileImage && 
-                             profileData.profileImage.startsWith('file://');
+                           (profileData.profileImage.startsWith('file://') || 
+                            profileData.profileImage.startsWith('content://'));
       
-      if (hasImageChanged) {
+      if (hasImageChanged && section === 'personalInfo') {
         try {
           finalProfileImage = await uploadImageToS3(profileData.profileImage);
         } catch (error) {
@@ -157,35 +203,58 @@ const ClientProfileScreen = ({ navigation }) => {
       }
 
       const formData = new FormData();
-    
-      // Add all profile data fields
-      formData.append('name', profileData.name);
-      formData.append('email', profileData.email);
-      formData.append('phone', profileData.phone);
-
-      if (profileData.location) {
-        formData.append('location[region]', profileData.location.region || '');
-        formData.append('location[city]', profileData.location.city || '');
-        formData.append('location[town]', profileData.location.town || '');
-        formData.append('location[street]', profileData.location.street || '');
+      
+      if (section === 'personalInfo') {
+        formData.append('name', profileData.name);
+        formData.append('email', profileData.email);
+        formData.append('phone', profileData.phone);
+        formData.append('Bio', profileData.Bio || '');
+        
+        if (hasImageChanged) {
+          formData.append('profileImage', finalProfileImage);
+        }
+        
+        if (profileData.location) {
+          formData.append('location[region]', profileData.location.region || '');
+          formData.append('location[city]', profileData.location.city || '');
+          formData.append('location[town]', profileData.location.town || '');
+          formData.append('location[street]', profileData.location.street || '');
+        }
       }
 
-      // Add the profile image URL (either the existing one or the new S3 URL)
-      formData.append('profileImage', finalProfileImage);
+      if (section === 'preferences') {
+        formData.append('preferences[verifiedOnly]', preferences.verifiedOnly.toString());
+        formData.append('preferences[highRatedOnly]', preferences.highRatedOnly.toString());
+      }
 
-      await updateProfile(formData);
-      
-      // Update the original image reference
-      setOriginalProfileImage(finalProfileImage);
-      setEditing(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      const res = await updateProfile(formData);
+      if (res?.status === 200) {
+        if (hasImageChanged) {
+          setOriginalProfileImage(finalProfileImage);
+        }
+        setEditingSections(prev => ({ ...prev, [section]: false }));
+        Alert.alert('Success', `${getSectionDisplayName(section)} updated successfully!`);
+      } else {
+        throw new Error('Failed to update profile');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+      console.error('Update error:', error);
+      Alert.alert('Error', `Failed to update ${getSectionDisplayName(section).toLowerCase()}. Please try again.`);
     } finally {
       setLoading(false);
     }
   };
 
+  const getSectionDisplayName = (section) => {
+    const names = {
+      personalInfo: 'Personal information',
+      preferences: 'Task preferences',
+      notifications: 'Notification settings',
+    };
+    return names[section] || section;
+  };
+
+  // Image picker
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -208,10 +277,18 @@ const ClientProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Toggle functions
   const toggleNotification = (type) => {
     setNotifications({
       ...notifications,
       [type]: !notifications[type],
+    });
+  };
+
+  const togglePreference = (type) => {
+    setPreferences({
+      ...preferences,
+      [type]: !preferences[type],
     });
   };
 
@@ -226,19 +303,7 @@ const ClientProfileScreen = ({ navigation }) => {
     );
   };
 
-  const StatsCard = ({ value, label, icon, color }) => (
-    <LinearGradient
-      colors={['#FFFFFF', '#F8FAFC']}
-      style={styles.statsCard}
-    >
-      <View style={[styles.statsIcon, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={20} color="#FFFFFF" />
-      </View>
-      <Text style={styles.statsValue}>{value}</Text>
-      <Text style={styles.statsLabel}>{label}</Text>
-    </LinearGradient>
-  );
-
+  // Helper functions
   const formatMemberSince = () => {
     try {
       return new Date(profileData.memberSince).toLocaleDateString('en-US', {
@@ -250,13 +315,67 @@ const ClientProfileScreen = ({ navigation }) => {
     }
   };
 
+  // Component: Stats Card
+  const StatsCard = ({ value, label, icon, color }) => (
+    <View style={styles.statsCard}>
+      <View style={[styles.statsIcon, { backgroundColor: color }]}>
+        <Ionicons name={icon} size={18} color={THEME.white} />
+      </View>
+      <Text style={styles.statsValue}>{value}</Text>
+      <Text style={styles.statsLabel}>{label}</Text>
+    </View>
+  );
+
+  // Component: Section Header
+  const SectionHeader = ({ title, section, icon, showEdit = true }) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionTitleContainer}>
+        <Ionicons name={icon} size={20} color={THEME.accent} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {showEdit && !editingSections[section] ? (
+        <TouchableOpacity 
+          style={styles.sectionEditButton}
+          onPress={() => setEditingSections(prev => ({ ...prev, [section]: true }))}
+        >
+          <Ionicons name="create-outline" size={16} color={THEME.accent} />
+        </TouchableOpacity>
+      ) : showEdit && editingSections[section] && (
+        <View style={styles.sectionActionButtons}>
+          <TouchableOpacity 
+            style={styles.sectionCancelButton}
+            onPress={() => {
+              setEditingSections(prev => ({ ...prev, [section]: false }));
+              // Reset to original data if needed
+            }}
+            disabled={loading}
+          >
+            <Text style={styles.sectionCancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.sectionSaveButton}
+            onPress={() => handleSaveSection(section)}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color={THEME.white} />
+            ) : (
+              <Text style={styles.sectionSaveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // Component: Quick Action Button
   const QuickActionButton = ({ title, icon, color, onPress }) => (
     <TouchableOpacity style={styles.quickActionButton} onPress={onPress}>
       <LinearGradient
         colors={[color, `${color}CC`]}
         style={styles.quickActionGradient}
       >
-        <Ionicons name={icon} size={24} color="#FFFFFF" />
+        <Ionicons name={icon} size={24} color={THEME.white} />
         <Text style={styles.quickActionText}>{title}</Text>
       </LinearGradient>
     </TouchableOpacity>
@@ -264,24 +383,9 @@ const ClientProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <Header 
         title="My Profile" 
-        rightComponent={
-          <TouchableOpacity 
-            style={[styles.headerButton, editing && styles.headerButtonActive]}
-            onPress={editing ? handleSave : () => setEditing(true)}
-            disabled={loading || imageUploading}
-          >
-            {loading || imageUploading ? (
-              <ActivityIndicator size="small" color={editing ? "#FFFFFF" : "#6366F1"} />
-            ) : (
-              <Text style={[styles.headerButtonText, editing && styles.headerButtonTextActive]}>
-                {editing ? 'Save' : 'Edit'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        }
+        showBackButton={false}
       />
 
       <Animated.ScrollView 
@@ -291,84 +395,118 @@ const ClientProfileScreen = ({ navigation }) => {
       >
         {/* Enhanced Profile Header */}
         <LinearGradient
-          colors={['#1A1F3B', '#2D325D']}
+          colors={[THEME.primary, THEME.secondary]}
           style={styles.profileHeader}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <View style={styles.profileImageContainer}>
-            <Image
-              source={{ uri: profileData.profileImage }}
-              style={styles.profileImage}
-              defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
-            />
-            {editing && (
-              <TouchableOpacity 
-                style={styles.editImageButton} 
-                onPress={pickImage}
-                disabled={imageUploading}
-              >
-                {imageUploading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+          <View style={styles.profileHeaderContent}>
+            {/* Profile Image */}
+            <View style={styles.profileImageWrapper}>
+              <View style={styles.profileImageContainer}>
+                <Image
+                  source={{ uri: profileData.profileImage || DEFAULT_PROFILE_IMAGE }}
+                  style={styles.profileImage}
+                  defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
+                />
+                
+                {editingSections.personalInfo ? (
+                  <TouchableOpacity 
+                    style={styles.editImageButton} 
+                    onPress={pickImage}
+                    disabled={imageUploading}
+                  >
+                    {imageUploading ? (
+                      <ActivityIndicator size="small" color={THEME.white} />
+                    ) : (
+                      <Ionicons name="camera" size={16} color={THEME.white} />
+                    )}
+                  </TouchableOpacity>
                 ) : (
-                  <Ionicons name="camera" size={18} color="#FFFFFF" />
+                  <TouchableOpacity 
+                    style={styles.editImageButton} 
+                    onPress={() => setEditingSections(prev => ({ ...prev, personalInfo: true }))}
+                  >
+                    <Ionicons name="camera" size={16} color={THEME.white} />
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profileData.name}</Text>
-            <Text style={styles.profileEmail}>{profileData.email}</Text>
+              </View>
+            </View>
             
-            <View style={styles.verificationContainer}>
-              {profileData.verified && (
-                <View style={styles.verificationBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#FFFFFF" />
-                  <Text style={styles.verificationText}>Verified Client</Text>
-                </View>
-              )}
+            {/* Profile Info */}
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>{profileData.name || 'Client'}</Text>
+              <Text style={styles.profileEmail}>{profileData.email}</Text>
+              
+              <View style={styles.ratingVerificationContainer}>
+                {profileData.rating > 0 && (
+                  <View style={[styles.ratingContainer, { backgroundColor: THEME.success }]}>
+                    <Ionicons name="star" size={12} color={THEME.white} />
+                    <Text style={styles.ratingText}>
+                      {parseFloat(profileData.rating || 0).toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                
+                {profileData.verified && (
+                  <View style={styles.verificationBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color={THEME.success} />
+                    <Text style={styles.verificationText}>Verified Client</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* Quick Stats */}
+          <View style={styles.headerStats}>
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{totalTasksPosted}</Text>
+              <Text style={styles.headerStatLabel}>Posted</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>{activeTasks}</Text>
+              <Text style={styles.headerStatLabel}>Active</Text>
+            </View>
+            <View style={styles.headerStatDivider} />
+            <View style={styles.headerStatItem}>
+              <Text style={styles.headerStatValue}>₵{totalSpent.toLocaleString()}</Text>
+              <Text style={styles.headerStatLabel}>Spent</Text>
             </View>
           </View>
         </LinearGradient>
 
-        {/* Client Stats Overview */}
-        <View style={styles.statsContainer}>
-          <StatsCard 
-            value={totalTasksPosted} 
-            label="Tasks Posted" 
-            icon="document-text" 
-            color="#6366F1" 
-          />
-          <StatsCard 
-            value={activeTasks} 
-            label="Active Tasks" 
-            icon="time" 
-            color="#F59E0B" 
-          />
-          <StatsCard 
-            value={`₵${totalSpent}`} 
-            label="Total Spent" 
-            icon="cash" 
-            color="#10B981" 
-          />
-        </View>
+        {/* Switch to Tasker Button */}
+        <TouchableOpacity 
+          style={styles.switchAccountButton}
+          onPress={handleSwitchToTasker}
+        >
+          <Ionicons name="swap-horizontal" size={18} color={THEME.primary} />
+          <Text style={styles.switchAccountText}>Switch to Tasker Mode</Text>
+          <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
+        </TouchableOpacity>
 
         {/* Quick Actions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="flash-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="flash-outline" size={20} color={THEME.accent} />
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+            </View>
           </View>
+          
           <View style={styles.quickActionsGrid}>
             <QuickActionButton
               title="Post Task"
               icon="add-circle"
-              color="#10B981"
-              onPress={() => navigate('PostedTasks',{ screen: 'CreateTask' })}
+              color={THEME.success}
+              onPress={() => navigate('PostedTasks', { screen: 'CreateTask' })}
             />
             <QuickActionButton
               title="My Tasks"
               icon="list"
-              color="#6366F1"
+              color={THEME.accent}
               onPress={() => navigate('PostedTasks')}
             />
             <QuickActionButton
@@ -380,92 +518,172 @@ const ClientProfileScreen = ({ navigation }) => {
             <QuickActionButton
               title="Payments"
               icon="wallet"
-              color="#F59E0B"
+              color={THEME.warning}
               onPress={() => navigate('Payments')}
             />
           </View>
         </View>
 
-        {/* Enhanced Profile Information */}
+        {/* Personal Information */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="business-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-          </View>
+          <SectionHeader 
+            title="Personal Information" 
+            section="personalInfo" 
+            icon="person-outline" 
+          />
+          
           <View style={styles.sectionContent}>
-            <ProfileField
-              label="Full Name"
-              value={profileData.name}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, name: text })}
-              placeholder="Enter your full name"
-              editing={editing}
-              setProfileData={setProfileData}
-            />
-            <ProfileField
-              label="Email"
-              value={profileData.email}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, email: text })}
-              placeholder="Enter your email"
-              editing={editing}
-              setProfileData={setProfileData}
-            />
-            <ProfileField
-              label="Phone"
-              value={profileData.phone}
-              editable
-              onChange={(text) => setProfileData({ ...profileData, phone: text })}
-              placeholder="Enter your phone number"
-              editing={editing}
-              setProfileData={setProfileData}
-            />
-            
+            <View style={styles.formGrid}>
+              <ProfileField
+                label="Full Name"
+                value={profileData.name}
+                editable={editingSections.personalInfo}
+                onChange={(text) => setProfileData({ ...profileData, name: text })}
+                placeholder="Your full name"
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                containerStyle={styles.formField}
+              />
+              
+              <ProfileField
+                label="Email"
+                value={profileData.email}
+                editable={editingSections.personalInfo}
+                onChange={(text) => setProfileData({ ...profileData, email: text })}
+                placeholder="Your email"
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                containerStyle={styles.formField}
+              />
+              
+              <ProfileField
+                label="Phone"
+                value={profileData.phone}
+                editable={editingSections.personalInfo}
+                onChange={(text) => setProfileData({ ...profileData, phone: text })}
+                placeholder="Phone number"
+                editing={editingSections.personalInfo}
+                setProfileData={setProfileData}
+                containerStyle={styles.formField}
+              />
+            </View>
+
             {/* Location Fields */}
-            <LocationField
-              label="City"
-              field="city"
-              value={profileData.location?.city}
-              editable
-              editing={editing}
+            <View style={styles.locationSection}>
+              <Text style={styles.sectionSubtitle}>Location</Text>
+              <View style={styles.locationGrid}>
+                <LocationField
+                  label="Region"
+                  field="region"
+                  value={profileData.location?.region}
+                  editable={editingSections.personalInfo}
+                  editing={editingSections.personalInfo}
+                  setProfileData={setProfileData}
+                  profileData={profileData}
+                  containerStyle={styles.locationField}
+                />
+                <LocationField
+                  label="City"
+                  field="city"
+                  value={profileData.location?.city}
+                  editable={editingSections.personalInfo}
+                  editing={editingSections.personalInfo}
+                  setProfileData={setProfileData}
+                  profileData={profileData}
+                  containerStyle={styles.locationField}
+                />
+                <LocationField
+                  label="Town"
+                  field="town"
+                  value={profileData.location?.town}
+                  editable={editingSections.personalInfo}
+                  editing={editingSections.personalInfo}
+                  setProfileData={setProfileData}
+                  profileData={profileData}
+                  containerStyle={styles.locationField}
+                />
+                <LocationField
+                  label="Street"
+                  field="street"
+                  value={profileData.location?.street}
+                  editable={editingSections.personalInfo}
+                  editing={editingSections.personalInfo}
+                  setProfileData={setProfileData}
+                  profileData={profileData}
+                  containerStyle={styles.locationField}
+                />
+              </View>
+            </View>
+
+            {/* Bio */}
+            <ProfileField
+              label="About Me"
+              value={profileData.Bio}
+              editable={editingSections.personalInfo}
+              onChange={(text) => setProfileData({ ...profileData, Bio: text })}
+              multiline
+              placeholder="Tell taskers about yourself and what kind of tasks you usually post..."
+              editing={editingSections.personalInfo}
               setProfileData={setProfileData}
-              profileData={profileData}
-            />
-            <LocationField
-              label="Region"
-              field="region"
-              value={profileData.location?.region}
-              editable
-              editing={editing}
-              setProfileData={setProfileData}
-              profileData={profileData}
-            />
-            <LocationField
-              label="Town"
-              field="town"
-              value={profileData.location?.town}
-              editable
-              editing={editing}
-              setProfileData={setProfileData}
-              profileData={profileData}
-            />
-            <LocationField
-              label="Street"
-              field="street"
-              value={profileData.location?.street}
-              editable
-              editing={editing}
-              setProfileData={setProfileData}
-              profileData={profileData}
+              characterCount
+              maxLength={500}
+              containerStyle={styles.bioField}
             />
           </View>
         </View>
 
-        {/* Reviews & Ratings Section */}
+        {/* Task Preferences */}
+        <View style={styles.section}>
+          <SectionHeader 
+            title="Task Preferences" 
+            section="preferences" 
+            icon="options-outline" 
+          />
+          
+          <View style={styles.preferencesList}>
+            <View style={styles.preferenceItem}>
+              <View style={styles.preferenceInfo}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={THEME.accent} />
+                <View style={styles.preferenceText}>
+                  <Text style={styles.preferenceLabel}>Verified Taskers Only</Text>
+                  <Text style={styles.preferenceDescription}>Only show verified taskers in applications</Text>
+                </View>
+              </View>
+              <Switch
+                value={preferences.verifiedOnly}
+                onValueChange={() => togglePreference('verifiedOnly')}
+                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
+                thumbColor={preferences.verifiedOnly ? THEME.accent : '#9CA3AF'}
+                disabled={!editingSections.preferences}
+              />
+            </View>
+            
+            <View style={styles.preferenceItem}>
+              <View style={styles.preferenceInfo}>
+                <Ionicons name="star-outline" size={20} color={THEME.accent} />
+                <View style={styles.preferenceText}>
+                  <Text style={styles.preferenceLabel}>High-Rated Taskers</Text>
+                  <Text style={styles.preferenceDescription}>Prioritize taskers with 4+ star ratings</Text>
+                </View>
+              </View>
+              <Switch
+                value={preferences.highRatedOnly}
+                onValueChange={() => togglePreference('highRatedOnly')}
+                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
+                thumbColor={preferences.highRatedOnly ? THEME.accent : '#9CA3AF'}
+                disabled={!editingSections.preferences}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Reviews & Ratings */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="star-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="star-outline" size={20} color={THEME.accent} />
+              <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
+            </View>
             {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
               <TouchableOpacity 
                 style={styles.viewAllButton}
@@ -477,7 +695,7 @@ const ClientProfileScreen = ({ navigation }) => {
                 })}
               >
                 <Text style={styles.viewAllText}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+                <Ionicons name="chevron-forward" size={16} color={THEME.accent} />
               </TouchableOpacity>
             )}
           </View>
@@ -486,7 +704,7 @@ const ClientProfileScreen = ({ navigation }) => {
             reviews={profileData.ratingsReceived || []}
             averageRating={profileData.rating || 0}
             totalReviews={profileData.numberOfRatings || 0}
-            onViewAll={()=>navigation.navigate('AllReviews', { 
+            onViewAll={() => navigation.navigate('AllReviews', { 
               reviews: profileData.ratingsReceived || [],
               userName: profileData.name,
               averageRating: profileData.rating || 0,
@@ -495,65 +713,18 @@ const ClientProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Task Preferences */}
+        {/* Notifications */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="options-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Task Preferences</Text>
-          </View>
-          
-          <View style={styles.preferencesList}>
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Ionicons name="shield-checkmark-outline" size={20} color="#6366F1" />
-                </View>
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>Verified Taskers Only</Text>
-                  <Text style={styles.preferenceDescription}>Only show verified taskers in applications</Text>
-                </View>
-              </View>
-              <Switch
-                value={user?.preferences?.verifiedOnly || false}
-                onValueChange={(value) => {/* Handle preference change */}}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={user?.preferences?.verifiedOnly ? '#4F46E5' : '#9CA3AF'}
-              />
-            </View>
-            
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Ionicons name="star-outline" size={20} color="#6366F1" />
-                </View>
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>High-Rated Taskers</Text>
-                  <Text style={styles.preferenceDescription}>Prioritize taskers with 4+ star ratings</Text>
-                </View>
-              </View>
-              <Switch
-                value={user?.preferences?.highRatedOnly || false}
-                onValueChange={(value) => {/* Handle preference change */}}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={user?.preferences?.highRatedOnly ? '#4F46E5' : '#9CA3AF'}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Enhanced Notification Settings */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="notifications-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Notifications</Text>
-          </View>
+          <SectionHeader 
+            title="Notifications" 
+            section="notifications" 
+            icon="notifications-outline" 
+          />
           
           <View style={styles.notificationList}>
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons name="person-add-outline" size={20} color="#6366F1" />
-                </View>
+                <Ionicons name="person-add-outline" size={20} color={THEME.accent} />
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>New Applicants</Text>
                   <Text style={styles.notificationDescription}>When someone applies to your tasks</Text>
@@ -563,15 +734,13 @@ const ClientProfileScreen = ({ navigation }) => {
                 value={notifications.applicantAlerts}
                 onValueChange={() => toggleNotification('applicantAlerts')}
                 trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.applicantAlerts ? '#4F46E5' : '#9CA3AF'}
+                thumbColor={notifications.applicantAlerts ? THEME.accent : '#9CA3AF'}
               />
             </View>
             
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#6366F1" />
-                </View>
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color={THEME.accent} />
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Messages</Text>
                   <Text style={styles.notificationDescription}>New messages from taskers</Text>
@@ -581,15 +750,13 @@ const ClientProfileScreen = ({ navigation }) => {
                 value={notifications.messageNotifications}
                 onValueChange={() => toggleNotification('messageNotifications')}
                 trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.messageNotifications ? '#4F46E5' : '#9CA3AF'}
+                thumbColor={notifications.messageNotifications ? THEME.accent : '#9CA3AF'}
               />
             </View>
 
             <View style={styles.notificationItem}>
               <View style={styles.notificationInfo}>
-                <View style={styles.notificationIcon}>
-                  <Ionicons name="checkmark-done-outline" size={20} color="#6366F1" />
-                </View>
+                <Ionicons name="checkmark-done-outline" size={20} color={THEME.accent} />
                 <View style={styles.notificationText}>
                   <Text style={styles.notificationLabel}>Task Updates</Text>
                   <Text style={styles.notificationDescription}>Task status changes and completions</Text>
@@ -599,63 +766,52 @@ const ClientProfileScreen = ({ navigation }) => {
                 value={notifications.taskUpdates}
                 onValueChange={() => toggleNotification('taskUpdates')}
                 trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.taskUpdates ? '#4F46E5' : '#9CA3AF'}
+                thumbColor={notifications.taskUpdates ? THEME.accent : '#9CA3AF'}
               />
             </View>
           </View>
         </View>
 
-        {/* Enhanced Account Actions */}
+        {/* Account Settings */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="settings-outline" size={20} color="#6366F1" />
-            <Text style={styles.sectionTitle}>Account Settings</Text>
+            <View style={styles.sectionTitleContainer}>
+              <Ionicons name="settings-outline" size={20} color={THEME.accent} />
+              <Text style={styles.sectionTitle}>Account Settings</Text>
+            </View>
           </View>
           
-          <View style={styles.accountActions}>
-            <TouchableOpacity style={styles.accountButton} onPress={() => navigate('PostedTasks')}>
-              <View style={styles.accountButtonIcon}>
-                <Ionicons name="list-outline" size={20} color="#6366F1" />
-              </View>
-              <Text style={styles.accountButtonText}>My Posted Tasks</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+          <View style={styles.settingsList}>
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('PostedTasks')}>
+              <Ionicons name="list-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>My Posted Tasks</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.accountButton} onPress={() => navigate('Payments')}>
-              <View style={styles.accountButtonIcon}>
-                <Ionicons name="receipt-outline" size={20} color="#6366F1" />
-              </View>
-              <Text style={styles.accountButtonText}>Payment History</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('Payments')}>
+              <Ionicons name="receipt-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>Payment History</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity  style={styles.accountButton} onPress={()=>navigate('ClientSupport')}>
-              <View style={styles.accountButtonIcon}>
-                <Ionicons name="help-circle-outline" size={20} color="#6366F1" />
-              </View>
-              <Text style={styles.accountButtonText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('ClientSupport')}>
+              <Ionicons name="help-circle-outline" size={20} color={THEME.accent} />
+              <Text style={styles.settingText}>Help & Support</Text>
+              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.accountButton, styles.logoutButton]}
-              onPress={handleLogout}
-            >
-              <View style={styles.accountButtonIcon}>
-                <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              </View>
-              <Text style={[styles.accountButtonText, styles.logoutText]}>Log Out</Text>
+            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color={THEME.danger} />
+              <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Enhanced Footer */}
+        {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Client since {formatMemberSince()}
-          </Text>
+          <Text style={styles.footerText}>Client since {formatMemberSince()}</Text>
           <Text style={styles.footerSubtext}>
-            {totalTasksPosted} tasks posted • {completedTasks} completed
+            {totalTasksPosted} tasks posted • {completedTasks} completed • ₵{totalSpent.toLocaleString()} spent
           </Text>
         </View>
       </Animated.ScrollView>
@@ -666,174 +822,196 @@ const ClientProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: THEME.lightBg,
   },
   scrollContent: {
-    paddingBottom: 40,
-  },
-  headerButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  headerButtonActive: {
-    backgroundColor: '#6366F1',
-  },
-  headerButtonText: {
-    color: '#6366F1',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  headerButtonTextActive: {
-    color: '#FFFFFF',
+    paddingBottom: 30,
   },
   profileHeader: {
-    padding: 24,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 20,
+    padding: 20,
+    borderRadius: 34,
+    marginHorizontal: 12,
+    marginTop: 12,
+  },
+  profileHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 20,
+  },
+  profileImageWrapper: {
+    marginRight: 16,
   },
   profileImageContainer: {
     position: 'relative',
-    marginRight: 16,
   },
   profileImage: {
     width: 80,
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: THEME.white,
   },
   editImageButton: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
-    backgroundColor: '#6366F1',
+    bottom: 0,
+    right: 0,
+    backgroundColor: THEME.accent,
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: THEME.white,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: 'bold',
+    color: THEME.white,
     marginBottom: 4,
   },
   profileEmail: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  verificationContainer: {
+  ratingVerificationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  ratingText: {
+    color: THEME.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   verificationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
-    gap: 6,
   },
   verificationText: {
-    color: '#FFFFFF',
+    color: THEME.success,
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 4,
   },
-  statsContainer: {
+  headerStats: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  statsCard: {
-    flex: 1,
-    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    padding: 16,
   },
-  statsIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  headerStatItem: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  statsValue: {
+  headerStatValue: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: 'bold',
+    color: THEME.white,
     marginBottom: 4,
   },
-  statsLabel: {
+  headerStatLabel: {
     fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
-    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginHorizontal: 8,
+  },
+  switchAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.white,
+    marginHorizontal: 16,
+    marginTop: -20,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  switchAccountText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: THEME.primary,
+    marginLeft: 12,
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.cardBg,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
+    marginBottom: 20,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginLeft: 12,
   },
-  sectionContent: {
-    gap: 16,
+  sectionEditButton: {
+    padding: 8,
+  },
+  sectionActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionCancelButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  sectionCancelButtonText: {
+    color: THEME.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  sectionSaveButton: {
+    backgroundColor: THEME.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  sectionSaveButtonText: {
+    color: THEME.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -858,10 +1036,43 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   quickActionText: {
-    color: '#FFFFFF',
+    color: THEME.white,
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  sectionContent: {
+    gap: 16,
+  },
+  formGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  formField: {
+    width: '48%',
+    marginBottom: 16,
+  },
+  locationSection: {
+    marginTop: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: THEME.textPrimary,
+    marginBottom: 12,
+  },
+  locationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  locationField: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  bioField: {
+    marginTop: 8,
   },
   preferencesList: {
     gap: 12,
@@ -878,26 +1089,18 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  preferenceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   preferenceText: {
     flex: 1,
   },
   preferenceLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: THEME.textPrimary,
     marginBottom: 2,
   },
   preferenceDescription: {
     fontSize: 14,
-    color: '#64748B',
+    color: THEME.textSecondary,
     lineHeight: 18,
   },
   notificationList: {
@@ -915,81 +1118,61 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  notificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   notificationText: {
     flex: 1,
   },
   notificationLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: THEME.textPrimary,
     marginBottom: 2,
   },
   notificationDescription: {
     fontSize: 14,
-    color: '#64748B',
+    color: THEME.textSecondary,
     lineHeight: 18,
-  },
-  accountActions: {
-    gap: 4,
   },
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 4,
   },
   viewAllText: {
     fontSize: 14,
-    color: '#6366F1',
-    fontWeight: '600',
-    marginRight: 2,
+    color: THEME.accent,
+    fontWeight: '500',
+    marginRight: 4,
   },
-  accountButton: {
+  settingsList: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.border,
   },
-  accountButtonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  accountButtonText: {
+  settingText: {
     flex: 1,
     fontSize: 16,
-    color: '#1E293B',
-    fontWeight: '500',
+    color: THEME.textPrimary,
+    marginLeft: 12,
   },
-  logoutButton: {
-    marginTop: 8,
-    backgroundColor: '#FEF2F2',
+  logoutItem: {
+    borderBottomWidth: 0,
   },
   logoutText: {
-    color: '#EF4444',
+    color: THEME.danger,
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 24,
   },
   footerText: {
     fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    fontWeight: '500',
+    color: THEME.textSecondary,
   },
   footerSubtext: {
     fontSize: 12,
