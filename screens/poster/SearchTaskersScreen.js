@@ -1,4 +1,4 @@
-// screens/client/SearchTaskersScreen.js
+// screens/client/SearchTaskersScreen.js - COMPLETE FIXED VERSION
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
@@ -17,6 +17,7 @@ import {
   Animated,
   Modal,
   Image,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { searchTaskers } from '../../api/bidApi';
@@ -27,16 +28,20 @@ import { navigate } from '../../services/navigationService';
 import TaskerSelectionCard from '../../component/client/TaskerSelectionCard';
 import RequestServiceFAB from '../../component/client/RequestServiceFAB';
 import SelectionHeader from '../../component/client/SelectionHeader';
-import PopularServicesGrid from '../../component/client/PopularServicesGrid';
 
 const { width, height } = Dimensions.get('window');
 
 // Service suggestions database
 const SERVICE_SUGGESTIONS = [
-  // Digital & Tech
-  'Software Engineering', 'Web Development', 'Mobile App Development', 'UI/UX Design',
+  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services',
   'Graphic Design', 'Video Editing', 'Photo Editing', 'Digital Marketing',
-  'SEO/SEM', 'Social Media Management', 'Data Analysis', 'AI/ML',
+  'Video Production', 'Interior Design',
+  'Web Development', 'Animation', 'Motion Graphics',
+  'Video Production',
+
+  // Digital & Tech
+  'Software Engineering', 'Mobile App Development', 'UI/UX Design',
+   'SEO/SEM', 'Social Media Management', 'Data Analysis', 'AI/ML',
   'Cybersecurity', 'Network Administration', 'IT Support', 'Cloud Computing',
   
   // Creative & Design
@@ -46,18 +51,10 @@ const SERVICE_SUGGESTIONS = [
   'Product Design', 'Creative Writing',
   
   // Home & Professional Services
-  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services',
   'Gardening', 'Landscaping', 'Moving & Packing', 'Home Appliance Repair',
   'HVAC Installation', 'CCTV Installation', 'Home Security', 'Home Renovation',
   'Event Planning', 'Catering', 'Personal Training', 'Tutoring',
   'Language Translation', 'Virtual Assistance', 'Accounting',
-];
-
-// Popular services
-const POPULAR_SERVICES = [
-  'Plumbing', 'Electrical Repairs', 'Cleaning Services', 'Home Appliance Repair',
-  'Web Development', 'Graphic Design', 'Digital Marketing', 'Video Editing',
-  'Tutoring', 'Personal Training', 'Event Planning', 'Virtual Assistance',
 ];
 
 const SearchTaskersScreen = ({ navigation }) => {
@@ -88,6 +85,12 @@ const SearchTaskersScreen = ({ navigation }) => {
   const debounceTimeout = useRef(null);
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
+
+  // ====== FIX 1: Consistent Modal Triggering ======
+  const showLocationModal = () => {
+   
+    setShowLocationSuggestions(true);
+  };
 
   // Filter service suggestions
   useEffect(() => {
@@ -122,6 +125,7 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   // Modal animation
   useEffect(() => {
+  
     if (showLocationSuggestions) {
       Animated.parallel([
         Animated.timing(backdropAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
@@ -160,6 +164,7 @@ const SearchTaskersScreen = ({ navigation }) => {
     setTimeout(() => setShowServiceSuggestions(false), 200);
   };
 
+  // ====== FIX 2: Proper Skill Input Handling ======
   const handleSkillChange = (text) => {
     setSearchQuery(text);
     if (!text.trim()) {
@@ -209,21 +214,26 @@ const SearchTaskersScreen = ({ navigation }) => {
           <Text style={styles.suggestionsTitle}>Suggested Services</Text>
           <Text style={styles.suggestionsSubtitle}>{serviceSuggestions.length} suggestions</Text>
         </View>
-        <FlatList
-          data={serviceSuggestions}
-          keyExtractor={(_, index) => `service-${index}`}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.suggestionItem} onPress={() => handleServiceSelect(item)} activeOpacity={0.7}>
-              <View style={styles.suggestionIconContainer}>
-                <Ionicons name="search" size={18} color="#6366F1" />
-              </View>
-              <Text style={styles.suggestionText} numberOfLines={1}>{item}</Text>
-            </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.suggestionSeparator} />}
-          keyboardShouldPersistTaps="always"
-          showsVerticalScrollIndicator={false}
-        />
+        {/* Using View instead of FlatList to avoid nesting warnings */}
+        <View style={styles.suggestionsList}>
+          {serviceSuggestions.map((item, index) => (
+            <React.Fragment key={`service-${index}`}>
+              <TouchableOpacity 
+                style={styles.suggestionItem} 
+                onPress={() => handleServiceSelect(item)} 
+                activeOpacity={0.7}
+              >
+                <View style={styles.suggestionIconContainer}>
+                  <Ionicons name="search" size={18} color="#6366F1" />
+                </View>
+                <Text style={styles.suggestionText} numberOfLines={1}>{item}</Text>
+              </TouchableOpacity>
+              {index < serviceSuggestions.length - 1 && (
+                <View style={styles.suggestionSeparator} />
+              )}
+            </React.Fragment>
+          ))}
+        </View>
       </View>
     );
   };
@@ -271,20 +281,25 @@ const SearchTaskersScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  // ====== FIX 3: Proper Location Input Handling ======
   const handleLocationFocus = () => {
-    if (locationQuery.trim().length > 0) setShowLocationSuggestions(true);
+    showLocationModal();
   };
 
   const handleLocationQueryChange = (text) => {
+   
     setLocationQuery(text);
+    
+    // Show modal when user starts typing (if not already shown)
+    if (text.length > 0 && !showLocationSuggestions) {
+      showLocationModal();
+    }
+    
+    // Clear location data if text is empty
     if (!text.trim()) {
       setLocation('');
       setLocationDetails(null);
-      setHasSearched(false);
-      setSearchResults([]);
-      setSelectedTaskers([]);
-      setIsSelectionMode(false);
-      setShowLocationSuggestions(false);
+      // Don't hide modal - let user keep typing
     }
   };
 
@@ -469,6 +484,7 @@ const SearchTaskersScreen = ({ navigation }) => {
       case 'search':
         return (
           <View style={styles.searchSection}>
+            {/* Service Input */}
             <View style={styles.inputGroup}>
               <View style={styles.inputContainer}>
                 <View style={styles.iconCircle}><Ionicons name="construct" size={18} color="#FFF" /></View>
@@ -481,7 +497,10 @@ const SearchTaskersScreen = ({ navigation }) => {
                   onChangeText={handleSkillChange}
                   onFocus={handleServiceFocus}
                   onBlur={handleServiceBlur}
-                  onSubmitEditing={() => locationInputRef.current?.focus()}
+                  onSubmitEditing={() => {
+                    locationInputRef.current?.focus();
+                    showLocationModal(); // Open modal when moving to location
+                  }}
                   returnKeyType="next"
                 />
                 {searchQuery.length > 0 && (
@@ -491,6 +510,7 @@ const SearchTaskersScreen = ({ navigation }) => {
               <ServiceSuggestionsDropdown />
             </View>
 
+            {/* ====== FIX 4: Correct Location Input Element ====== */}
             <View style={styles.inputGroup}>
               <View style={styles.inputContainer}>
                 <View style={styles.iconSquare}><Ionicons name="location" size={18} color="#FFF" /></View>
@@ -504,15 +524,23 @@ const SearchTaskersScreen = ({ navigation }) => {
                   onFocus={handleLocationFocus}
                   onSubmitEditing={handleSearch}
                   returnKeyType="search"
+                  // Make it clear this opens a modal
+                  showSoftInputOnFocus={false} // This prevents keyboard from opening
+                  onTouchStart={handleLocationFocus} // Alternative trigger
                 />
                 {searchingLocations ? <ActivityIndicator size="small" color="#000" /> : locationQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => { setLocationQuery(''); setLocation(''); setLocationDetails(null); setShowLocationSuggestions(false); }}>
+                  <TouchableOpacity onPress={() => { 
+                    setLocationQuery(''); 
+                    setLocation(''); 
+                    setLocationDetails(null); 
+                  }}>
                     <Ionicons name="close-circle" size={20} color="#C7C7CC" />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
 
+            {/* Search Button */}
             {(searchQuery.trim() || location.trim()) && (
               <TouchableOpacity
                 style={[styles.searchButton, (!searchQuery.trim() || !location.trim()) && styles.searchButtonDisabled]}
@@ -524,6 +552,7 @@ const SearchTaskersScreen = ({ navigation }) => {
               </TouchableOpacity>
             )}
 
+            {/* Clear All Button */}
             {(searchQuery.trim() || location.trim()) && (
               <TouchableOpacity style={styles.clearButton} onPress={clearAllInputs}>
                 <Ionicons name="close-circle" size={16} color="#8E8E93" />
@@ -531,6 +560,7 @@ const SearchTaskersScreen = ({ navigation }) => {
               </TouchableOpacity>
             )}
 
+            {/* Error Message */}
             {error && !loading && (
               <View style={styles.errorBox}>
                 <Ionicons name="alert-circle" size={18} color="#EF4444" />
@@ -550,15 +580,17 @@ const SearchTaskersScreen = ({ navigation }) => {
 
       case 'resultsHeader':
         return (
-          <View style={styles.resultHeader}>
-            <Text style={styles.resultsTitle}>{searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Found</Text>
-            <Text style={styles.resultsSubtitle}>for "{searchQuery}" near {locationDetails?.city || location}</Text>
-            {isSelectionMode && (
-              <View style={styles.selectionInfoContainer}>
-                <Text style={styles.selectionModeText}>Select multiple taskers to receive competitive offers</Text>
-                <Text style={styles.selectionSubtext}>Invite multiple professionals to submit proposals, then choose the best offer</Text>
-              </View>
-            )}
+          <View style={styles.resultsSection}>
+            <View style={styles.resultHeader}>
+              <Text style={styles.resultsTitle}>{searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Found</Text>
+              <Text style={styles.resultsSubtitle}>for "{searchQuery}" near {locationDetails?.city || location}</Text>
+              {isSelectionMode && (
+                <View style={styles.selectionInfoContainer}>
+                  <Text style={styles.selectionModeText}>Select multiple taskers to receive competitive offers</Text>
+                  <Text style={styles.selectionSubtext}>Invite multiple professionals to submit proposals, then choose the best offer</Text>
+                </View>
+              )}
+            </View>
           </View>
         );
 
@@ -580,23 +612,25 @@ const SearchTaskersScreen = ({ navigation }) => {
             <Ionicons name="search" size={64} color="#C7C7CC" />
             <Text style={styles.emptyTitle}>No taskers found</Text>
             <Text style={styles.emptyText}>Try adjusting your search terms or location</Text>
-            <View style={styles.popularServicesFallback}>
-              <Text style={styles.popularServicesTitle}>Popular Services to Try:</Text>
-              <View style={styles.popularServicesGrid}>
-                {POPULAR_SERVICES.slice(0, 6).map((service, index) => (
-                  <TouchableOpacity key={index} style={styles.popularServiceTag} onPress={() => handleServiceSelect(service)}>
-                    <Text style={styles.popularServiceText}>{service}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
           </View>
         );
 
       case 'discovery':
         return (
           <View style={styles.discoveryContent}>
-            <PopularServicesGrid onServiceSelect={handleServiceSelect} popularServices={POPULAR_SERVICES} />
+            <Text style={styles.discoveryTitle}>Find Taskers Near You</Text>
+            <Text style={styles.discoverySubtitle}>Browse popular services or search for specific needs</Text>
+            <View style={styles.popularServicesGrid}>
+              {SERVICE_SUGGESTIONS.slice(0, 12).map((service, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.popularServiceCard}
+                  onPress={() => handleServiceSelect(service)}
+                >
+                  <Text style={styles.popularServiceText}>{service}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         );
 
@@ -628,6 +662,9 @@ const SearchTaskersScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
+          // ====== FIX 5: Remove nested scrollview warning ======
+          ListHeaderComponent={null}
+          ListFooterComponent={null}
         />
       </KeyboardAvoidingView>
 
@@ -638,11 +675,20 @@ const SearchTaskersScreen = ({ navigation }) => {
         isSelectionMode={isSelectionMode}
       />
 
-      {/* Location Modal */}
-      <Modal visible={showLocationSuggestions} transparent animationType="none" onRequestClose={() => setShowLocationSuggestions(false)}>
+      {/* ====== FIX 6: Location Modal without nested FlatList ====== */}
+      <Modal 
+        visible={showLocationSuggestions} 
+        transparent 
+        animationType="none" 
+        onRequestClose={() => setShowLocationSuggestions(false)}
+      >
         <View style={styles.modalContainer}>
           <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
-            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowLocationSuggestions(false)} />
+            <TouchableOpacity 
+              style={{ flex: 1 }} 
+              activeOpacity={1} 
+              onPress={() => setShowLocationSuggestions(false)}
+            />
           </Animated.View>
 
           <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
@@ -668,13 +714,17 @@ const SearchTaskersScreen = ({ navigation }) => {
                     returnKeyType="done"
                   />
                   {locationQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => { setLocationQuery(''); setShowLocationSuggestions(false); }}>
+                    <TouchableOpacity onPress={() => { 
+                      setLocationQuery(''); 
+                      setShowLocationSuggestions(true); // Keep modal open
+                    }}>
                       <Ionicons name="close-circle" size={22} color="#C7C7CC" />
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
 
+              {/* ====== Using ScrollView instead of FlatList ====== */}
               <View style={styles.modalBody}>
                 {searchingLocations ? (
                   <View style={styles.modalLoadingContainer}>
@@ -684,15 +734,20 @@ const SearchTaskersScreen = ({ navigation }) => {
                 ) : locationSuggestions.length > 0 ? (
                   <>
                     <Text style={styles.resultsCount}>{locationSuggestions.length} location{locationSuggestions.length !== 1 ? 's' : ''} found</Text>
-                    <FlatList
-                      data={locationSuggestions}
-                      keyExtractor={item => item.id}
-                      renderItem={({ item }) => <LocationSuggestionItem suggestion={item} />}
+                    <ScrollView 
+                      style={styles.modalScrollView}
                       keyboardShouldPersistTaps="always"
-                      ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
                       showsVerticalScrollIndicator={false}
-                      contentContainerStyle={{ paddingBottom: 20 }}
-                    />
+                    >
+                      {locationSuggestions.map((item, index) => (
+                        <React.Fragment key={item.id}>
+                          <LocationSuggestionItem suggestion={item} />
+                          {index < locationSuggestions.length - 1 && (
+                            <View style={styles.modalSeparator} />
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </ScrollView>
                   </>
                 ) : locationQuery.length >= 2 ? (
                   <View style={styles.modalEmptyState}>
@@ -721,21 +776,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
   },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 24,
+  listContent: {
+    paddingBottom: 100,
   },
   searchSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#FFF',
-    position: 'relative',
   },
   inputGroup: {
     marginBottom: 12,
@@ -749,7 +796,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 12,
-    zIndex: 10,
   },
   iconCircle: {
     width: 28,
@@ -792,7 +838,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F2F2F7',
     zIndex: 1000,
-    maxHeight: 300,
   },
   suggestionsHeader: {
     paddingHorizontal: 16,
@@ -810,7 +855,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
   },
-  suggestionsContent: {
+  suggestionsList: {
     paddingBottom: 8,
   },
   suggestionItem: {
@@ -841,7 +886,7 @@ const styles = StyleSheet.create({
     marginLeft: 60,
   },
   
-  // Search Button Styles
+  // Search Button
   searchButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -862,7 +907,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // Clear Button Styles
+  // Clear Button
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -877,6 +922,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
+  // Error
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -894,6 +940,8 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '400',
   },
+  
+  // Loading
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -905,6 +953,8 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontWeight: '400',
   },
+  
+  // Results
   resultsSection: {
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -942,11 +992,14 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 18,
   },
+  
+  // Tasker Card
   taskerCard: {
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    marginHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1062,13 +1115,46 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  
+  // Discovery Content
   discoveryContent: {
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
+  discoveryTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 4,
+  },
+  discoverySubtitle: {
+    fontSize: 15,
+    color: '#8E8E93',
+    marginBottom: 20,
+  },
+  popularServicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  popularServiceCard: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  popularServiceText: {
+    fontSize: 14,
+    color: '#000',
+    fontWeight: '500',
+  },
+  
+  // Empty State
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 60,
     paddingHorizontal: 20,
   },
   emptyTitle: {
@@ -1083,41 +1169,6 @@ const styles = StyleSheet.create({
     color: '#C7C7CC',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
-  },
-  
-  // Popular Services Fallback
-  popularServicesFallback: {
-    width: '100%',
-    backgroundColor: '#F9F9F9',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
-  },
-  popularServicesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
-  },
-  popularServicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  popularServiceTag: {
-    backgroundColor: '#FFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 8,
-  },
-  popularServiceText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '500',
   },
 
   // MODAL STYLES
@@ -1133,9 +1184,6 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  backdropTouchable: {
-    flex: 1,
   },
   modalContent: {
     position: 'absolute',
@@ -1202,6 +1250,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
   },
+  modalScrollView: {
+    flex: 1,
+  },
   resultsCount: {
     fontSize: 13,
     color: '#8E8E93',
@@ -1209,9 +1260,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#F9F9F9',
-  },
-  listContent: {
-    paddingBottom: 20,
   },
   suggestionIconContainer: {
     width: 40,
