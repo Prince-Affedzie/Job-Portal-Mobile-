@@ -1,8 +1,8 @@
+// screens/client/SearchTaskersScreen.js
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
@@ -22,14 +22,43 @@ import { Ionicons } from '@expo/vector-icons';
 import { searchTaskers } from '../../api/bidApi';
 import Header from '../../component/tasker/Header';
 import { navigate } from '../../services/navigationService';
-import PopularServicesGrid from '../../component/client/PopularServicesGrid';
 
-// Import new components
+// Import components
 import TaskerSelectionCard from '../../component/client/TaskerSelectionCard';
 import RequestServiceFAB from '../../component/client/RequestServiceFAB';
 import SelectionHeader from '../../component/client/SelectionHeader';
+import PopularServicesGrid from '../../component/client/PopularServicesGrid';
 
 const { width, height } = Dimensions.get('window');
+
+// Service suggestions database
+const SERVICE_SUGGESTIONS = [
+  // Digital & Tech
+  'Software Engineering', 'Web Development', 'Mobile App Development', 'UI/UX Design',
+  'Graphic Design', 'Video Editing', 'Photo Editing', 'Digital Marketing',
+  'SEO/SEM', 'Social Media Management', 'Data Analysis', 'AI/ML',
+  'Cybersecurity', 'Network Administration', 'IT Support', 'Cloud Computing',
+  
+  // Creative & Design
+  'Logo Design', 'Brand Identity', 'Interior Decor', 'Interior Design',
+  'Architectural Design', '3D Modeling', 'Animation', 'Motion Graphics',
+  'Video Production', 'Photography', 'Illustration', 'Fashion Design',
+  'Product Design', 'Creative Writing',
+  
+  // Home & Professional Services
+  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services',
+  'Gardening', 'Landscaping', 'Moving & Packing', 'Home Appliance Repair',
+  'HVAC Installation', 'CCTV Installation', 'Home Security', 'Home Renovation',
+  'Event Planning', 'Catering', 'Personal Training', 'Tutoring',
+  'Language Translation', 'Virtual Assistance', 'Accounting',
+];
+
+// Popular services
+const POPULAR_SERVICES = [
+  'Plumbing', 'Electrical Repairs', 'Cleaning Services', 'Home Appliance Repair',
+  'Web Development', 'Graphic Design', 'Digital Marketing', 'Video Editing',
+  'Tutoring', 'Personal Training', 'Event Planning', 'Virtual Assistance',
+];
 
 const SearchTaskersScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
@@ -41,22 +70,45 @@ const SearchTaskersScreen = ({ navigation }) => {
   const [locationDetails, setLocationDetails] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  const [serviceSuggestions, setServiceSuggestions] = useState([]);
+  const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
+  const [isServiceInputFocused, setIsServiceInputFocused] = useState(false);
+
   const [locationQuery, setLocationQuery] = useState('');
   const [locationSuggestions, setLocationSuggestions] = useState([]);
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [searchingLocations, setSearchingLocations] = useState(false);
 
-  // Selection state
   const [selectedTaskers, setSelectedTaskers] = useState([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   const locationInputRef = useRef(null);
   const skillInputRef = useRef(null);
+  
   const debounceTimeout = useRef(null);
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // Reset screen when inputs are cleared
+  // Filter service suggestions
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      const query = searchQuery.toLowerCase();
+      const filtered = SERVICE_SUGGESTIONS
+        .filter(service => 
+          service.toLowerCase().includes(query) ||
+          query.split(' ').some(word => service.toLowerCase().includes(word))
+        )
+        .slice(0, 8);
+      
+      setServiceSuggestions(filtered);
+      setShowServiceSuggestions(filtered.length > 0 && isServiceInputFocused);
+    } else {
+      setServiceSuggestions([]);
+      setShowServiceSuggestions(false);
+    }
+  }, [searchQuery, isServiceInputFocused]);
+
+  // Reset when inputs cleared
   useEffect(() => {
     if (!searchQuery.trim() && !location.trim()) {
       setHasSearched(false);
@@ -64,44 +116,26 @@ const SearchTaskersScreen = ({ navigation }) => {
       setError(null);
       setSelectedTaskers([]);
       setIsSelectionMode(false);
+      setShowServiceSuggestions(false);
     }
   }, [searchQuery, location]);
 
-  // Animate modal when it opens/closes
+  // Modal animation
   useEffect(() => {
     if (showLocationSuggestions) {
-      // Animate in
       Animated.parallel([
-        Animated.timing(backdropAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          damping: 25,
-          stiffness: 200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(backdropAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 25, stiffness: 200, useNativeDriver: true }),
       ]).start();
     } else {
-      // Animate out
       Animated.parallel([
-        Animated.timing(backdropAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: height,
-          duration: 250,
-          useNativeDriver: true,
-        }),
+        Animated.timing(backdropAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: height, duration: 250, useNativeDriver: true }),
       ]).start();
     }
   }, [showLocationSuggestions]);
 
-  // Reset selection when search results change
+  // Reset selection on new results
   useEffect(() => {
     if (searchResults.length > 0) {
       setSelectedTaskers([]);
@@ -111,128 +145,21 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   const handleServiceSelect = (serviceName) => {
     setSearchQuery(serviceName);
+    setShowServiceSuggestions(false);
     setHasSearched(false);
     setTimeout(() => locationInputRef.current?.focus(), 100);
   };
 
-  // Handle tasker selection
-  const toggleTaskerSelection = (tasker) => {
-    setSelectedTaskers(prev => {
-      const isSelected = prev.find(t => t._id === tasker._id);
-      if (isSelected) {
-        return prev.filter(t => t._id !== tasker._id);
-      } else {
-        return [...prev, tasker];
-      }
-    });
+  const handleServiceFocus = () => {
+    setIsServiceInputFocused(true);
+    if (searchQuery.trim().length > 0) setShowServiceSuggestions(true);
   };
 
-  const selectAllTaskers = () => {
-    setSelectedTaskers([...searchResults]);
+  const handleServiceBlur = () => {
+    setIsServiceInputFocused(false);
+    setTimeout(() => setShowServiceSuggestions(false), 200);
   };
 
-  const clearAllSelection = () => {
-    setSelectedTaskers([]);
-  };
-
-  const handleFABPress = () => {
-    if (!isSelectionMode) {
-      // First click: Enter selection mode
-      setIsSelectionMode(true);
-    } else {
-      // Second click: Either cancel or proceed to form
-      if (selectedTaskers.length > 0) {
-        // Navigate to request form with selected taskers
-        navigate('ServiceRequestForm', {
-          selectedTaskers: selectedTaskers,
-          serviceType: searchQuery,
-          location: locationDetails || {
-            suburb: location,
-            city: location,
-            region: location,
-            town: location,
-            village: location,
-          },
-          notifiedTaskers: selectedTaskers.map(t => t._id)
-        });
-      } else {
-        // Cancel selection mode
-        setIsSelectionMode(false);
-      }
-    }
-  };
-
-  const handleViewProfile = (tasker) => {
-    navigate('ApplicantProfile', { applicant: tasker });
-  };
-
-  // Original TaskerCard for normal browsing
-  const TaskerCard = ({ tasker }) => (
-    <TouchableOpacity 
-      style={styles.taskerCard}
-      activeOpacity={0.7}
-      onPress={() => handleViewProfile(tasker)}
-    >
-      <View style={styles.taskerHeader}>
-        <View style={styles.taskerImageContainer}>
-          <Image
-            source={{ uri: tasker.profileImage || 'https://via.placeholder.com/70' }}
-            style={styles.taskerImage}
-          />
-          {tasker.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
-            </View>
-          )}
-        </View>
-        <View style={styles.taskerInfo}>
-          <Text style={styles.taskerName} numberOfLines={1}>
-            {tasker.name}
-          </Text>
-          <Text style={styles.taskerSkill} numberOfLines={1}>
-            Available
-          </Text>
-          
-          {/* Location Information */}
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={12} color="#8E8E93" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {formatTaskerLocation(tasker.location) || 'Location not specified'}
-            </Text>
-          </View>
-          
-          <View style={styles.taskerMeta}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>
-                {tasker.rating?.toFixed(1) || 'New'}
-              </Text>
-              {tasker.numberOfRatings > 0 && (
-                <Text style={styles.reviewCount}>
-                  ({tasker.numberOfRatings})
-                </Text>
-              )}
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.distanceContainer}>
-              <Ionicons name="navigate-outline" size={13} color="#8E8E93" />
-              <Text style={styles.distanceText}>
-                {formatDistance(tasker.distance)} away
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-      
-      <View style={styles.taskerFooter}>
-        <TouchableOpacity onPress={() => handleViewProfile(tasker)} style={styles.hireButton}>
-          <Text style={styles.hireButtonText}>View Profile</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Handle skill input change
   const handleSkillChange = (text) => {
     setSearchQuery(text);
     if (!text.trim()) {
@@ -243,24 +170,113 @@ const SearchTaskersScreen = ({ navigation }) => {
     }
   };
 
-  // Handle location input focus - DON'T show modal on focus
-  const handleLocationFocus = () => {
-    // Only show modal if there's already text in the input
-    if (locationQuery.trim().length > 0) {
-      setShowLocationSuggestions(true);
+  const toggleTaskerSelection = (tasker) => {
+    setSelectedTaskers(prev => {
+      const exists = prev.find(t => t._id === tasker._id);
+      return exists ? prev.filter(t => t._id !== tasker._id) : [...prev, tasker];
+    });
+  };
+
+  const selectAllTaskers = () => setSelectedTaskers([...searchResults]);
+  const clearAllSelection = () => setSelectedTaskers([]);
+
+  const handleFABPress = () => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+    } else if (selectedTaskers.length > 0) {
+      navigate('ServiceRequestForm', {
+        selectedTaskers,
+        serviceType: searchQuery,
+        location: locationDetails || { suburb: location, city: location, region: location, town: location, village: location },
+        notifiedTaskers: selectedTaskers.map(t => t._id)
+      });
+    } else {
+      setIsSelectionMode(false);
     }
   };
 
-  // Handle location query change - show modal when user starts typing
+  const handleViewProfile = (tasker) => {
+    navigate('ApplicantProfile', { applicant: tasker });
+  };
+
+  // Service Suggestions Dropdown
+  const ServiceSuggestionsDropdown = () => {
+    if (!showServiceSuggestions || serviceSuggestions.length === 0) return null;
+
+    return (
+      <View style={styles.serviceSuggestionsContainer}>
+        <View style={styles.suggestionsHeader}>
+          <Text style={styles.suggestionsTitle}>Suggested Services</Text>
+          <Text style={styles.suggestionsSubtitle}>{serviceSuggestions.length} suggestions</Text>
+        </View>
+        <FlatList
+          data={serviceSuggestions}
+          keyExtractor={(_, index) => `service-${index}`}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.suggestionItem} onPress={() => handleServiceSelect(item)} activeOpacity={0.7}>
+              <View style={styles.suggestionIconContainer}>
+                <Ionicons name="search" size={18} color="#6366F1" />
+              </View>
+              <Text style={styles.suggestionText} numberOfLines={1}>{item}</Text>
+            </TouchableOpacity>
+          )}
+          ItemSeparatorComponent={() => <View style={styles.suggestionSeparator} />}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+    );
+  };
+
+  // TaskerCard (normal mode)
+  const TaskerCard = ({ tasker }) => (
+    <TouchableOpacity style={styles.taskerCard} activeOpacity={0.7} onPress={() => handleViewProfile(tasker)}>
+      <View style={styles.taskerHeader}>
+        <View style={styles.taskerImageContainer}>
+          <Image source={{ uri: tasker.profileImage || 'https://via.placeholder.com/70' }} style={styles.taskerImage} />
+          {tasker.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+            </View>
+          )}
+        </View>
+        <View style={styles.taskerInfo}>
+          <Text style={styles.taskerName} numberOfLines={1}>{tasker.name}</Text>
+          <Text style={styles.taskerSkill} numberOfLines={1}>Available</Text>
+          <View style={styles.locationContainer}>
+            <Ionicons name="location-outline" size={12} color="#8E8E93" />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {formatTaskerLocation(tasker.location) || 'Location not specified'}
+            </Text>
+          </View>
+          <View style={styles.taskerMeta}>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.ratingText}>{tasker.rating?.toFixed(1) || 'New'}</Text>
+              {tasker.numberOfRatings > 0 && <Text style={styles.reviewCount}>({tasker.numberOfRatings})</Text>}
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.distanceContainer}>
+              <Ionicons name="navigate-outline" size={13} color="#8E8E93" />
+              <Text style={styles.distanceText}>{formatDistance(tasker.distance)} away</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      <View style={styles.taskerFooter}>
+        <TouchableOpacity onPress={() => handleViewProfile(tasker)} style={styles.hireButton}>
+          <Text style={styles.hireButtonText}>View Profile</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const handleLocationFocus = () => {
+    if (locationQuery.trim().length > 0) setShowLocationSuggestions(true);
+  };
+
   const handleLocationQueryChange = (text) => {
     setLocationQuery(text);
-    
-    // Show modal when user starts typing (text length > 0)
-    if (text.trim().length > 0 && !showLocationSuggestions) {
-      setShowLocationSuggestions(true);
-    }
-    
-    // Hide modal and clear location if text is empty
     if (!text.trim()) {
       setLocation('');
       setLocationDetails(null);
@@ -272,7 +288,6 @@ const SearchTaskersScreen = ({ navigation }) => {
     }
   };
 
-  // Clear all inputs and reset to initial state
   const clearAllInputs = () => {
     setSearchQuery('');
     setLocation('');
@@ -283,10 +298,10 @@ const SearchTaskersScreen = ({ navigation }) => {
     setError(null);
     setSelectedTaskers([]);
     setIsSelectionMode(false);
+    setShowServiceSuggestions(false);
     setShowLocationSuggestions(false);
   };
 
-  // Helper functions
   const formatTaskerLocation = (location) => {
     if (!location) return null;
     const parts = [];
@@ -294,37 +309,28 @@ const SearchTaskersScreen = ({ navigation }) => {
     if (location.town) parts.push(location.town);
     if (location.city) parts.push(location.city);
     if (location.region) parts.push(location.region);
-    const uniqueParts = [...new Set(parts)];
-    return uniqueParts.join(', ') || null;
+    return [...new Set(parts)].join(', ') || null;
   };
 
   const formatDistance = (meters) => {
     if (!meters) return 'Nearby';
-    return meters < 1000 
-      ? `${Math.round(meters)}m` 
-      : `${(meters / 1000).toFixed(1)}km`;
+    return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
   };
 
-  // Location search function
+  // Location search
   const searchLocations = useCallback(async (query) => {
     if (!query.trim() || query.length < 2) {
       setLocationSuggestions([]);
       return;
     }
-
     setSearchingLocations(true);
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&countrycodes=gh&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'WorkaflowApp/1.0(support@Workaflow.com)', 
-          },
-        }
+        { headers: { 'User-Agent': 'WorkaflowApp/1.0(support@Workaflow.com)' } }
       );
       const data = await response.json();
-      
-      const suggestions = data.map((item) => ({
+      const suggestions = data.map(item => ({
         id: item.place_id.toString(),
         displayName: item.display_name,
         lat: parseFloat(item.lat),
@@ -332,7 +338,6 @@ const SearchTaskersScreen = ({ navigation }) => {
         address: item.address,
         type: item.type,
       }));
-      
       setLocationSuggestions(suggestions);
     } catch (err) {
       console.error('Location search error:', err);
@@ -343,19 +348,9 @@ const SearchTaskersScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
-
-    debounceTimeout.current = setTimeout(() => {
-      searchLocations(locationQuery);
-    }, 300);
-
-    return () => {
-      if (debounceTimeout.current) {
-        clearTimeout(debounceTimeout.current);
-      }
-    };
+    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    debounceTimeout.current = setTimeout(() => searchLocations(locationQuery), 300);
+    return () => clearTimeout(debounceTimeout.current);
   }, [locationQuery, searchLocations]);
 
   const handleLocationSelect = (suggestion) => {
@@ -365,15 +360,8 @@ const SearchTaskersScreen = ({ navigation }) => {
     setLocation(addressString);
     setLocationQuery(addressString);
     setLocationDetails({
-      village: village,
-      town: town,
-      suburb: suburb || town || village,
-      city: city || county,
-      region: state || region,
-      coordinates: [
-        suggestion.lat,
-        suggestion.lon
-      ]
+      village, town, suburb: suburb || town || village, city: city || county, region: state || region,
+      coordinates: [suggestion.lat, suggestion.lon]
     });
     setShowLocationSuggestions(false);
     Keyboard.dismiss();
@@ -390,28 +378,20 @@ const SearchTaskersScreen = ({ navigation }) => {
     setSearchResults([]);
     setSelectedTaskers([]);
     setIsSelectionMode(false);
+    setShowServiceSuggestions(false);
     setShowLocationSuggestions(false);
     setHasSearched(true);
 
     try {
       const searchData = {
         searchQuery: searchQuery.trim(),
-        address: locationDetails || {
-          suburb: location,
-          city: location,
-          region: location,
-          town: location,
-          village: location,
-        },
+        address: locationDetails || { suburb: location, city: location, region: location, town: location, village: location },
       };
 
       const response = await searchTaskers(searchData);
-
       if (response.data.success) {
         setSearchResults(response.data.data || []);
-        if (response.data.data.length === 0) {
-          setError('No taskers found. Try different search terms.');
-        }
+        if (!response.data.data.length) setError('No taskers found. Try different search terms.');
       } else {
         setError(response.data.message || 'No taskers found matching your criteria');
       }
@@ -424,13 +404,10 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   const formatAddress = (suggestion) => {
     const { address } = suggestion;
-    const { suburb, city, town, village, county, state, region } = address;
-    
     const parts = [];
-    if (suburb || town || village) parts.push(suburb || town || village);
-    if (city || county) parts.push(city || county);
-    if (state || region) parts.push(state || region);
-    
+    if (address.suburb || address.town || address.village) parts.push(address.suburb || address.town || address.village);
+    if (address.city || address.county) parts.push(address.city || address.county);
+    if (address.state || address.region) parts.push(address.state || address.region);
     return parts.join(', ');
   };
 
@@ -444,48 +421,196 @@ const SearchTaskersScreen = ({ navigation }) => {
   };
 
   const LocationSuggestionItem = ({ suggestion }) => (
-    <TouchableOpacity 
-      style={styles.suggestionItem}
-      onPress={() => handleLocationSelect(suggestion)}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={styles.suggestionItem} onPress={() => handleLocationSelect(suggestion)} activeOpacity={0.7}>
       <View style={styles.suggestionIconContainer}>
-        <Ionicons 
-          name={getLocationIcon(suggestion.type)} 
-          size={22} 
-          color="#007AFF" 
-        />
+        <Ionicons name={getLocationIcon(suggestion.type)} size={22} color="#007AFF" />
       </View>
       <View style={styles.suggestionTextContainer}>
-        <Text style={styles.suggestionMainText} numberOfLines={1}>
-          {formatAddress(suggestion)}
-        </Text>
-        <Text style={styles.suggestionSubText} numberOfLines={2}>
-          {suggestion.displayName}
-        </Text>
+        <Text style={styles.suggestionMainText} numberOfLines={1}>{formatAddress(suggestion)}</Text>
+        <Text style={styles.suggestionSubText} numberOfLines={2}>{suggestion.displayName}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#C7C7CC" />
     </TouchableOpacity>
   );
 
-  // Show FAB when we have search results
   const showFAB = searchResults.length > 0 && hasSearched && !loading;
+
+  // Build dynamic sections for FlatList
+  const getSections = () => {
+    const sections = [];
+
+    // Always show search inputs
+    sections.push({ type: 'search', key: 'search' });
+
+    if (loading) {
+      sections.push({ type: 'loading', key: 'loading' });
+      return sections;
+    }
+
+    if (searchResults.length > 0) {
+      sections.push({ type: 'resultsHeader', key: 'resultsHeader' });
+      searchResults.forEach((tasker, idx) => {
+        sections.push({ type: 'tasker', key: `tasker-${tasker._id || idx}`, tasker });
+      });
+      return sections;
+    }
+
+    if (hasSearched) {
+      sections.push({ type: 'empty', key: 'empty' });
+      return sections;
+    }
+
+    sections.push({ type: 'discovery', key: 'discovery' });
+    return sections;
+  };
+
+  const renderSection = ({ item }) => {
+    switch (item.type) {
+      case 'search':
+        return (
+          <View style={styles.searchSection}>
+            <View style={styles.inputGroup}>
+              <View style={styles.inputContainer}>
+                <View style={styles.iconCircle}><Ionicons name="construct" size={18} color="#FFF" /></View>
+                <TextInput
+                  ref={skillInputRef}
+                  style={styles.textInput}
+                  placeholder="What service do you need?"
+                  placeholderTextColor="#8E8E93"
+                  value={searchQuery}
+                  onChangeText={handleSkillChange}
+                  onFocus={handleServiceFocus}
+                  onBlur={handleServiceBlur}
+                  onSubmitEditing={() => locationInputRef.current?.focus()}
+                  returnKeyType="next"
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}><Ionicons name="close-circle" size={20} color="#C7C7CC" /></TouchableOpacity>
+                )}
+              </View>
+              <ServiceSuggestionsDropdown />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.inputContainer}>
+                <View style={styles.iconSquare}><Ionicons name="location" size={18} color="#FFF" /></View>
+                <TextInput
+                  ref={locationInputRef}
+                  style={styles.textInput}
+                  placeholder="Enter your location"
+                  placeholderTextColor="#8E8E93"
+                  value={locationQuery}
+                  onChangeText={handleLocationQueryChange}
+                  onFocus={handleLocationFocus}
+                  onSubmitEditing={handleSearch}
+                  returnKeyType="search"
+                />
+                {searchingLocations ? <ActivityIndicator size="small" color="#000" /> : locationQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => { setLocationQuery(''); setLocation(''); setLocationDetails(null); setShowLocationSuggestions(false); }}>
+                    <Ionicons name="close-circle" size={20} color="#C7C7CC" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {(searchQuery.trim() || location.trim()) && (
+              <TouchableOpacity
+                style={[styles.searchButton, (!searchQuery.trim() || !location.trim()) && styles.searchButtonDisabled]}
+                onPress={handleSearch}
+                disabled={!searchQuery.trim() || !location.trim()}
+              >
+                <Ionicons name="search" size={20} color="#FFF" />
+                <Text style={styles.searchButtonText}>Search Taskers</Text>
+              </TouchableOpacity>
+            )}
+
+            {(searchQuery.trim() || location.trim()) && (
+              <TouchableOpacity style={styles.clearButton} onPress={clearAllInputs}>
+                <Ionicons name="close-circle" size={16} color="#8E8E93" />
+                <Text style={styles.clearButtonText}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+
+            {error && !loading && (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={18} color="#EF4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+          </View>
+        );
+
+      case 'loading':
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#000" />
+            <Text style={styles.loadingText}>Finding taskers near you...</Text>
+          </View>
+        );
+
+      case 'resultsHeader':
+        return (
+          <View style={styles.resultHeader}>
+            <Text style={styles.resultsTitle}>{searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Found</Text>
+            <Text style={styles.resultsSubtitle}>for "{searchQuery}" near {locationDetails?.city || location}</Text>
+            {isSelectionMode && (
+              <View style={styles.selectionInfoContainer}>
+                <Text style={styles.selectionModeText}>Select multiple taskers to receive competitive offers</Text>
+                <Text style={styles.selectionSubtext}>Invite multiple professionals to submit proposals, then choose the best offer</Text>
+              </View>
+            )}
+          </View>
+        );
+
+      case 'tasker':
+        return isSelectionMode ? (
+          <TaskerSelectionCard
+            tasker={item.tasker}
+            isSelected={selectedTaskers.some(t => t._id === item.tasker._id)}
+            onToggleSelect={toggleTaskerSelection}
+            onViewProfile={handleViewProfile}
+          />
+        ) : (
+          <TaskerCard tasker={item.tasker} />
+        );
+
+      case 'empty':
+        return (
+          <View style={styles.emptyState}>
+            <Ionicons name="search" size={64} color="#C7C7CC" />
+            <Text style={styles.emptyTitle}>No taskers found</Text>
+            <Text style={styles.emptyText}>Try adjusting your search terms or location</Text>
+            <View style={styles.popularServicesFallback}>
+              <Text style={styles.popularServicesTitle}>Popular Services to Try:</Text>
+              <View style={styles.popularServicesGrid}>
+                {POPULAR_SERVICES.slice(0, 6).map((service, index) => (
+                  <TouchableOpacity key={index} style={styles.popularServiceTag} onPress={() => handleServiceSelect(service)}>
+                    <Text style={styles.popularServiceText}>{service}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        );
+
+      case 'discovery':
+        return (
+          <View style={styles.discoveryContent}>
+            <PopularServicesGrid onServiceSelect={handleServiceSelect} popularServices={POPULAR_SERVICES} />
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
-      
-      <Header
-        title="Find Taskers" 
-      />
+      <Header title="Find Taskers" />
 
-      <KeyboardAvoidingView 
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        
-        {/* Selection Header - Only show in selection mode */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         {isSelectionMode && (
           <SelectionHeader
             selectedCount={selectedTaskers.length}
@@ -496,169 +621,16 @@ const SearchTaskersScreen = ({ navigation }) => {
           />
         )}
 
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+        <FlatList
+          data={getSections()}
+          renderItem={renderSection}
+          keyExtractor={item => item.key}
           showsVerticalScrollIndicator={false}
-        >
-          {/* Search Inputs Section */}
-          <View style={styles.searchSection}>
-            {/* Service Input */}
-            <View style={styles.inputGroup}>
-              <View style={styles.inputContainer}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="construct" size={18} color="#FFF" />
-                </View>
-                <TextInput
-                  ref={skillInputRef}
-                  style={styles.textInput}
-                  placeholder="What service do you need?"
-                  placeholderTextColor="#8E8E93"
-                  value={searchQuery}
-                  onChangeText={handleSkillChange}
-                  onSubmitEditing={() => locationInputRef.current?.focus()}
-                  returnKeyType="next"
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color="#C7C7CC" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Location Input */}
-            <View style={styles.inputGroup}>
-              <View style={styles.inputContainer}>
-                <View style={styles.iconSquare}>
-                  <Ionicons name="location" size={18} color="#FFF" />
-                </View>
-                <TextInput
-                  ref={locationInputRef}
-                  style={styles.textInput}
-                  placeholder="Enter your location"
-                  placeholderTextColor="#8E8E93"
-                  value={locationQuery}
-                  onChangeText={handleLocationQueryChange}
-                  onFocus={handleLocationFocus} // Changed this line
-                  onSubmitEditing={handleSearch}
-                  returnKeyType="search"
-                />
-                {searchingLocations ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : locationQuery.length > 0 ? (
-                  <TouchableOpacity onPress={() => {
-                    setLocationQuery('');
-                    setLocation('');
-                    setLocationDetails(null);
-                    setShowLocationSuggestions(false);
-                  }}>
-                    <Ionicons name="close-circle" size={20} color="#C7C7CC" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-
-            {/* Search Button */}
-            {(searchQuery.trim() || location.trim()) && (
-              <TouchableOpacity 
-                style={[
-                  styles.searchButton,
-                  (!searchQuery.trim() || !location.trim()) && styles.searchButtonDisabled
-                ]}
-                onPress={handleSearch}
-                disabled={!searchQuery.trim() || !location.trim()}
-              >
-                <Ionicons name="search" size={20} color="#FFF" />
-                <Text style={styles.searchButtonText}>Search Taskers</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Clear All Button */}
-            {(searchQuery.trim() || location.trim()) && (
-              <TouchableOpacity 
-                style={styles.clearButton}
-                onPress={clearAllInputs}
-              >
-                <Ionicons name="close-circle" size={16} color="#8E8E93" />
-                <Text style={styles.clearButtonText}>Clear all</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Error Message */}
-            {error && !loading && (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={18} color="#EF4444" />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Content based on state */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#000" />
-              <Text style={styles.loadingText}>Finding taskers near you...</Text>
-            </View>
-          ) : searchResults.length > 0 ? (
-           <View style={styles.resultsSection}>
-  <View style={styles.resultHeader}>
-    <Text style={styles.resultsTitle}>
-      {searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Found
-    </Text>
-    <Text style={styles.resultsSubtitle}>
-      for "{searchQuery}" near {locationDetails?.city || location}
-    </Text>
-    
-    {/* Selection Mode Indicator */}
-    {isSelectionMode && (
-      <View style={styles.selectionInfoContainer}>
-        <Text style={styles.selectionModeText}>
-          Select multiple taskers to receive competitive offers
-        </Text>
-        <Text style={styles.selectionSubtext}>
-          Invite multiple professionals to submit proposals, then choose the best offer for your needs
-        </Text>
-      </View>
-    )}
-  </View>
-              
-              {/* Taskers List - Show different cards based on mode */}
-              {searchResults.map((tasker, index) => 
-                isSelectionMode ? (
-                  <TaskerSelectionCard
-                    key={tasker._id || index}
-                    tasker={tasker}
-                    isSelected={selectedTaskers.some(t => t._id === tasker._id)}
-                    onToggleSelect={toggleTaskerSelection}
-                    onViewProfile={handleViewProfile}
-                  />
-                ) : (
-                  <TaskerCard 
-                    key={tasker._id || index}
-                    tasker={tasker}
-                  />
-                )
-              )}
-            </View>
-          ) : hasSearched ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="search" size={64} color="#C7C7CC" />
-              <Text style={styles.emptyTitle}>No taskers found</Text>
-              <Text style={styles.emptyText}>
-                Try adjusting your search terms or location
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.discoveryContent}>
-              <PopularServicesGrid onServiceSelect={handleServiceSelect} />
-            </View>
-          )}
-        </ScrollView>
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.listContent}
+        />
       </KeyboardAvoidingView>
 
-      {/* Floating Action Button */}
       <RequestServiceFAB
         selectedCount={selectedTaskers.length}
         onPress={handleFABPress}
@@ -666,79 +638,43 @@ const SearchTaskersScreen = ({ navigation }) => {
         isSelectionMode={isSelectionMode}
       />
 
-      {/* FULL-SCREEN LOCATION MODAL - Only shows when user types */}
-      <Modal
-        visible={showLocationSuggestions}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowLocationSuggestions(false)}
-      >
+      {/* Location Modal */}
+      <Modal visible={showLocationSuggestions} transparent animationType="none" onRequestClose={() => setShowLocationSuggestions(false)}>
         <View style={styles.modalContainer}>
-          {/* Backdrop */}
-          <Animated.View 
-            style={[
-              styles.backdrop,
-              {
-                opacity: backdropAnim,
-              }
-            ]}
-          >
-            <TouchableOpacity 
-              style={styles.backdropTouchable}
-              activeOpacity={1}
-              onPress={() => setShowLocationSuggestions(false)}
-            />
+          <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowLocationSuggestions(false)} />
           </Animated.View>
 
-          {/* Full-Screen Content */}
-          <Animated.View 
-            style={[
-              styles.modalContent,
-              {
-                transform: [{ translateY: slideAnim }],
-              }
-            ]}
-          >
+          <Animated.View style={[styles.modalContent, { transform: [{ translateY: slideAnim }] }]}>
             <SafeAreaView style={styles.modalSafeArea}>
-              {/* Header */}
               <View style={styles.modalHeader}>
-                <TouchableOpacity 
-                  onPress={() => setShowLocationSuggestions(false)}
-                  style={styles.backButton}
-                >
+                <TouchableOpacity onPress={() => setShowLocationSuggestions(false)} style={styles.backButton}>
                   <Ionicons name="arrow-back" size={24} color="#000" />
                 </TouchableOpacity>
                 <Text style={styles.modalTitle}>Choose Location</Text>
                 <View style={styles.headerSpacer} />
               </View>
 
-              {/* Search Input */}
               <View style={styles.modalSearchContainer}>
                 <View style={styles.modalInputContainer}>
-                  <View style={styles.modalIconSquare}>
-                    <Ionicons name="search" size={20} color="#FFF" />
-                  </View>
+                  <View style={styles.modalIconSquare}><Ionicons name="search" size={20} color="#FFF" /></View>
                   <TextInput
                     style={styles.modalTextInput}
                     placeholder="Search for a location"
                     placeholderTextColor="#8E8E93"
                     value={locationQuery}
                     onChangeText={handleLocationQueryChange}
-                    autoFocus={true}
+                    autoFocus
                     returnKeyType="done"
                   />
                   {locationQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => {
-                      setLocationQuery('');
-                      setShowLocationSuggestions(false);
-                    }}>
+                    <TouchableOpacity onPress={() => { setLocationQuery(''); setShowLocationSuggestions(false); }}>
                       <Ionicons name="close-circle" size={22} color="#C7C7CC" />
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
 
-              {/* Suggestions List */}
               <View style={styles.modalBody}>
                 {searchingLocations ? (
                   <View style={styles.modalLoadingContainer}>
@@ -747,36 +683,28 @@ const SearchTaskersScreen = ({ navigation }) => {
                   </View>
                 ) : locationSuggestions.length > 0 ? (
                   <>
-                    <Text style={styles.resultsCount}>
-                      {locationSuggestions.length} location{locationSuggestions.length !== 1 ? 's' : ''} found
-                    </Text>
+                    <Text style={styles.resultsCount}>{locationSuggestions.length} location{locationSuggestions.length !== 1 ? 's' : ''} found</Text>
                     <FlatList
                       data={locationSuggestions}
-                      keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <LocationSuggestionItem suggestion={item} />
-                      )}
+                      keyExtractor={item => item.id}
+                      renderItem={({ item }) => <LocationSuggestionItem suggestion={item} />}
                       keyboardShouldPersistTaps="always"
                       ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
                       showsVerticalScrollIndicator={false}
-                      contentContainerStyle={styles.listContent}
+                      contentContainerStyle={{ paddingBottom: 20 }}
                     />
                   </>
                 ) : locationQuery.length >= 2 ? (
                   <View style={styles.modalEmptyState}>
                     <Ionicons name="location-outline" size={64} color="#C7C7CC" />
                     <Text style={styles.modalEmptyTitle}>No locations found</Text>
-                    <Text style={styles.modalEmptyText}>
-                      Try a different search term
-                    </Text>
+                    <Text style={styles.modalEmptyText}>Try a different search term</Text>
                   </View>
                 ) : (
                   <View style={styles.modalEmptyState}>
                     <Ionicons name="map-outline" size={64} color="#C7C7CC" />
                     <Text style={styles.modalEmptyTitle}>Start typing</Text>
-                    <Text style={styles.modalEmptyText}>
-                      Enter at least 2 characters to search
-                    </Text>
+                    <Text style={styles.modalEmptyText}>Enter at least 2 characters to search</Text>
                   </View>
                 )}
               </View>
@@ -807,9 +735,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: '#FFF',
+    position: 'relative',
   },
   inputGroup: {
     marginBottom: 12,
+    position: 'relative',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -819,6 +749,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     gap: 12,
+    zIndex: 10,
   },
   iconCircle: {
     width: 28,
@@ -843,6 +774,73 @@ const styles = StyleSheet.create({
     padding: 0,
     fontWeight: '400',
   },
+  
+  // Service Suggestions Styles
+  serviceSuggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F2F2F7',
+    zIndex: 1000,
+    maxHeight: 300,
+  },
+  suggestionsHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  suggestionsTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 2,
+  },
+  suggestionsSubtitle: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  suggestionsContent: {
+    paddingBottom: 8,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFF',
+  },
+  suggestionIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#000',
+    fontWeight: '400',
+  },
+  suggestionSeparator: {
+    height: 1,
+    backgroundColor: '#F2F2F7',
+    marginLeft: 60,
+  },
+  
   // Search Button Styles
   searchButton: {
     flexDirection: 'row',
@@ -863,6 +861,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  
   // Clear Button Styles
   clearButton: {
     flexDirection: 'row',
@@ -877,17 +876,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  suggestionsHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
-  },
-  suggestionsTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000',
-  },
+  
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -933,6 +922,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
     fontWeight: '400',
+  },
+  selectionInfoContainer: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+    marginTop: 8,
+  },
+  selectionModeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginBottom: 4,
+  },
+  selectionSubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 18,
   },
   taskerCard: {
     backgroundColor: '#FFF',
@@ -1060,7 +1068,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: 40,
     paddingHorizontal: 20,
   },
   emptyTitle: {
@@ -1075,9 +1083,44 @@ const styles = StyleSheet.create({
     color: '#C7C7CC',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
+  },
+  
+  // Popular Services Fallback
+  popularServicesFallback: {
+    width: '100%',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+  },
+  popularServicesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 12,
+  },
+  popularServicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  popularServiceTag: {
+    backgroundColor: '#FFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  popularServiceText: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '500',
   },
 
-  // MODAL STYLES - Uber Style
+  // MODAL STYLES
   modalContainer: {
     flex: 1,
     position: 'absolute',
@@ -1170,13 +1213,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
   },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFF',
-  },
   suggestionIconContainer: {
     width: 40,
     height: 40,
@@ -1236,32 +1272,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-
-  selectionModeText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  selectionInfoContainer: {
-  backgroundColor: '#F0F9FF',
-  padding: 12,
-  borderRadius: 8,
-  borderLeftWidth: 4,
-  borderLeftColor: '#3B82F6',
-  marginTop: 8,
-},
-selectionModeText: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#1E40AF',
-  marginBottom: 4,
-},
-selectionSubtext: {
-  fontSize: 14,
-  color: '#6B7280',
-  lineHeight: 18,
-},
 });
 
 export default SearchTaskersScreen;
