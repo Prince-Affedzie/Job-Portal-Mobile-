@@ -29,7 +29,7 @@ import { navigate,reset } from '../../services/navigationService';
 import { sendFileToS3 } from '../../api/commonApi';
 import { uploadProfileImage, updateAvailability, switchAccount } from '../../api/authApi';
 import ReviewsComponent from '../../component/common/ReviewsComponent';
-import { createNavigationContainerRef } from '@react-navigation/native';
+import VerificationTooltip from "../../component/common/VerificationToolTip";
 
 
 // Components
@@ -91,10 +91,18 @@ const TaskerProfileScreen = ({ navigation }) => {
   const [updatingAvailability, setUpdatingAvailability] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
 
-   const navigationRef = createNavigationContainerRef();
-
-
-  const insets = useSafeAreaInsets();
+  const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
+  
+  // useEffect to check verification status
+  useEffect(() => {
+    if (user && user.role === 'job_seeker' && !user.isVerified) {
+      // Show prompt after a short delay
+      const timer = setTimeout(() => {
+        setShowVerificationPrompt(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   // Initialize profile data
   useEffect(() => {
@@ -774,6 +782,10 @@ const TaskerProfileScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <Header title="My Profile" showBack={false} />
+      <VerificationTooltip 
+        placement="right"
+        offset={12}
+        />
 
       <Animated.ScrollView 
         style={{ opacity: fadeAnim }}

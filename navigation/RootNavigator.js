@@ -5,7 +5,6 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NotificationProvider } from "../context/NotificationContext";
 import NotificationPopup from "../component/common/NotificationPopUp";
 
-
 import AuthStack from "./AuthStack";
 import TaskerStack from "./TaskerStack";
 import PosterStack from "./PosterStack";

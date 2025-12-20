@@ -14,6 +14,7 @@ import { PaystackProvider } from "react-native-paystack-webview";
 import { StatusBar } from "react-native";
 import * as Updates from 'expo-updates';
 const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
+import VerificationBanner from "./component/common/VerificationBanner";
 
 
 function PushNotificationInitializer() {
@@ -55,6 +56,7 @@ export default function App() {
            >
           <PushNotificationInitializer />
            <NotificationPopup/>
+           <VerificationBanner position="top" autoHideDuration={10000} />
           <RootNavigator />
           </PaystackProvider>
           </ServiceRequestProvider>

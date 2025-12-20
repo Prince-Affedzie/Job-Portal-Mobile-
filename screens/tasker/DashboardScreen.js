@@ -19,6 +19,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import Header from "../../component/tasker/Header";
 import LoadingIndicator from '../../component/common/LoadingIndicator';
+import VerificationTooltip from "../../component/common/VerificationToolTip";
 
 const { width } = Dimensions.get('window');
 
@@ -485,6 +486,10 @@ const TaskerDashboard = () => {
         showBack={false}
         onRightPress={() => navigate('Notifications')}
       />
+      <VerificationTooltip 
+       placement="right"
+        offset={12}
+      />
       
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
@@ -506,12 +511,6 @@ const TaskerDashboard = () => {
             <Text style={styles.welcomeName}>{user?.name || 'Tasker'} 👋</Text>
             <Text style={styles.welcomeSubtitle}>Here's your performance overview</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.profileButton}
-            onPress={() => navigate('Profile')}
-          >
-            <Ionicons name="person-circle" size={24} color={THEME.accent} />
-          </TouchableOpacity>
         </View>
 
         {/* Earnings Card */}

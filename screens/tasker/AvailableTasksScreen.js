@@ -25,6 +25,7 @@ import CategoryCards from "../../component/tasker/CategoryCards";
 import Header from "../../component/tasker/Header";
 import moment from "moment";
 import LoadingIndicator from "../../component/common/LoadingIndicator";
+import VerificationTooltip from "../../component/common/VerificationToolTip";
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -493,6 +494,7 @@ const AvailableTasksScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <Header title="Available Tasks" />
+      
       <FlatList
         data={currentTasks}
         keyExtractor={(item) => item._id}
@@ -520,6 +522,10 @@ const AvailableTasksScreen = () => {
         initialNumToRender={10}
         windowSize={10}
       />
+      <VerificationTooltip 
+      placement="right"
+      offset={12}
+     />
     </View>
   );
 };
