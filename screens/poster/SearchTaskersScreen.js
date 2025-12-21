@@ -256,7 +256,7 @@ const TaskerCard = ({ tasker }) => {
     if (tasker.hourlyRate) return `GHS ${tasker.hourlyRate}/hr`;
     if (tasker.minBudget && tasker.maxBudget) return `GHS ${tasker.minBudget}-${tasker.maxBudget}`;
     if (tasker.budget) return `GHS ${tasker.budget}`;
-    return 'Contact for price';
+    return 'Available';
   };
 
   // Get tasker's primary skill
