@@ -238,49 +238,168 @@ const SearchTaskersScreen = ({ navigation }) => {
     );
   };
 
-  // TaskerCard (normal mode)
-  const TaskerCard = ({ tasker }) => (
-    <TouchableOpacity style={styles.taskerCard} activeOpacity={0.7} onPress={() => handleViewProfile(tasker)}>
-      <View style={styles.taskerHeader}>
-        <View style={styles.taskerImageContainer}>
-          <Image source={{ uri: tasker.profileImage || 'https://via.placeholder.com/70' }} style={styles.taskerImage} />
+
+// TaskerCard (inspired by TaskRabbit/Fiverr)
+const TaskerCard = ({ tasker }) => {
+ 
+  const getServiceBadgeColor = () => {
+    const service = searchQuery.toLowerCase();
+    if (service.includes('clean') || service.includes('home')) return '#10B981';
+    if (service.includes('tech') || service.includes('digital')) return '#6366F1';
+    if (service.includes('design') || service.includes('creative')) return '#8B5CF6';
+    if (service.includes('repair') || service.includes('install')) return '#F59E0B';
+    return '#3B82F6';
+  };
+
+  // Format hourly rate or budget
+  const formatRate = () => {
+    if (tasker.hourlyRate) return `GHS ${tasker.hourlyRate}/hr`;
+    if (tasker.minBudget && tasker.maxBudget) return `GHS ${tasker.minBudget}-${tasker.maxBudget}`;
+    if (tasker.budget) return `GHS ${tasker.budget}`;
+    return 'Contact for price';
+  };
+
+  // Get tasker's primary skill
+  const getPrimarySkill = () => {
+    if (tasker.skills?.length > 0) return tasker.skills[0];
+    if (tasker.category) return tasker.category;
+    return 'Skilled Professional';
+  };
+
+  return (
+    <TouchableOpacity 
+      style={styles.taskerCard}
+      activeOpacity={0.8}
+      onPress={() => handleViewProfile(tasker)}
+    >
+      {/* Top Section with Image and Badges */}
+      <View style={styles.taskerTopSection}>
+        {/* Large Profile Image */}
+        <View style={styles.profileImageContainer}>
+          <Image
+            source={{ uri: tasker.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' }}
+            style={styles.profileImage}
+          />
+          
+          {/* Verified Badge */}
           {tasker.isVerified && (
             <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+            </View>
+          )}
+          
+          {/* Online Status Indicator */}
+          {tasker.isOnline && (
+            <View style={styles.onlineIndicator} />
+          )}
+        </View>
+
+        {/* Rating and Distance Badge */}
+        <View style={styles.ratingBadge}>
+          <View style={styles.ratingStars}>
+            <Ionicons name="star" size={14} color="#F59E0B" />
+            <Text style={styles.ratingText}>{tasker.rating?.toFixed(1) || '5.0'}</Text>
+            {tasker.numberOfRatings > 0 && (
+              <Text style={styles.ratingCount}>({tasker.numberOfRatings})</Text>
+            )}
+          </View>
+          {tasker.distance && (
+            <View style={styles.distanceBadge}>
+              <Ionicons name="navigate" size={12} color="#FFFFFF" />
+              <Text style={styles.distanceText}>{formatDistance(tasker.distance)}</Text>
             </View>
           )}
         </View>
-        <View style={styles.taskerInfo}>
-          <Text style={styles.taskerName} numberOfLines={1}>{tasker.name}</Text>
-          <Text style={styles.taskerSkill} numberOfLines={1}>Available</Text>
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={12} color="#8E8E93" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {formatTaskerLocation(tasker.location) || 'Location not specified'}
-            </Text>
-          </View>
-          <View style={styles.taskerMeta}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>{tasker.rating?.toFixed(1) || 'New'}</Text>
-              {tasker.numberOfRatings > 0 && <Text style={styles.reviewCount}>({tasker.numberOfRatings})</Text>}
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.distanceContainer}>
-              <Ionicons name="navigate-outline" size={13} color="#8E8E93" />
-              <Text style={styles.distanceText}>{formatDistance(tasker.distance)} away</Text>
-            </View>
-          </View>
-        </View>
       </View>
-      <View style={styles.taskerFooter}>
-        <TouchableOpacity onPress={() => handleViewProfile(tasker)} style={styles.hireButton}>
-          <Text style={styles.hireButtonText}>View Profile</Text>
-        </TouchableOpacity>
+
+      {/* Tasker Details Section */}
+      <View style={styles.taskerDetails}>
+        <View style={styles.nameAndRate}>
+          <View style={styles.nameContainer}>
+            <Text style={styles.taskerName} numberOfLines={1}>
+              {tasker.name || 'Professional Tasker'}
+            </Text>
+            {tasker.isPro && (
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.hourlyRate}>{formatRate()}</Text>
+        </View>
+
+        {/* Primary Skill */}
+        <View style={styles.skillBadge}>
+          <Ionicons name="briefcase-outline" size={14} color={getServiceBadgeColor()} />
+          <Text style={[styles.skillText, { color: getServiceBadgeColor() }]} numberOfLines={1}>
+            {getPrimarySkill()}
+          </Text>
+        </View>
+
+        {/* Location */}
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={14} color="#64748B" />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {formatTaskerLocation(tasker.location) || 'Available Nationwide'}
+          </Text>
+        </View>
+
+        {/* Brief Description/Highlights */}
+        {tasker.Bio && (
+          <Text style={styles.taskerBio} numberOfLines={2}>
+            {tasker.Bio.length > 80 ? `${tasker.Bio.substring(0, 80)}...` : tasker.Bio}
+          </Text>
+        )}
+
+        {/* Stats Row (like Fiverr) */}
+        <View style={styles.statsRow}>
+          {tasker.completedJobs > 0 && (
+            <View style={styles.statItem}>
+              <Ionicons name="checkmark-done" size={14} color="#10B981" />
+              <Text style={styles.statText}>{tasker.completedJobs} jobs</Text>
+            </View>
+          )}
+          
+          {tasker.responseRate && (
+            <View style={styles.statItem}>
+              <Ionicons name="chatbubble-outline" size={14} color="#6366F1" />
+              <Text style={styles.statText}>{tasker.responseRate}% response</Text>
+            </View>
+          )}
+
+          {tasker.onTimeRate && (
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={14} color="#F59E0B" />
+              <Text style={styles.statText}>{tasker.onTimeRate}% on time</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          {/*<TouchableOpacity 
+            style={styles.messageButton}
+            onPress={() => navigate('Chat', { 
+              userId: tasker._id,
+              userName: tasker.name 
+            })}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6366F1" />
+            <Text style={styles.messageButtonText}>Message</Text>
+          </TouchableOpacity>*/}
+
+          <TouchableOpacity 
+            style={styles.hireButton}
+            onPress={() => handleViewProfile(tasker)}
+          >
+            <Text style={styles.hireButtonText}>View Profile</Text>
+            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
-
+};
   // ====== FIX 3: Proper Location Input Handling ======
   const handleLocationFocus = () => {
     showLocationModal();
@@ -291,7 +410,7 @@ const SearchTaskersScreen = ({ navigation }) => {
     setLocationQuery(text);
     
     // Show modal when user starts typing (if not already shown)
-    if (text.length > 0 && !showLocationSuggestions) {
+    if (text.length > 2 && !showLocationSuggestions) {
       showLocationModal();
     }
     
@@ -499,7 +618,7 @@ const SearchTaskersScreen = ({ navigation }) => {
                   onBlur={handleServiceBlur}
                   onSubmitEditing={() => {
                     locationInputRef.current?.focus();
-                    showLocationModal(); // Open modal when moving to location
+                    //showLocationModal(); // Open modal when moving to location
                   }}
                   returnKeyType="next"
                 />
@@ -993,127 +1112,266 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   
-  // Tasker Card
   taskerCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F2F2F7',
-  },
-  taskerHeader: {
-    flexDirection: 'row',
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
   },
-  taskerImageContainer: {
+
+  
+  taskerTopSection: {
     position: 'relative',
-    marginRight: 12,
+    height: 160,
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
   },
-  taskerImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E2E8F0',
+
+  profileImageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
   },
+
+  profileImage: {
+    width: '100%',
+    height: '150%',
+    resizeMode: 'cover',
+  },
+
   verifiedBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 1,
-  },
-  taskerInfo: {
-    flex: 1,
+    bottom: 12,
+    left: 12,
+    backgroundColor: '#10B981',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
-  },
-  locationContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  locationText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    fontWeight: '400',
-    flex: 1,
-  },
-  taskerName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 3,
-  },
-  taskerSkill: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-  taskerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#000',
-    fontWeight: '600',
-  },
-  reviewCount: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginLeft: 2,
-  },
-  divider: {
-    width: 1,
+
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 12,
     height: 12,
-    backgroundColor: '#C7C7CC',
-    marginHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  distanceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  distanceText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    fontWeight: '400',
-  },
-  taskerFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
-  },
-  hireButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+
+  ratingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    alignItems: 'flex-end',
     gap: 6,
   },
-  hireButtonText: {
-    color: '#FFF',
-    fontSize: 15,
+
+  ratingStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+
+  ratingCount: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+
+  distanceText: {
+    fontSize: 12,
+    color: '#FFFFFF',
     fontWeight: '600',
+  },
+
+ 
+  taskerDetails: {
+    padding: 16,
+  },
+
+  nameAndRate: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+
+  taskerName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+  },
+
+  proBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+
+  proBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  hourlyRate: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+  },
+
+  skillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    marginBottom: 10,
+  },
+
+  skillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+
+  locationText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+    flex: 1,
+  },
+
+  taskerBio: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+    marginBottom: 14,
+    fontStyle: 'italic',
+  },
+
+ 
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  statText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+
+  
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  messageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+
+  messageButtonText: {
+    fontSize: 14,
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+
+  hireButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+
+  hireButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   
   // Discovery Content

@@ -552,7 +552,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
                     title="Budget"
                     value={`₵${task.budget}`}
                     color="#10B981"
-                    subtitle="Fixed price"
+                    subtitle="Client budget"
                   />
                   <InfoCard
                     icon="calendar-outline"

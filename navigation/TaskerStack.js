@@ -18,6 +18,7 @@ import EarningScreen from "../screens/tasker/EarningsScreen";
 import PaymentMethodScreen from '../screens/tasker/PaymentMethodScreen'
 import WorkSamplesScreen from '../screens/tasker/WorkSamplesScreen'
 import ServiceRequestDetailScreen from '../screens/tasker/ServiceRequestDetailScreen'
+import BidDetailsScreen from "../screens/tasker/BidDetailsScreen";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -34,6 +35,7 @@ function TaskerStackNavigator() {
       {/* Stack Screens (not in tabs) */}
       <Stack.Screen name="TaskDetails" component={TaskDetailsScreen} />
       <Stack.Screen name="AppliedTaskDetails" component={AppliedTaskDetailsScreen} />
+      <Stack.Screen name="BidDetails" component={BidDetailsScreen} />
       <Stack.Screen name="Submissions" component={SubmissionsScreen} />
       <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
       <Stack.Screen name="EarningScreen" component={EarningScreen} />

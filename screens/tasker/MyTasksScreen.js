@@ -278,7 +278,7 @@ const TaskerTasksScreen = () => {
         navigate('AppliedTaskDetails', { taskId: item._id });
         break;
       case TABS.BIDS:
-        navigate('AppliedTaskDetails', { taskId: item.task?._id });
+        navigate('BidDetails', { bidId: item.bid?._id });;
         break;
       case TABS.SERVICE_REQUESTS:
         navigate('ServiceRequestDetail', { requestId: item._id });

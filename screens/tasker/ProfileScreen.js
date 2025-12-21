@@ -1179,41 +1179,170 @@ const TaskerProfileScreen = ({ navigation }) => {
         </View>
 
         {/* Work Samples Preview */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="images-outline" size={20} color={THEME.accent} />
-              <Text style={styles.sectionTitle}>Work Samples</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => navigate('WorkSamples')}
-            >
-              <Text style={styles.viewAllText}>
-                {profileData.workPortfolio?.length > 0 ? 'View All' : 'Add'}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={THEME.accent} />
-            </TouchableOpacity>
-          </View>
-          
+        {/* Enhanced Work Portfolio Preview Section */}
+<View style={styles.section}>
+  <View style={styles.sectionHeader}>
+    <View style={styles.sectionTitleContainer}>
+      <Ionicons name="trophy-outline" size={22} color={THEME.accent} />
+      <Text style={styles.sectionTitle}>Your Work Portfolio</Text>
+      {/*<View style={styles.portfolioStatusBadge}>
+        <Text style={styles.portfolioStatusText}>
+          {profileData.workPortfolio?.length || 0} {profileData.workPortfolio?.length === 1 ? 'Project' : 'Projects'}
+        </Text>
+      </View>*/}
+    </View>
+    <TouchableOpacity 
+      style={styles.portfolioCtaButton}
+      onPress={() => navigate('WorkSamples')}
+    >
+      <Text style={styles.portfolioCtaText}>Manage</Text>
+      <Ionicons name="chevron-forward" size={16} color={THEME.white} />
+    </TouchableOpacity>
+  </View>
+  
+  <Text style={styles.portfolioSubtitle}>
+    Showcase your best work. A strong portfolio helps you win <Text style={styles.highlightText}>3x more jobs</Text>.
+  </Text>
+  
+  {/* Portfolio Stats & Benefits Card */}
+ 
+  
+  {/* Action Card - Clear CTA */}
+  <TouchableOpacity 
+    style={styles.portfolioActionCard}
+    onPress={() => navigate('WorkSamples')}
+    activeOpacity={0.9}
+  >
+    <LinearGradient
+      colors={[THEME.primary, THEME.secondary]}
+      style={styles.actionCardGradient}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+    >
+      <View style={styles.actionCardContent}>
+        <View style={styles.actionCardIcon}>
+          <Ionicons name="sparkles" size={28} color={THEME.white} />
+        </View>
+        <View style={styles.actionCardText}>
+          <Text style={styles.actionCardTitle}>
+            {profileData.workPortfolio?.length > 0 
+              ? 'Make Your Portfolio Stand Out' 
+              : 'Launch Your Portfolio Today'}
+          </Text>
+          <Text style={styles.actionCardDescription}>
+            {profileData.workPortfolio?.length > 0 
+              ? `You have ${profileData.workPortfolio.length} projects. Add more to increase your visibility.` 
+              : 'Add your first project to start attracting better clients and higher-paying jobs.'}
+          </Text>
+        </View>
+        <View style={styles.actionCardArrow}>
+          <Ionicons name="arrow-forward-circle" size={32} color={THEME.white} />
+        </View>
+      </View>
+    </LinearGradient>
+  </TouchableOpacity>
+  
+  {/* Project Thumbnails Preview */}
+  {profileData.workPortfolio && profileData.workPortfolio.length > 0 ? (
+    <>
+      <View style={styles.portfolioPreviewHeader}>
+        <Text style={styles.previewTitle}>Recent Projects</Text>
+        <TouchableOpacity onPress={() => navigate('WorkSamples')}>
+          <Text style={styles.viewAllLink}>View All</Text>
+        </TouchableOpacity>
+      </View>
+      
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.portfolioPreview}
+      >
+        {profileData.workPortfolio.slice(0, 3).map((project, index) => (
           <TouchableOpacity 
-            style={styles.workSamplesCard}
-            onPress={() => navigate('WorkSamples')}
+            key={index} 
+            style={styles.projectThumbnail}
+            onPress={() => navigate('WorkSamples', { scrollToProject: project.id })}
           >
-            <View style={styles.workSamplesContent}>
-              <Ionicons name="images-outline" size={24} color={THEME.accent} />
-              <View style={styles.workSamplesText}>
-                <Text style={styles.workSamplesTitle}>Showcase Your Work</Text>
-                <Text style={styles.workSamplesDescription}>
-                  {profileData.workPortfolio?.length > 0 
-                    ? `${profileData.workPortfolio.length} sample${profileData.workPortfolio.length !== 1 ? 's' : ''}`
-                    : 'Add photos of your completed projects'
-                  }
+            <View style={styles.thumbnailImageContainer}>
+              {project.files && project.files.length > 0 ? (
+                <Image 
+                  source={{ uri: project.files[0].publicUrl }}
+                  style={styles.thumbnailImage}
+                  defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
+                />
+              ) : (
+                <View style={styles.thumbnailPlaceholder}>
+                  <Ionicons name="images-outline" size={32} color={THEME.textSecondary} />
+                </View>
+              )}
+              <View style={styles.thumbnailBadge}>
+                <Ionicons name="image" size={12} color={THEME.white} />
+                <Text style={styles.thumbnailBadgeText}>
+                  {project.files ? project.files.length : 0}
                 </Text>
               </View>
             </View>
+            <View style={styles.thumbnailInfo}>
+              <Text style={styles.thumbnailTitle} numberOfLines={1}>
+                {project.title || 'Untitled Project'}
+              </Text>
+              <Text style={styles.thumbnailCategory} numberOfLines={1}>
+                {project.category || 'General'}
+              </Text>
+            </View>
           </TouchableOpacity>
+        ))}
+        
+        {/* Add More Project Button */}
+        <TouchableOpacity 
+          style={styles.addMoreCard}
+          onPress={() => navigate('WorkSamples')}
+        >
+          <View style={styles.addMoreContent}>
+            <Ionicons name="add-circle" size={32} color={THEME.accent} />
+            <Text style={styles.addMoreText}>Add More</Text>
+          </View>
+        </TouchableOpacity>
+      </ScrollView>
+    </>
+  ) : (
+    <View style={styles.emptyPortfolioState}>
+      <View style={styles.emptyPortfolioIcon}>
+        <Ionicons name="images-outline" size={48} color={THEME.textSecondary} />
+      </View>
+      <Text style={styles.emptyPortfolioTitle}>Your Portfolio is Empty</Text>
+      <Text style={styles.emptyPortfolioDescription}>
+        Clients want to see your work before hiring. Add projects to:
+      </Text>
+      <View style={styles.emptyBenefitsList}>
+        <View style={styles.emptyBenefitItem}>
+          <Ionicons name="checkmark-circle" size={16} color={THEME.success} />
+          <Text style={styles.emptyBenefitText}>Attract more clients</Text>
         </View>
+        <View style={styles.emptyBenefitItem}>
+          <Ionicons name="checkmark-circle" size={16} color={THEME.success} />
+          <Text style={styles.emptyBenefitText}>Justify higher rates</Text>
+        </View>
+        <View style={styles.emptyBenefitItem}>
+          <Ionicons name="checkmark-circle" size={16} color={THEME.success} />
+          <Text style={styles.emptyBenefitText}>Stand out from competitors</Text>
+        </View>
+      </View>
+    </View>
+  )}
+  
+  {/* Quick Tips */}
+  <View style={styles.portfolioTips}>
+    <View style={styles.tipsHeader}>
+      <Ionicons name="bulb-outline" size={18} color={THEME.warning} />
+      <Text style={styles.tipsTitle}>Pro Tip:</Text>
+    </View>
+    <Text style={styles.tipsText}>
+      Include before/after photos and videos, client testimonials, and project details. 
+      Tell the story of how you solved a problem.
+    </Text>
+  </View>
+</View>
 
         {/* Reviews & Ratings */}
         <View style={styles.section}>
@@ -2026,29 +2155,270 @@ const styles = StyleSheet.create({
     color: THEME.textSecondary,
   },
   // Work Samples Styles
-  workSamplesCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-  },
-  workSamplesContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  workSamplesText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  workSamplesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: THEME.textPrimary,
-    marginBottom: 4,
-  },
-  workSamplesDescription: {
-    fontSize: 14,
-    color: THEME.textSecondary,
-  },
+  // Add these styles to your existing StyleSheet
+portfolioStatusBadge: {
+  backgroundColor: THEME.accent,
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 10,
+  marginLeft: 8,
+},
+portfolioStatusText: {
+  color: THEME.white,
+  fontSize: 11,
+  fontWeight: '600',
+},
+portfolioCtaButton: {
+  backgroundColor: THEME.accent,
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 8,
+},
+portfolioCtaText: {
+  color: THEME.white,
+  fontSize: 14,
+  fontWeight: '600',
+  marginRight: 4,
+},
+portfolioSubtitle: {
+  fontSize: 14,
+  color: THEME.textPrimary,
+  marginBottom: 16,
+  lineHeight: 20,
+},
+highlightText: {
+  color: THEME.success,
+  fontWeight: '700',
+},
+portfolioBenefitsCard: {
+  backgroundColor: '#F8FAFC',
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 16,
+},
+benefitsGrid: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+},
+benefitItem: {
+  alignItems: 'center',
+  flex: 1,
+  paddingHorizontal: 8,
+},
+benefitIcon: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 8,
+},
+benefitTitle: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: THEME.textPrimary,
+  textAlign: 'center',
+  marginBottom: 4,
+},
+benefitDescription: {
+  fontSize: 11,
+  color: THEME.textSecondary,
+  textAlign: 'center',
+  lineHeight: 14,
+},
+portfolioActionCard: {
+  borderRadius: 16,
+  overflow: 'hidden',
+  marginBottom: 20,
+  elevation: 4,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+},
+actionCardGradient: {
+  padding: 20,
+},
+actionCardContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+actionCardIcon: {
+  marginRight: 16,
+},
+actionCardText: {
+  flex: 1,
+},
+actionCardTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: THEME.white,
+  marginBottom: 4,
+},
+actionCardDescription: {
+  fontSize: 14,
+  color: 'rgba(255, 255, 255, 0.9)',
+  lineHeight: 18,
+},
+actionCardArrow: {
+  marginLeft: 12,
+},
+portfolioPreviewHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+previewTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: THEME.textPrimary,
+},
+viewAllLink: {
+  fontSize: 14,
+  color: THEME.accent,
+  fontWeight: '500',
+},
+portfolioPreview: {
+  flexDirection: 'row',
+  marginBottom: 20,
+},
+projectThumbnail: {
+  width: 140,
+  marginRight: 12,
+  backgroundColor: THEME.white,
+  borderRadius: 12,
+  overflow: 'hidden',
+  borderWidth: 1,
+  borderColor: THEME.border,
+},
+thumbnailImageContainer: {
+  width: '100%',
+  height: 100,
+  position: 'relative',
+},
+thumbnailImage: {
+  width: '100%',
+  height: '100%',
+},
+thumbnailPlaceholder: {
+  width: '100%',
+  height: '100%',
+  backgroundColor: '#F8FAFC',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+thumbnailBadge: {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 10,
+},
+thumbnailBadgeText: {
+  color: THEME.white,
+  fontSize: 10,
+  fontWeight: '600',
+  marginLeft: 2,
+},
+thumbnailInfo: {
+  padding: 12,
+},
+thumbnailTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: THEME.textPrimary,
+  marginBottom: 4,
+},
+thumbnailCategory: {
+  fontSize: 12,
+  color: THEME.textSecondary,
+},
+addMoreCard: {
+  width: 140,
+  backgroundColor: '#F8FAFC',
+  borderRadius: 12,
+  borderWidth: 2,
+  borderColor: THEME.border,
+  borderStyle: 'dashed',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+addMoreContent: {
+  alignItems: 'center',
+  padding: 20,
+},
+addMoreText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: THEME.accent,
+  marginTop: 8,
+},
+emptyPortfolioState: {
+  alignItems: 'center',
+  backgroundColor: '#F8FAFC',
+  borderRadius: 12,
+  padding: 24,
+  marginBottom: 20,
+},
+emptyPortfolioIcon: {
+  marginBottom: 16,
+},
+emptyPortfolioTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: THEME.textPrimary,
+  marginBottom: 12,
+},
+emptyPortfolioDescription: {
+  fontSize: 14,
+  color: THEME.textSecondary,
+  textAlign: 'center',
+  marginBottom: 16,
+  lineHeight: 20,
+},
+emptyBenefitsList: {
+  alignSelf: 'stretch',
+},
+emptyBenefitItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+emptyBenefitText: {
+  fontSize: 14,
+  color: THEME.textPrimary,
+  marginLeft: 8,
+},
+portfolioTips: {
+  backgroundColor: 'rgba(245, 158, 11, 0.05)',
+  borderLeftWidth: 4,
+  borderLeftColor: THEME.warning,
+  padding: 12,
+  borderRadius: 8,
+},
+tipsHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 4,
+},
+tipsTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: THEME.warning,
+  marginLeft: 8,
+},
+tipsText: {
+  fontSize: 13,
+  color: THEME.textPrimary,
+  lineHeight: 18,
+},
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
