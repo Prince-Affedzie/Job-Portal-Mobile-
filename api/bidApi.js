@@ -25,8 +25,8 @@ export const GetTaskers = ()=>
 export const getBidDetails = (bidId)=>
   API.get(`/api/h1/v2/get_bid/${bidId}`)
 
-export const updateBid = (bidId,update)=>
-  API.put(`/api/h1/v2/update_bid/${bidId}`,update)
+export const updateBid = (bidId,bidData)=>
+  API.put(`/api/h1/v2/update_bid/${bidId}`,bidData)
 
 export const withdrawBid = (bidId)=>
   API.delete(`/api/h1/v2/withdraw_bid/${bidId}`)
