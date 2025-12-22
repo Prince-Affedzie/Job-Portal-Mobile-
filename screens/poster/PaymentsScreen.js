@@ -11,12 +11,10 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
-  Animated,
   Alert,
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
 import { AuthContext } from '../../context/AuthContext';
@@ -25,7 +23,7 @@ import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width, height } = Dimensions.get('window');
 
-// Move getStatusConfig to the main component scope
+// Simple status config
 const getStatusConfig = (status) => {
   const configs = {
     'released': { color: '#10B981', icon: 'checkmark-circle', label: 'Paid', bgColor: '#F0FDF4' },
@@ -42,59 +40,34 @@ const PaymentsScreen = ({ navigation }) => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState('month');
+  const [timeRange, setTimeRange] = useState('all'); // Changed from 'month' to 'all'
   const [statusFilter, setStatusFilter] = useState('all');
-  const [fadeAnim] = useState(new Animated.Value(0));
   const [showAllPayments, setShowAllPayments] = useState(false);
-  const [statsAnim] = useState(new Animated.Value(0));
   const [referenceModalVisible, setReferenceModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
 
-  // Enhanced task title resolver
+  // Simple task title resolver
   const getTaskTitle = (payment) => {
-    // Check if taskId exists and has data
+    // Handle null taskId
     if (!payment.taskId) {
-      return 'Task Payment';
+      return payment.reference ? `Payment ${payment.reference.substring(0, 8)}...` : 'Direct Payment';
     }
 
-    // Handle different task schema structures
     const task = payment.taskId;
     
-    // Priority 1: Check for title field
-    if (task.title && task.title.trim() !== '') {
+    if (task.title) {
       return task.title;
     }
     
-    // Priority 2: Check for type field
-    if (task.type && task.type.trim() !== '') {
-      // Format the type to be more readable
-      const formattedType = task.type
-        .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      return formattedType;
-    }
-    
-    // Priority 3: Check for description (first few words)
-    if (task.description && task.description.trim() !== '') {
+    if (task.description) {
       const words = task.description.split(' ').slice(0, 5).join(' ');
       return words + (task.description.split(' ').length > 5 ? '...' : '');
     }
     
-    // Priority 4: Check for category
-    if (task.category && task.category.trim() !== '') {
-      return `${task.category} Task`;
-    }
-    
-    // Fallback: Use payment reference or generic title
-    if (payment.reference) {
-      return `Payment ${payment.reference.substring(0, 8)}...`;
-    }
-    
-    return 'Task Payment';
+    return payment.reference ? `Payment ${payment.reference.substring(0, 8)}...` : 'Task Payment';
   };
 
-  // Enhanced reference display with modal support
+  // Simple reference display
   const getPaymentReference = (payment) => {
     return payment.reference || payment.transactionRef || payment._id || 'N/A';
   };
@@ -104,13 +77,7 @@ const PaymentsScreen = ({ navigation }) => {
     setReferenceModalVisible(true);
   };
 
-  const copyToClipboard = async (text) => {
-    // You'll need to install and use expo-clipboard
-    // import * as Clipboard from 'expo-clipboard';
-    // await Clipboard.setStringAsync(text);
-    Alert.alert('Copied!', 'Payment reference copied to clipboard');
-  };
-
+  // Simple filtering
   const filterPaymentsByTimeRange = (payments, range) => {
     const now = moment();
     switch (range) {
@@ -136,16 +103,7 @@ const PaymentsScreen = ({ navigation }) => {
     return payments.filter(payment => payment.status === status);
   };
 
-  const getPreviousPeriod = (currentRange) => {
-    switch (currentRange) {
-      case 'week': return 'week';
-      case 'month': return 'month';
-      case 'year': return 'year';
-      default: return 'all';
-    }
-  };
-
-  // Calculate payment statistics
+  // Simple payment statistics
   const paymentStats = useMemo(() => {
     const timeFiltered = filterPaymentsByTimeRange(payments, timeRange);
     const statusFiltered = filterPaymentsByStatus(timeFiltered, statusFilter);
@@ -157,55 +115,34 @@ const PaymentsScreen = ({ navigation }) => {
     const escrowAmount = timeFiltered
       .filter(p => p.status === 'in_escrow')
       .reduce((sum, payment) => sum + payment.amount, 0);
-    const refundedAmount = timeFiltered
-      .filter(p => p.status === 'refunded')
-      .reduce((sum, payment) => sum + payment.amount, 0);
     
     const totalTasks = timeFiltered.length;
     const completedTasks = timeFiltered.filter(p => p.status === 'released').length;
-    const activeTasks = timeFiltered.filter(p => p.status === 'in_escrow' || p.status === 'pending').length;
-    
-    // Calculate growth compared to previous period
-    const previousPeriodPayments = filterPaymentsByTimeRange(
-      payments, 
-      getPreviousPeriod(timeRange)
-    );
-    const previousSpent = previousPeriodPayments.reduce((sum, payment) => sum + payment.amount, 0);
-    const spendingGrowth = previousSpent > 0 ? 
-      ((totalSpent - previousSpent) / previousSpent * 100).toFixed(1) : 0;
-    
-    // Status breakdown
-    const statusCounts = {
-      released: timeFiltered.filter(p => p.status === 'released').length,
-      in_escrow: timeFiltered.filter(p => p.status === 'in_escrow').length,
-      pending: timeFiltered.filter(p => p.status === 'pending').length,
-      refunded: timeFiltered.filter(p => p.status === 'refunded').length,
-      failed: timeFiltered.filter(p => p.status === 'failed').length,
-    };
 
     return {
       totalSpent,
       releasedAmount,
       escrowAmount,
-      refundedAmount,
       totalTasks,
       completedTasks,
-      activeTasks,
-      spendingGrowth: Math.max(0, spendingGrowth),
-      isPositiveGrowth: spendingGrowth >= 0,
       filteredPayments: statusFiltered,
-      statusCounts,
       allPayments: timeFiltered
     };
   }, [payments, timeRange, statusFilter]);
 
   const fetchPayments = async () => {
     try {
-      const response = await getClientPayments();
-      setPayments(response.data || []);
+      const response = await getClientPayments(); 
+      if(response.status === 200){
+        
+        setPayments(response.data || []);
+      } else {
+        setPayments([]);
+      }
     } catch (error) {
       console.error('Error fetching payments:', error);
       Alert.alert('Error', 'Failed to load payment data');
+      setPayments([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -214,19 +151,6 @@ const PaymentsScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchPayments();
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(statsAnim, {
-        toValue: 1,
-        duration: 800,
-        delay: 200,
-        useNativeDriver: true,
-      })
-    ]).start();
   }, []);
 
   const onRefresh = () => {
@@ -234,59 +158,14 @@ const PaymentsScreen = ({ navigation }) => {
     fetchPayments();
   };
 
-  const StatCard = ({ title, value, subtitle, icon, color, gradient, isCurrency = false }) => (
-    <Animated.View 
-      style={[
-        styles.statCard, 
-        { 
-          transform: [{
-            translateY: statsAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [50, 0]
-            })
-          }]
-        }
-      ]}
-    >
-      <LinearGradient
-        colors={gradient || ['#FFFFFF', '#F8FAFC']}
-        style={[styles.statGradient, { borderLeftColor: color, borderLeftWidth: 4 }]}
-      >
-        <View style={styles.statHeader}>
-          <View style={[styles.statIcon, { backgroundColor: color }]}>
-            <Ionicons name={icon} size={18} color="#FFFFFF" />
-          </View>
-          <Text style={styles.statTitle}>{title}</Text>
-        </View>
-        <Text style={styles.statValue}>
-          {isCurrency ? '₵' : ''}{typeof value === 'number' ? value.toLocaleString() : value}
-        </Text>
-        <Text style={styles.statSubtitle}>{subtitle}</Text>
-      </LinearGradient>
-    </Animated.View>
-  );
-
   const PaymentItem = ({ payment, index }) => {
     const statusConfig = getStatusConfig(payment.status);
     const taskTitle = getTaskTitle(payment);
     const paymentReference = getPaymentReference(payment);
 
     return (
-      <Animated.View 
-        style={[
-          styles.paymentItem,
-          {
-            opacity: fadeAnim,
-            transform: [{
-              translateX: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [50, 0]
-              })
-            }]
-          }
-        ]}
-      >
-        <TouchableOpacity  onPress={() => showReferenceModal(payment)} style={styles.paymentLeft}>
+      <View style={styles.paymentItem}>
+        <TouchableOpacity onPress={() => showReferenceModal(payment)} style={styles.paymentLeft}>
           <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
             <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
           </View>
@@ -297,30 +176,30 @@ const PaymentsScreen = ({ navigation }) => {
             </Text>
             
             <View style={styles.paymentMeta}>
-              <Text style={styles.paymentDate} numberOfLines={1}>
+              <Text style={styles.paymentDate}>
                 {moment(payment.createdAt).format('MMM D, YYYY • h:mm A')}
               </Text>
             </View>
             
             <View style={styles.paymentDetails}>
-              <Text style={styles.paymentMethod} numberOfLines={1}>
-                {getPaymentMethodLabel(payment.paymentMethod)}
+              <Text style={styles.paymentMethod}>
+                {payment.paymentMethod === 'momo' ? 'Mobile Money' : 
+                 payment.paymentMethod === 'mobile_money' ? 'Mobile Money' : 
+                 payment.paymentMethod || 'N/A'}
               </Text>
               
-              {/* Enhanced Reference Display */}
               <TouchableOpacity 
                 style={styles.referenceContainer}
                 onPress={() => showReferenceModal(payment)}
               >
                 <Ionicons name="document-text" size={12} color="#6B7280" />
-                <Text style={styles.transactionRef} numberOfLines={1}>
+                <Text style={styles.transactionRef}>
                   Ref: {paymentReference.substring(0, 12)}...
                 </Text>
-                <Ionicons name="expand" size={10} color="#6B7280" />
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity >
+        </TouchableOpacity>
         
         <View style={styles.paymentRight}>
           <Text style={[
@@ -337,119 +216,100 @@ const PaymentsScreen = ({ navigation }) => {
             </Text>
           </View>
         </View>
-      </Animated.View>
+      </View>
     );
   };
 
- const ReferenceModal = () => {
-  if (!selectedPayment) return null;
+  const ReferenceModal = () => {
+    if (!selectedPayment) return null;
 
-  const statusConfig = getStatusConfig(selectedPayment.status);
+    const statusConfig = getStatusConfig(selectedPayment.status);
 
-  return (
-    <Modal
-      visible={referenceModalVisible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setReferenceModalVisible(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Payment Details</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setReferenceModalVisible(false)}
-            >
-              <Ionicons name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Scrollable Body - This is the key fix */}
-          <ScrollView
-            style={styles.modalBody}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 20 }}
-          >
-            <View style={styles.detailRow}>
-              <Text style={styles.referenceLabel}>Reference ID:</Text>
-              <Text style={styles.referenceValue}>
-                {getPaymentReference(selectedPayment)}
-              </Text>
+    return (
+      <Modal
+        visible={referenceModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setReferenceModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Payment Details</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setReferenceModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.referenceLabel}>Task:</Text>
-              <Text style={styles.referenceValue}>
-                {getTaskTitle(selectedPayment)}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.referenceLabel}>Amount:</Text>
-              <Text style={[styles.referenceValue, styles.amountHighlight]}>
-                ₵{selectedPayment.amount.toLocaleString()}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.referenceLabel}>Date:</Text>
-              <Text style={styles.referenceValue}>
-                {moment(selectedPayment.createdAt).format('MMMM D, YYYY [at] h:mm A')}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.referenceLabel}>Status:</Text>
-              <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
-                <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                  {statusConfig.label}
-                </Text>
-              </View>
-            </View>
-
-            {selectedPayment.paymentMethod && (
+            {/* Body */}
+            <ScrollView style={styles.modalBody}>
               <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Payment Method:</Text>
+                <Text style={styles.referenceLabel}>Reference ID:</Text>
                 <Text style={styles.referenceValue}>
-                  {getPaymentMethodLabel(selectedPayment.paymentMethod)}
+                  {getPaymentReference(selectedPayment)}
                 </Text>
               </View>
-            )}
-          </ScrollView>
 
-          {/* Fixed Bottom Actions */}
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={() => copyToClipboard(getPaymentReference(selectedPayment))}
-            >
-              {/*<Ionicons name="copy-outline" size={18} color="#FFFFFF" />*/}
-              <Text style={styles.copyButtonText}>Copy Reference</Text>
-            </TouchableOpacity>
+              <View style={styles.detailRow}>
+                <Text style={styles.referenceLabel}>Task:</Text>
+                <Text style={styles.referenceValue}>
+                  {getTaskTitle(selectedPayment)}
+                </Text>
+              </View>
 
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={() => setReferenceModalVisible(false)}
-            >
-              <Text style={styles.closeModalText}>Close</Text>
-            </TouchableOpacity>
+              <View style={styles.detailRow}>
+                <Text style={styles.referenceLabel}>Amount:</Text>
+                <Text style={[styles.referenceValue, styles.amountHighlight]}>
+                  ₵{selectedPayment.amount.toLocaleString()}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.referenceLabel}>Date:</Text>
+                <Text style={styles.referenceValue}>
+                  {moment(selectedPayment.createdAt).format('MMMM D, YYYY [at] h:mm A')}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.referenceLabel}>Status:</Text>
+                <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
+                  <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
+                  <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                    {statusConfig.label}
+                  </Text>
+                </View>
+              </View>
+
+              {selectedPayment.paymentMethod && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.referenceLabel}>Payment Method:</Text>
+                  <Text style={styles.referenceValue}>
+                    {selectedPayment.paymentMethod === 'momo' ? 'Mobile Money' : 
+                     selectedPayment.paymentMethod === 'mobile_money' ? 'Mobile Money' : 
+                     selectedPayment.paymentMethod}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.closeModalButton}
+                onPress={() => setReferenceModalVisible(false)}
+              >
+                <Text style={styles.closeModalText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
-    </Modal>
-  );
-};
-  const getPaymentMethodLabel = (method) => {
-    const labels = {
-      'mobile_money': 'Mobile Money',
-      'card': 'Credit/Debit Card',
-      'bank': 'Bank Transfer',
-      'wallet': 'Digital Wallet'
-    };
-    return labels[method] || method;
+      </Modal>
+    );
   };
 
   const TimeRangeFilter = () => (
@@ -484,56 +344,67 @@ const PaymentsScreen = ({ navigation }) => {
     </View>
   );
 
-  const StatusFilter = () => (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false}
-      style={styles.statusFilter}
-      contentContainerStyle={styles.statusFilterContent}
-    >
-      {[
-        { key: 'all', label: 'All Payments', count: paymentStats.allPayments.length },
-        { key: 'released', label: 'Paid', count: paymentStats.statusCounts.released },
-        { key: 'in_escrow', label: 'Escrow', count: paymentStats.statusCounts.in_escrow },
-        { key: 'pending', label: 'Processing', count: paymentStats.statusCounts.pending },
-        { key: 'refunded', label: 'Refunded', count: paymentStats.statusCounts.refunded },
-        { key: 'failed', label: 'Failed', count: paymentStats.statusCounts.failed },
-      ].map((status) => (
-        <TouchableOpacity
-          key={status.key}
-          style={[
-            styles.statusFilterButton,
-            statusFilter === status.key && styles.statusFilterButtonActive
-          ]}
-          onPress={() => setStatusFilter(status.key)}
-        >
-          <Text style={[
-            styles.statusFilterText,
-            statusFilter === status.key && styles.statusFilterTextActive
-          ]}>
-            {status.label}
-          </Text>
-          <View style={[
-            styles.statusCountBadge,
-            statusFilter === status.key && styles.statusCountBadgeActive
-          ]}>
+  const StatusFilter = () => {
+    // Calculate counts for each status
+    const statusCounts = {
+      all: paymentStats.allPayments.length,
+      released: paymentStats.allPayments.filter(p => p.status === 'released').length,
+      in_escrow: paymentStats.allPayments.filter(p => p.status === 'in_escrow').length,
+      pending: paymentStats.allPayments.filter(p => p.status === 'pending').length,
+      refunded: paymentStats.allPayments.filter(p => p.status === 'refunded').length,
+      failed: paymentStats.allPayments.filter(p => p.status === 'failed').length,
+    };
+
+    return (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.statusFilter}
+      >
+        {[
+          { key: 'all', label: 'All Payments' },
+          { key: 'released', label: 'Paid' },
+          { key: 'in_escrow', label: 'Escrow' },
+          { key: 'pending', label: 'Processing' },
+          { key: 'refunded', label: 'Refunded' },
+          { key: 'failed', label: 'Failed' },
+        ].map((status) => (
+          <TouchableOpacity
+            key={status.key}
+            style={[
+              styles.statusFilterButton,
+              statusFilter === status.key && styles.statusFilterButtonActive
+            ]}
+            onPress={() => setStatusFilter(status.key)}
+          >
             <Text style={[
-              styles.statusCountText,
-              statusFilter === status.key && styles.statusCountTextActive
+              styles.statusFilterText,
+              statusFilter === status.key && styles.statusFilterTextActive
             ]}>
-              {status.count}
+              {status.label}
             </Text>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+            <View style={[
+              styles.statusCountBadge,
+              statusFilter === status.key && styles.statusCountBadgeActive
+            ]}>
+              <Text style={[
+                styles.statusCountText,
+                statusFilter === status.key && styles.statusCountTextActive
+              ]}>
+                {statusCounts[status.key] || 0}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="My Payments" showBackButton={true} />
-          <LoadingIndicator text='Loading your payments...'/>
+        <LoadingIndicator text='Loading your payments...' />
       </SafeAreaView>
     );
   }
@@ -551,8 +422,7 @@ const PaymentsScreen = ({ navigation }) => {
         showBackButton={true}
       />
       
-      <Animated.ScrollView 
-        style={{ opacity: fadeAnim }}
+      <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -564,10 +434,7 @@ const PaymentsScreen = ({ navigation }) => {
         }
       >
         {/* Spending Overview */}
-        <LinearGradient
-          colors={['#4F46E5','#6366F1']}
-          style={styles.spendingHeader}
-        >
+        <View style={styles.spendingHeader}>
           <View style={styles.spendingOverview}>
             <Text style={styles.spendingLabel}>Total Spent</Text>
             <Text style={styles.spendingAmount}>
@@ -587,66 +454,36 @@ const PaymentsScreen = ({ navigation }) => {
                   In Escrow: ₵{paymentStats.escrowAmount.toLocaleString()}
                 </Text>
               </View>
-              {paymentStats.refundedAmount > 0 && (
-                <View style={styles.spendingItem}>
-                  <View style={[styles.spendingDot, { backgroundColor: '#8B5CF6' }]} />
-                  <Text style={styles.spendingText}>
-                    Refunded: ₵{paymentStats.refundedAmount.toLocaleString()}
-                  </Text>
-                </View>
-              )}
             </View>
           </View>
           
           <View style={styles.spendingVisual}>
             <Ionicons name="card" size={48} color="#FFFFFF" opacity={0.8} />
           </View>
-        </LinearGradient>
+        </View>
+
+        {/* Time Filter */}
+        <TimeRangeFilter />
 
         {/* Status Filter */}
         <StatusFilter />
 
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statsRow}>
-            <StatCard
-              title="Total Tasks"
-              value={paymentStats.totalTasks}
-              subtitle="All paid tasks"
-              icon="briefcase"
-              color="#6366F1"
-              gradient={['#EEF2FF', '#F0F4FF']}
-            />
-            
-            <StatCard
-              title="Completed"
-              value={paymentStats.completedTasks}
-              subtitle="Tasks delivered"
-              icon="checkmark-done"
-              color="#10B981"
-              gradient={['#ECFDF5', '#F0FDF9']}
-            />
+        {/* Stats Summary */}
+        <View style={styles.statsSummary}>
+          <View style={styles.statItem}>
+            <Ionicons name="briefcase" size={24} color="#6366F1" />
+            <View style={styles.statItemContent}>
+              <Text style={styles.statItemLabel}>Total Tasks</Text>
+              <Text style={styles.statItemValue}>{paymentStats.totalTasks}</Text>
+            </View>
           </View>
           
-          <View style={styles.statsRow}>
-            <StatCard
-              title="Active Tasks"
-              value={paymentStats.activeTasks}
-              subtitle="In progress"
-              icon="time"
-              color="#F59E0B"
-              gradient={['#FFFBEB', '#FEFCE8']}
-            />
-            
-            <StatCard
-              title="Avg. per Task"
-              value={(paymentStats.totalSpent / paymentStats.totalTasks || 0).toFixed(2)}
-              subtitle="Average spending"
-              icon="trending-up"
-              color="#8B5CF6"
-              gradient={['#FAF5FF', '#F3E8FF']}
-              isCurrency={true}
-            />
+          <View style={styles.statItem}>
+            <Ionicons name="checkmark-done" size={24} color="#10B981" />
+            <View style={styles.statItemContent}>
+              <Text style={styles.statItemLabel}>Completed</Text>
+              <Text style={styles.statItemValue}>{paymentStats.completedTasks}</Text>
+            </View>
           </View>
         </View>
 
@@ -688,49 +525,23 @@ const PaymentsScreen = ({ navigation }) => {
               <Text style={styles.emptyStateTitle}>No Payments Found</Text>
               <Text style={styles.emptyStateText}>
                 {timeRange !== 'all' || statusFilter !== 'all'
-                  ? `No payments match your current filters`
-                  : 'Your payment history will appear here when you post tasks'
+                  ? 'No payments match your current filters'
+                  : 'Your payment history will appear here when you make payments'
                 }
               </Text>
               <TouchableOpacity 
                 style={styles.createTaskButton}
                 onPress={() => navigation.navigate('CreateTask')}
               >
-                <Text style={styles.createTaskText}>Post Your First Task</Text>
+                <Text style={styles.createTaskText}>Create Your First Task</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Payment Security Info */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoHeader}>
-            <Ionicons name="shield-checkmark" size={20} color="#10B981" />
-            <Text style={styles.infoTitle}>Secure Payment System</Text>
-          </View>
-          <Text style={styles.infoText}>
-            Your payments are protected through our escrow system. Funds are only released to taskers 
-            when work is completed and approved, ensuring you get quality service for your money.
-          </Text>
-          <View style={styles.securityFeatures}>
-            <View style={styles.securityFeature}>
-              <Ionicons name="lock-closed" size={16} color="#10B981" />
-              <Text style={styles.securityText}>Escrow Protection</Text>
-            </View>
-            <View style={styles.securityFeature}>
-              <Ionicons name="refresh" size={16} color="#10B981" />
-              <Text style={styles.securityText}>Money-Back Guarantee</Text>
-            </View>
-            <View style={styles.securityFeature}>
-              <Ionicons name="shield" size={16} color="#10B981" />
-              <Text style={styles.securityText}>Secure Transactions</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Bottom Padding */}
         <View style={styles.bottomPadding} />
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* Reference Modal */}
       <ReferenceModal />
@@ -743,32 +554,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
   spendingHeader: {
     padding: 24,
     paddingTop: 32,
-    borderRadius:22,
-    marginHorizontal:12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
-    marginBottom:8,
+    borderRadius: 22,
+    marginHorizontal: 12,
+    backgroundColor: '#6366F1',
+    marginBottom: 8,
   },
   spendingOverview: {
     flex: 1,
@@ -778,18 +570,15 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontWeight: '500',
     marginBottom: 8,
-    opacity: 0.9,
   },
   spendingAmount: {
     fontSize: 32,
     fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 16,
-    letterSpacing: 0.5,
   },
   spendingBreakdown: {
     gap: 8,
-    marginBottom: 16,
   },
   spendingItem: {
     flexDirection: 'row',
@@ -806,24 +595,6 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontWeight: '500',
   },
-  growthBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  growthBadgeNegative: {
-    backgroundColor: 'rgba(239, 68, 68, 0.25)',
-  },
-  growthText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 4,
-  },
   spendingVisual: {
     padding: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -833,14 +604,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 16,
     backgroundColor: '#FFFFFF',
-    marginTop: -20,
     marginHorizontal: 16,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    marginBottom: 8,
   },
   timeFilterButton: {
     flex: 1,
@@ -850,7 +616,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    marginHorizontal: 4,
     backgroundColor: '#F8FAFC',
     gap: 6,
   },
@@ -868,10 +633,7 @@ const styles = StyleSheet.create({
   statusFilter: {
     marginHorizontal: 16,
     marginBottom: 16,
-  },
-  statusFilterContent: {
     paddingHorizontal: 4,
-    gap: 8,
   },
   statusFilterButton: {
     flexDirection: 'row',
@@ -913,76 +675,40 @@ const styles = StyleSheet.create({
   statusCountTextActive: {
     color: '#6366F1',
   },
-  statsGrid: {
-    padding: 16,
-    gap: 12,
-  },
-  statsRow: {
+  statsSummary: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
-  statCard: {
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
     flex: 1,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    minHeight: 100,
+    marginHorizontal: 8,
+    gap: 12,
   },
-  statGradient: {
-    borderRadius: 16,
-    padding: 16,
+  statItemContent: {
+    flex: 1,
   },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statTitle: {
-    fontSize: 10,
-    fontWeight: '700',
+  statItemLabel: {
+    fontSize: 12,
     color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    flex: 1,
+    fontWeight: '600',
   },
-  statValue: {
+  statItemValue: {
     fontSize: 18,
     fontWeight: '800',
     color: '#1F2937',
-    marginBottom: 2,
-  },
-  statSubtitle: {
-    fontSize: 10,
-    color: '#9CA3AF',
-    fontWeight: '600',
   },
   section: {
     backgroundColor: '#FFFFFF',
     margin: 16,
-    marginHorizontal:10,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1026,7 +752,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
-    minHeight: 80,
   },
   paymentLeft: {
     flexDirection: 'row',
@@ -1041,11 +766,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    flexShrink: 0,
   },
   paymentInfo: {
     flex: 1,
-    minWidth: 0,
   },
   paymentTask: {
     fontSize: 15,
@@ -1075,7 +798,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    flexShrink: 1,
   },
   referenceContainer: {
     flexDirection: 'row',
@@ -1091,12 +813,10 @@ const styles = StyleSheet.create({
   transactionRef: {
     fontSize: 10,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   paymentRight: {
     alignItems: 'flex-end',
     minWidth: 90,
-    flexShrink: 0,
   },
   amountText: {
     fontSize: 16,
@@ -1119,7 +839,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     gap: 4,
-    alignSelf: 'flex-start',
   },
   statusText: {
     fontSize: 10,
@@ -1155,190 +874,84 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  infoSection: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginLeft: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  securityFeatures: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  securityFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  securityText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '600',
-  },
   bottomPadding: {
     height: 30,
   },
-  // Updated Modal Styles for better sizing
   modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 20,
-},
-
-modalContent: {
-  backgroundColor: '#FFFFFF',
-  borderRadius: 20,
-  width: '105%',
-  maxWidth: 420,
-   paddingHorizontal: 20,
-  maxHeight: height * 0.85, // Limits height to 85% of screen
-  overflow: 'hidden',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.25,
-  shadowRadius: 20,
-  elevation: 15,
-},
-
-modalHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: 20,
-  borderBottomWidth: 1,
-  borderBottomColor: '#F3F4F6',
-  backgroundColor: '#FFFFFF',
-},
-
-modalTitle: {
-  fontSize: 18,
-  fontWeight: '700',
-  color: '#1F2937',
-},
-
-closeButton: {
-  padding: 4,
-},
-
-modalBody: {
-  flexGrow: 1,
-  maxHeight: height * 0.55, // Ensures body can scroll if needed
-},
-
-detailRow: {
-  marginBottom: 16,
-},
-
-referenceLabel: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#6B7280',
-  marginBottom: 6,
-},
-
-referenceValue: {
-  fontSize: 15,
-  color: '#1F2937',
-  fontWeight: '500',
-  backgroundColor: '#F9FAFB',
-  padding: 14,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-},
-
-amountHighlight: {
-  fontSize: 18,
-  fontWeight: '800',
-  color: '#EF4444',
-},
-
-statusBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  alignSelf: 'flex-start',
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-  borderRadius: 8,
-  gap: 6,
-},
-
-statusText: {
-  fontSize: 11,
-  fontWeight: '700',
-  textTransform: 'uppercase',
-  letterSpacing: 0.5,
-},
-
-modalActions: {
-  flexDirection: 'row',
-  gap: 12,
-  padding: 20,
-  borderTopWidth: 1,
-  borderTopColor: '#F3F4F6',
-  backgroundColor: '#FFFFFF',
-},
-
-copyButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#6366F1',
-  paddingVertical: 14,
-  borderRadius: 12,
-  gap: 8,
-},
-
-copyButtonText: {
-  color: '#FFFFFF',
-  fontWeight: '600',
-  fontSize: 15,
-},
-
-closeModalButton: {
-  flex: 1,
-  alignItems: 'center',
-  justifyContent: 'center',
-  backgroundColor: '#F3F4F6',
-  paddingVertical: 14,
-  borderRadius: 12,
-},
-
-closeModalText: {
-  color: '#6B7280',
-  fontWeight: '600',
-  fontSize: 15,
-},
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: height * 0.8,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalBody: {
+    maxHeight: height * 0.5,
+    padding: 20,
+  },
+  detailRow: {
+    marginBottom: 16,
+  },
+  referenceLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  referenceValue: {
+    fontSize: 15,
+    color: '#1F2937',
+    fontWeight: '500',
+    backgroundColor: '#F9FAFB',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  amountHighlight: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  modalActions: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  closeModalButton: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  closeModalText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
 });
 
 export default PaymentsScreen;
