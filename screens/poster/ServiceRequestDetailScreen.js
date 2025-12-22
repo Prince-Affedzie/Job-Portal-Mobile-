@@ -31,6 +31,7 @@ import {acceptOffer,markServiceDone} from '../../api/serviceRequestAPI/clientAPI
 import { triggerPayment } from '../../services/PaymentServices';
 import { usePaystack } from "react-native-paystack-webview";
 import { startOrGetChatRoom } from '../../api/chatApi';
+import ServiceRequestRefundNoticeCard from '../../component/client/ServiceRequestRefundNotificationCard';
 
 const { width, height } = Dimensions.get('window');
 
@@ -522,6 +523,7 @@ once you both confirm the task is completed satisfactorily.`,
           </View>
 
           {/* Enhanced Completion Status */}
+          
           {isAssigned && (
             <View style={styles.completionCard}>
               <Text style={styles.completionTitle}>Completion Progress</Text>
@@ -875,7 +877,7 @@ once you both confirm the task is completed satisfactorily.`,
         </View>
       
       </ScrollView>
-
+      <ServiceRequestRefundNoticeCard serviceRequest={request} isTaskOwner={true}/>
       {/* Enhanced FAB with Message Tasker Functionality */}
       <View style={styles.fabContainer}>
         {/* Backdrop */}

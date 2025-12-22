@@ -28,6 +28,7 @@ import { navigate } from '../../services/navigationService'
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
 import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
+import ClientRefundNoticeCard from '../../component/client/ClientRefundNoticeCard';
 
 const { width, height } = Dimensions.get('window');
 
@@ -403,6 +404,8 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             </LinearGradient>
           </View>
 
+           
+
           {/* Enhanced Completion Status */}
           {isAssigned && (
             <View style={styles.completionCard}>
@@ -689,6 +692,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         </View>
       
       </ScrollView>
+      <ClientRefundNoticeCard task={task} isTaskOwner={true}/>
 
       {/* Enhanced FAB with Message Tasker Functionality */}
       <View style={styles.fabContainer}>

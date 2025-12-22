@@ -28,6 +28,7 @@ import { styles } from '../../styles/tasker/AppliedTaskDetailScreen.Styles';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
 import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
+import FullyFundedBadge from '../../component/tasker/FullyFundedBadge';
 
 const { width } = Dimensions.get('window');
 
@@ -475,6 +476,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
         </View>
 
         {/* Enhanced Completion Status */}
+        <FullyFundedBadge task={task} isAssignedToUser={isAssignedToUser}/>
         {isAssignedToUser && task?.assignmentAccepted && (
           <View style={styles.completionCard}>
             <Text style={styles.completionTitle}>Completion Progress</Text>
@@ -771,6 +773,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
               color="#10B981"
             />
           </View>
+            
         </View>
       </ScrollView>
 
@@ -981,7 +984,7 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
               <View style={styles.hintTextContainer}>
                 <Text style={styles.hintTitle}>Task Actions</Text>
                 <Text style={styles.hintDescription}>
-                  Task actions will appear here once you're assigned to this task
+                  Task Management buttons will appear here once you're assigned to this task
                 </Text>
               </View>
             </View>

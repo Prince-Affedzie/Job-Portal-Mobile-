@@ -17,7 +17,6 @@ import {
   SafeAreaView,
   Linking,
 } from 'react-native';
-//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
@@ -33,6 +32,264 @@ import { usePaystack } from "react-native-paystack-webview";
 
 const { width, height } = Dimensions.get('window');
 
+// Enhanced OfferCard Component with similar design to ApplicantCard
+// Updated OfferCard component with larger profile image
+// Updated OfferCard component with full-width profile image like ApplicantCard
+const OfferCard = ({ offer, request, canAccept, hasAccepted, onAccept, onDecline, onMessage, onViewProfile, onViewDetails }) => {
+  const { popup } = usePaystack();
+  const { user } = useContext(AuthContext);
+  
+  const isPending = offer.status === 'pending';
+  const isAccepted = offer.status === 'accepted';
+  const isDeclined = offer.status === 'declined';
+  
+  const userData = offer.tasker;
+  
+  // Get badge color based on status and rating
+  const getBadgeColor = () => {
+    if (isAccepted) return '#10B981'; // Green for accepted
+    if (isDeclined) return '#EF4444'; // Red for declined
+    if (userData?.rating >= 4.5) return '#6366F1'; // Purple for high rating
+    if (userData?.rating >= 3.5) return '#F59E0B'; // Orange for medium rating
+    return '#6B7280'; // Gray for low/unknown rating
+  };
+
+  // Format experience
+  const formatExperience = (exp) => {
+    if (!exp) return 'New';
+    if (exp < 1) return 'Beginner';
+    if (exp <= 3) return `${exp} year${exp !== 1 ? 's' : ''} exp`;
+    return `${exp}+ years`;
+  };
+
+  // Check if offer is within budget
+  const isWithinBudget = request?.budget && offer.amount <= request.budget;
+
+  // Format price comparison
+  const getPriceComparison = () => {
+    if (!request?.budget) return null;
+    const difference = offer.amount - request.budget;
+    if (difference <= 0) {
+      return { text: `Within budget`, color: '#10B981', icon: 'checkmark-circle' };
+    } else {
+      return { text: `₵${Math.abs(difference)} over budget`, color: '#EF4444', icon: 'alert-circle' };
+    }
+  };
+
+  const priceComparison = getPriceComparison();
+
+  // Calculate response time
+  const getResponseTime = () => {
+    if (!offer.createdAt) return '';
+    const createdAt = moment(offer.createdAt);
+    const now = moment();
+    const diffHours = now.diff(createdAt, 'hours');
+    
+    if (diffHours < 1) return `${now.diff(createdAt, 'minutes')} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+    return `${Math.floor(diffHours / 24)} day${Math.floor(diffHours / 24) !== 1 ? 's' : ''} ago`;
+  };
+
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.offerCard,
+        isAccepted && styles.offerCardAccepted,
+        isDeclined && styles.offerCardDeclined
+      ]}
+      onPress={() =>  navigate('ApplicantProfile', { applicant: userData})}
+      activeOpacity={0.95}
+    >
+      {/* Top Section with Full-Width Image - EXACTLY like ApplicantCard */}
+      <View style={styles.topSection}>
+        <View style={styles.profileImageContainer}>
+          {userData?.profileImage ? (
+            <Image
+              source={{ 
+                uri: userData.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' 
+              }}
+              style={styles.profileImage}
+            />
+          ) : (
+            <LinearGradient 
+              colors={['#6366F1', '#8B5CF6']} 
+              style={styles.profileImage}
+            >
+              <View style={styles.profileImagePlaceholder}>
+                <Text style={styles.profileInitial}>
+                  {userData?.name?.[0]?.toUpperCase() || 'T'}
+                </Text>
+              </View>
+            </LinearGradient>
+          )}
+          
+          {/* Verified Badge - Positioned exactly like ApplicantCard */}
+          {userData?.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+            </View>
+          )}
+          
+          {/* Status Badge - Positioned like ApplicantCard */}
+          {isAccepted && (
+            <View style={styles.assignedBadge}>
+              <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+            </View>
+          )}
+          {isDeclined && (
+            <View style={styles.declinedBadge}>
+              <Ionicons name="close" size={12} color="#FFFFFF" />
+            </View>
+          )}
+        </View>
+
+        {/* Rating and Amount Badge - Overlay on top of image like ApplicantCard */}
+        <View style={styles.ratingBadge}>
+          <View style={styles.ratingStars}>
+            <Ionicons name="star" size={14} color="#F59E0B" />
+            <Text style={styles.ratingText}>
+              {(userData?.rating || 0).toFixed(1)}
+            </Text>
+            {userData?.completedTasks > 0 && (
+              <Text style={styles.ratingCount}>({userData.completedTasks})</Text>
+            )}
+          </View>
+          
+          {/* Amount Badge - Similar to Score Badge in ApplicantCard */}
+          <View style={[styles.scoreBadge, { backgroundColor: getBadgeColor() }]}>
+            <Text style={styles.scoreText}>₵{offer.amount}</Text>
+            <Text style={styles.scoreLabel}>Offer</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Offer Details Section - Same structure as ApplicantCard */}
+      <View style={styles.detailsSection}>
+        <View style={styles.nameAndPrice}>
+          <View style={styles.nameContainer}>
+            <Text style={styles.userName} numberOfLines={1}>
+              {userData?.name || 'Professional Tasker'}
+            </Text>
+            {userData?.isPro && (
+              <View style={styles.proBadge}>
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Price Comparison */}
+          {priceComparison && (
+            <Text style={[
+              styles.budgetText, 
+              { color: priceComparison.color }
+            ]}>
+              {priceComparison.text}
+            </Text>
+          )}
+        </View>
+
+        {/* Primary Skill */}
+        <View style={styles.skillBadge}>
+          <Ionicons name="briefcase-outline" size={14} color="#6366F1" />
+          <Text style={styles.skillText} numberOfLines={1}>
+            {userData?.skills?.[0] || 'Skilled Professional'}
+          </Text>
+        </View>
+
+        {/* Experience & Location */}
+        <View style={styles.statsRow}>
+          {userData?.experience > 0 && (
+            <View style={styles.statItem}>
+              <Ionicons name="trophy-outline" size={14} color="#F59E0B" />
+              <Text style={styles.statText}>
+                {formatExperience(userData.experience)}
+              </Text>
+            </View>
+          )}
+          
+          <View style={styles.statItem}>
+            <Ionicons name="location-outline" size={14} color="#64748B" />
+            <Text style={styles.statText}>
+              {userData?.location?.city || 'Available Nationwide'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Offer Message */}
+        {offer.message && (
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageText} numberOfLines={2}>
+              "{offer.message}"
+            </Text>
+          </View>
+        )}
+
+        {/* Performance Stats */}
+        <View style={styles.performanceStats}>
+          {userData?.completedTasks > 0 && (
+            <View style={styles.performanceItem}>
+              <Ionicons name="checkmark-done" size={14} color="#10B981" />
+              <Text style={styles.performanceText}>{userData.completedTasks} jobs</Text>
+            </View>
+          )}
+          
+          {userData?.onTimeRate && (
+            <View style={styles.performanceItem}>
+              <Ionicons name="time-outline" size={14} color="#6366F1" />
+              <Text style={styles.performanceText}>{userData.onTimeRate}% on time</Text>
+            </View>
+          )}
+          
+          <View style={styles.performanceItem}>
+            <Ionicons name="timer-outline" size={14} color="#F59E0B" />
+            <Text style={styles.performanceText}>{getResponseTime()}</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons - Exactly like ApplicantCard */}
+        <View style={styles.actionButtons}>
+          {/* Message Button - Always Visible */}
+          <TouchableOpacity 
+            style={styles.messageButton}
+            onPress={() => onMessage(offer.tasker)}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6366F1" />
+            <Text style={styles.messageButtonText}>Message</Text>
+          </TouchableOpacity>
+
+          {/* Decline/Accept Buttons */}
+          {isPending && canAccept && !hasAccepted ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.assignButton, !canAccept && styles.disabledButton]}
+                onPress={() => onAccept(offer)}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.assignButtonText}>
+                  Accept Offer
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : isAccepted ? (
+            <View style={styles.assignedButton}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.assignedButtonText}>
+                Accepted
+              </Text>
+            </View>
+          ) : isDeclined ? (
+            <View style={styles.assignedButton} >
+              <Ionicons name="close-circle" size={16} color="#EF4444" />
+              <Text style={styles.assignedButtonText}>
+                Declined
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 // Helper Components
 const FilterChip = ({ label, count, active, onPress }) => (
   <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
@@ -89,19 +346,6 @@ const PaymentFlexibilityBanner = () => (
     <Ionicons name="information-circle" size={20} color="#10B981" />
   </View>
 );
-
-// Utility Functions
-const getStatusColor = (status) => ({
-  pending: '#F59E0B',
-  accepted: '#10B981',
-  declined: '#EF4444'
-}[status] || '#6B7280');
-
-const getStatusIcon = (status) => ({
-  pending: 'time',
-  accepted: 'checkmark-circle',
-  declined: 'close-circle'
-}[status] || 'help-circle');
 
 const ServiceRequestOffersScreen = ({ route, navigation }) => {
   const { requestId, offers: initialOffers, request } = route.params;
@@ -172,7 +416,7 @@ const ServiceRequestOffersScreen = ({ route, navigation }) => {
       Alert.alert("Error", err.response?.data?.message || "Failed to accept offer");
     }
   };
-
+  
   // Accept Offer with Payment Flexibility
   const handleAcceptOffer = useCallback(async (offer) => {
     Alert.alert(
@@ -190,7 +434,6 @@ once you both confirm the task is completed satisfactorily.`,
           text: "Yes, Pay Full Amount",
           onPress: () => processFullPayment(offer)
         },
-        
       ]
     );
   }, [user, requestId, popup, navigation, loadOffers]);
@@ -200,7 +443,6 @@ once you both confirm the task is completed satisfactorily.`,
     Alert.alert(
       "Need Payment Assistance?",
       `Our support team can help you arrange a partial payment plan with ${offer.tasker?.name}.\n\nWe'll contact the tasker on your behalf and if they agree, you can pay 50% now and 50% later.`,
-      //We understand that ₵${offer.amount} might be a large amount to pay at once.\n\n
       [
         { text: "Cancel", style: "cancel" },
         { 
@@ -365,116 +607,6 @@ once you both confirm the task is completed satisfactorily.`,
   const hasAccepted = offers.some(o => o.status === 'accepted');
   const canAccept = ['Pending', 'Quoted'].includes(request?.status);
 
-  // Offer Card Component
-  const OfferCard = React.memo(({ offer }) => {
-    const isPending = offer.status === 'pending';
-    const isAccepted = offer.status === 'accepted';
-
-    return (
-      <View style={[styles.card, isAccepted && styles.cardAccepted]}>
-        <View style={styles.cardHeader}>
-          <TouchableOpacity
-            style={styles.taskerRow}
-            onPress={() => navigate('ApplicantProfile', { applicant: offer.tasker, requestId })}
-          >
-            <View style={styles.avatarContainer}>
-              {offer.tasker?.profileImage ? (
-                <Image source={{ uri: offer.tasker.profileImage }} style={styles.avatar} />
-              ) : (
-                <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.avatar}>
-                  <Text style={styles.avatarInitial}>
-                    {offer.tasker?.name?.[0]?.toUpperCase() || 'T'}
-                  </Text>
-                </LinearGradient>
-              )}
-              {isAccepted && <View style={styles.acceptedBadge} />}
-            </View>
-
-            <View style={styles.taskerInfo}>
-              <Text style={styles.taskerName} numberOfLines={1}>
-                {offer.tasker?.name || 'Tasker'}
-              </Text>
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={styles.rating}>{(offer.tasker?.rating || 0).toFixed(1)}</Text>
-                <Text style={styles.reviews}>({offer.tasker?.completedTasks || 0})</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.amountContainer}>
-            <Text style={styles.amount}>₵{offer.amount}</Text>
-            {request.budget && (
-              <View style={[
-                styles.budgetTag,
-                offer.amount <= request.budget ? styles.within : styles.over
-              ]}>
-                <Text style={styles.budgetTagText}>
-                  {offer.amount <= request.budget ? 'Within' : 'Over'}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {offer.message ? (
-          <View style={styles.messageBox}>
-            <Text style={styles.message} numberOfLines={3}>"{offer.message}"</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.cardFooter}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusPill, { backgroundColor: `${getStatusColor(offer.status)}20` }]}>
-              <Ionicons name={getStatusIcon(offer.status)} size={13} color={getStatusColor(offer.status)} />
-              <Text style={[styles.statusText, { color: getStatusColor(offer.status) }]}>
-                {offer.status}
-              </Text>
-            </View>
-            <Text style={styles.time}>{moment(offer.createdAt).fromNow()}</Text>
-          </View>
-
-          <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.msgBtn} onPress={() => openChat(offer.tasker)}>
-              <Ionicons name="chatbubble-ellipses" size={16} color="#3B82F6" />
-              <View style={styles.msgBtnContent}>
-                <Text style={styles.msgText}>Message</Text>
-                <Text style={styles.negotiateHint}>Negotiate offer</Text>
-              </View>
-            </TouchableOpacity>
-
-            {isPending && canAccept && !hasAccepted ? (
-              <>
-                <TouchableOpacity style={styles.declineBtn} onPress={() => handleDeclineOffer(offer)}>
-                  <Text style={styles.declineText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptOffer(offer)}>
-                  <Text style={styles.acceptText}>Accept Offer</Text>
-                </TouchableOpacity>
-              </>
-            ) : isAccepted ? (
-              <TouchableOpacity style={styles.detailsBtn} onPress={() => handleOfferAction(offer)}>
-                <Text style={styles.detailsText}>Details</Text>
-                <Ionicons name="chevron-forward" size={14} color="#6366F1" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.detailsBtn} onPress={() => handleOfferAction(offer)}>
-                <Text style={styles.detailsText}>View</Text>
-                <Ionicons name="chevron-forward" size={14} color="#6366F1" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {isAccepted && (
-          <LinearGradient colors={['#10B98110', '#10B98105']} style={styles.acceptedOverlay}>
-            <Text style={styles.acceptedLabel}>Accepted</Text>
-          </LinearGradient>
-        )}
-      </View>
-    );
-  });
-
   // List Header
   const ListHeader = () => (
     <View>
@@ -490,19 +622,25 @@ once you both confirm the task is completed satisfactorily.`,
         <View style={styles.summaryMeta}>
           <View style={styles.metaItem}>
             <Ionicons name="cash-outline" size={14} color="#E0E7FF" />
-            <Text style={styles.metaText}>₵{request?.budget || 'Flexible'}</Text>
+            <Text style={styles.metaText}>Budget: ₵{request?.budget || 'Flexible'}</Text>
           </View>
           <View style={styles.metaItem}>
             <Ionicons name="pricetags-outline" size={14} color="#E0E7FF" />
             <Text style={styles.metaText}>{offers.length} Offers</Text>
           </View>
+          {hasAccepted && (
+            <View style={styles.metaItem}>
+              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              <Text style={styles.metaText}>Offer Accepted</Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
 
-      {/* Negotiation Info Banner */}
+      {/* Payment Flexibility Banner 
       {offers.length > 0 && (
-        <NegotiationInfoBanner />
-      )}
+        <PaymentFlexibilityBanner />
+      )}*/}
 
       {/* Search & Filter */}
       <View style={styles.searchBar}>
@@ -594,8 +732,8 @@ once you both confirm the task is completed satisfactorily.`,
     </View>
   );
 
-  // Empty State Component with Negotiation Info
-  const EmptyStateWithNegotiationInfo = () => (
+  // Empty State Component
+  const EmptyState = () => (
     <View style={styles.empty}>
       <Ionicons name="chatbubble-ellipses-outline" size={64} color="#CBD5E1" />
       <Text style={styles.emptyTitle}>
@@ -603,11 +741,11 @@ once you both confirm the task is completed satisfactorily.`,
       </Text>
       <Text style={styles.emptySubtitle}>
         {offers.length === 0
-          ? 'Taskers will submit offers soon.'
+          ? 'Taskers will submit offers soon. Check back later.'
           : 'Try adjusting filters or search.'}
       </Text>
       
-      {/* Add negotiation info to empty state as well */}
+      {/* Add negotiation info to empty state */}
       {offers.length === 0 && (
         <View style={styles.emptyNegotiationInfo}>
           <Text style={styles.emptyNegotiationTitle}>Pro Tip:</Text>
@@ -620,7 +758,7 @@ once you both confirm the task is completed satisfactorily.`,
   );
 
   // Action Modal with Payment Flexibility
-  const ActionModalWithPaymentFlexibility = () => (
+  const ActionModal = () => (
     <Modal visible={actionModalVisible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modal}>
@@ -640,7 +778,7 @@ once you both confirm the task is completed satisfactorily.`,
                   <Text style={styles.modalMessage}>"{selectedOffer.message}"</Text>
                 )}
                 
-                {/* Payment flexibility reminder in modal */}
+                {/* Payment flexibility reminder */}
                 <View style={styles.paymentFlexibilityModalTip}>
                   <Ionicons name="card-outline" size={16} color="#10B981" />
                   <Text style={styles.paymentFlexibilityModalText}>
@@ -716,22 +854,34 @@ once you both confirm the task is completed satisfactorily.`,
 
       <FlatList
         data={filteredAndSortedOffers}
-        renderItem={({ item }) => <OfferCard offer={item} />}
+        renderItem={({ item }) => (
+          <OfferCard
+            offer={item}
+            request={request}
+            canAccept={canAccept}
+            hasAccepted={hasAccepted}
+            onAccept={handleAcceptOffer}
+            onDecline={handleDeclineOffer}
+            onMessage={openChat}
+            onViewProfile={(tasker) => navigate('ApplicantProfile', { applicant: tasker, requestId })}
+            onViewDetails={handleOfferAction}
+          />
+        )}
         keyExtractor={item => item._id}
         ListHeaderComponent={ListHeader}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={<EmptyStateWithNegotiationInfo />}
+        ListEmptyComponent={<EmptyState />}
       />
 
       {/* Action Modal */}
-      <ActionModalWithPaymentFlexibility />
+      <ActionModal />
     </SafeAreaView>
   );
 };
 
-// Styles
+// Styles - Matching ApplicantCard design
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   listContent: { paddingBottom: 24 },
@@ -742,193 +892,12 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: 19, fontWeight: '800', color: '#FFF', flex: 1, marginRight: 12 },
   offerCount: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
   offerCountText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-  summaryDesc: { color: '#E0E7FF', marginVertical: 12, fontSize: 14 },
-  summaryMeta: { flexDirection: 'row', gap: 16 },
+  summaryDesc: { color: '#E0E7FF', marginVertical: 12, fontSize: 14, lineHeight: 20 },
+  summaryMeta: { flexDirection: 'row', gap: 16, flexWrap: 'wrap' },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { color: '#E0E7FF', fontSize: 13, fontWeight: '500' },
 
-  // Negotiation Banner Styles
-  negotiationBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
-    gap: 12,
-  },
-  negotiationIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E0E7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  negotiationTextContainer: {
-    flex: 1,
-  },
-  negotiationTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
-  negotiationSubtitle: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 16,
-  },
-
-  // Search & Filter
-  searchBar: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, gap: 12 },
-  searchInputContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, marginLeft: 8 },
-  filterBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  filterBtnActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
-  filterDot: { position: 'absolute', top: 10, right: 10, width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
-  
-  // Filters Panel
-  filtersPanel: { backgroundColor: '#FFF', marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, elevation: 4 },
-  filtersHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  filtersTitle: { fontSize: 17, fontWeight: '700', color: '#1E293B' },
-  filterLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10, marginTop: 8 },
-  chipsRow: { marginBottom: 16 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', marginRight: 8 },
-  chipActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
-  chipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  chipTextActive: { color: '#FFF' },
-  sortGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  sortChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', flex: 1, minWidth: 100 },
-  sortChipActive: { backgroundColor: '#EEF2FF', borderColor: '#6366F1' },
-  sortChipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  sortChipTextActive: { color: '#6366F1', fontWeight: '600' },
-  
-  // Results Bar
-  resultsBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
-  resultsText: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
-  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  resetText: { color: '#6366F1', fontSize: 13, fontWeight: '600' },
-  
-  // Offer Card
-  card: { backgroundColor: '#FFF', marginHorizontal: 16, marginBottom: 16, padding: 18, borderRadius: 16, elevation: 4, borderWidth: 1, borderColor: '#F1F5F9' },
-  cardAccepted: { borderColor: '#10B981', borderWidth: 1.5 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  taskerRow: { flexDirection: 'row', flex: 1 },
-  avatarContainer: { marginRight: 12, position: 'relative' },
-  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  avatarInitial: { color: '#FFF', fontSize: 18, fontWeight: '600' },
-  acceptedBadge: { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, backgroundColor: '#10B981', borderRadius: 9, borderWidth: 2, borderColor: '#FFF' },
-  taskerInfo: { flex: 1, justifyContent: 'center' },
-  taskerName: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  rating: { fontSize: 13, color: '#64748B' },
-  reviews: { fontSize: 13, color: '#94A3B8' },
-  amountContainer: { alignItems: 'flex-end' },
-  amount: { fontSize: 20, fontWeight: '700', color: '#10B981' },
-  budgetTag: { marginTop: 6, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  within: { backgroundColor: '#10B981' },
-  over: { backgroundColor: '#EF4444' },
-  budgetTagText: { color: '#FFF', fontSize: 10, fontWeight: '600' },
-  messageBox: { backgroundColor: '#F8FAFC', padding: 14, borderRadius: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: '#6366F1' },
-  message: { fontSize: 14, color: '#475569', fontStyle: 'italic' },
-  cardFooter: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 5 },
-  statusText: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase' },
-  time: { fontSize: 12, color: '#94A3B8' },
-  actionsRow: { flexDirection: 'row', gap: 8 },
-  
-  // Enhanced Message Button
-  msgBtn: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: '#EFF6FF', 
-    paddingVertical: 10, 
-    borderRadius: 12, 
-    gap: 6, 
-    borderWidth: 1, 
-    borderColor: '#DBEAFE' 
-  },
-  msgBtnContent: {
-    alignItems: 'center',
-  },
-  msgText: { color: '#3B82F6', fontWeight: '600', fontSize: 14 },
-  negotiateHint: { fontSize: 10, color: '#60A5FA', fontWeight: '500', marginTop: 2 },
-  
-  declineBtn: { flex: 1, backgroundColor: '#FEF2F2', paddingVertical: 10, borderRadius: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA' },
-  declineText: { color: '#DC2626', fontWeight: '600', textAlign: 'center', fontSize: 14 },
-  acceptBtn: { flex: 1, backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 12, justifyContent: 'center' },
-  acceptText: { color: '#FFF', fontWeight: '600', textAlign: 'center', fontSize: 14 },
-  detailsBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', paddingVertical: 10, borderRadius: 12, gap: 4, borderWidth: 1, borderColor: '#E2E8F0' },
-  detailsText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
-  acceptedOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  acceptedLabel: { color: '#065F46', fontWeight: '600', fontSize: 13 },
-  
-  // Empty State
-  empty: { alignItems: 'center', paddingVertical: 80, paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#64748B', marginTop: 16 },
-  emptySubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 8 },
-  
-  // Empty State Negotiation Info
-  emptyNegotiationInfo: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#F0F9FF',
-    borderRadius: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#0EA5E9',
-  },
-  emptyNegotiationTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0369A1',
-    marginBottom: 4,
-  },
-  emptyNegotiationText: {
-    fontSize: 13,
-    color: '#0C4A6E',
-    lineHeight: 16,
-  },
-  
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modal: { backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.8 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalTitle: { fontSize: 19, fontWeight: '700', color: '#FFF' },
-  modalBody: { padding: 24 },
-  modalSummary: { alignItems: 'center', backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 20 },
-  modalAmount: { fontSize: 30, fontWeight: '700', color: '#10B981' },
-  modalTasker: { fontSize: 16, color: '#64748B', marginTop: 4 },
-  modalMessage: { fontSize: 15, color: '#475569', fontStyle: 'italic', marginTop: 12, textAlign: 'center' },
-  
-  // Modal Negotiation Tip
-  modalNegotiationTip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#F59E0B',
-  },
-  modalNegotiationText: {
-    fontSize: 13,
-    color: '#92400E',
-    flex: 1,
-    fontWeight: '500',
-  },
-  
-  modalButtons: { gap: 12 },
-  modalBtn: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 16, gap: 14, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0' },
-  modalBtnTitle: { fontSize: 16, fontWeight: '600' },
+  // Payment Flexibility Banner
   paymentFlexibilityBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -964,6 +933,427 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
+  // Offer Card Styles (Matching ApplicantCard)
+   offerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  offerCardAccepted: {
+    borderColor: '#10B981',
+    borderWidth: 1.5,
+  },
+  offerCardDeclined: {
+    borderColor: '#EF4444',
+    borderWidth: 1,
+    opacity: 0.8,
+  },
+  
+  // Top Section - EXACTLY like ApplicantCard
+  topSection: {
+    position: 'relative',
+    height: 140, // Same height as ApplicantCard
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  
+  profileImageContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  
+  profileImage: {
+    width: '100%',
+    height: '130%',
+    resizeMode: 'cover',
+  },
+  
+  profileImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  profileInitial: {
+    color: '#FFFFFF',
+    fontSize: 48,
+    fontWeight: '700',
+  },
+  
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: '#10B981',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  
+  assignedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  declinedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  
+  ratingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  
+  ratingStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 4,
+  },
+  
+  ratingText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  
+  ratingCount: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  
+  scoreBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  
+  scoreText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  
+  scoreLabel: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  
+  // Details Section - EXACTLY like ApplicantCard
+  detailsSection: {
+    padding: 16,
+  },
+  
+  nameAndPrice: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+  },
+  
+  proBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  
+  proBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  
+  budgetText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  
+  // Skill Badge
+  skillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    marginBottom: 10,
+  },
+  
+  skillText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 12,
+  },
+  
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  
+  statText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  
+  // Message Container
+  messageContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
+  },
+  
+  messageText: {
+    fontSize: 13,
+    color: '#475569',
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  
+  // Performance Stats
+  performanceStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  
+  performanceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  
+  performanceText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  
+  // Action Buttons - EXACTLY like ApplicantCard
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  
+  messageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  
+  messageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  
+  assignButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  
+  assignButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  
+  assignedButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  
+  assignedButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  // Search & Filter Styles
+  searchBar: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, gap: 12 },
+  searchInputContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, marginLeft: 8, color: '#1F2937' },
+  filterBtn: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  filterBtnActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  filterDot: { position: 'absolute', top: 10, right: 10, width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
+  
+  // Filters Panel
+  filtersPanel: { backgroundColor: '#FFF', marginHorizontal: 16, marginBottom: 16, padding: 20, borderRadius: 16, elevation: 4 },
+  filtersHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  filtersTitle: { fontSize: 17, fontWeight: '700', color: '#1F2937' },
+  filterLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10, marginTop: 8 },
+  chipsRow: { marginBottom: 16 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', marginRight: 8 },
+  chipActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  chipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  chipTextActive: { color: '#FFF' },
+  sortGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sortChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', flex: 1, minWidth: 100 },
+  sortChipActive: { backgroundColor: '#EEF2FF', borderColor: '#6366F1' },
+  sortChipText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  sortChipTextActive: { color: '#6366F1', fontWeight: '600' },
+  
+  // Results Bar
+  resultsBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+  resultsText: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  resetText: { color: '#6366F1', fontSize: 13, fontWeight: '600' },
+  
+  // Empty State
+  empty: { alignItems: 'center', paddingVertical: 80, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 18, fontWeight: '600', color: '#64748B', marginTop: 16 },
+  emptySubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  
+  // Empty State Negotiation Info
+  emptyNegotiationInfo: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0EA5E9',
+  },
+  emptyNegotiationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0369A1',
+    marginBottom: 4,
+  },
+  emptyNegotiationText: {
+    fontSize: 13,
+    color: '#0C4A6E',
+    lineHeight: 18,
+  },
+  
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modal: { backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: height * 0.8 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 18, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: '#FFF' },
+  modalBody: { padding: 24 },
+  modalSummary: { alignItems: 'center', backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 20 },
+  modalAmount: { fontSize: 30, fontWeight: '700', color: '#10B981' },
+  modalTasker: { fontSize: 16, color: '#64748B', marginTop: 4, fontWeight: '500' },
+  modalMessage: { fontSize: 15, color: '#475569', fontStyle: 'italic', marginTop: 12, textAlign: 'center', lineHeight: 22 },
+  
   // Payment Flexibility Modal Tip
   paymentFlexibilityModalTip: {
     flexDirection: 'row',
@@ -981,7 +1371,12 @@ const styles = StyleSheet.create({
     color: '#065F46',
     flex: 1,
     fontWeight: '500',
+    lineHeight: 18,
   },
+  
+  modalButtons: { gap: 12 },
+  modalBtn: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 16, gap: 14, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  modalBtnTitle: { fontSize: 16, fontWeight: '600' },
 });
 
 export default ServiceRequestOffersScreen;

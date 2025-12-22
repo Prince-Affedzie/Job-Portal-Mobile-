@@ -32,6 +32,7 @@ import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
 import {serviceRequestDetail,submitOffer,updateOffer,markServiceComplete} from '../../api/serviceRequestAPI/taskerAPI'
 import {startOrGetChatRoom} from '../../api/chatApi'
 import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal'
+import ServiceRequestFundingNoticeCard from '../../component/tasker/ServiceRequestFundingNoticeCard';
 
 
 
@@ -526,6 +527,11 @@ const toggleFAB = () => {
             </LinearGradient>
           </View>
 
+           <ServiceRequestFundingNoticeCard 
+           serviceRequest={request} 
+          isAssignedToUser={isAssignedToUser}
+        /> 
+
           {/* Enhanced Completion Status */}
           {isAssignedToUser && (
             <View style={styles.completionCard}>
@@ -902,7 +908,7 @@ const toggleFAB = () => {
           </View>
         </ScrollView>
 
-      
+    
 <View style={styles.fabContainer}>
   {/* Backdrop */}
   {fabExpanded && (

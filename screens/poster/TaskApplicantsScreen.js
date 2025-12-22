@@ -26,6 +26,7 @@ import { navigate } from '../../services/navigationService';
 import { triggerPayment } from '../../services/PaymentServices';
 import { usePaystack } from "react-native-paystack-webview";
 import LoadingIndicator from '../../component/common/LoadingIndicator'
+import { startOrGetChatRoom } from '../../api/chatApi';
 
 const { width } = Dimensions.get('window');
 
@@ -111,6 +112,28 @@ export default function ApplicantsScreen({ route }) {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
+  };
+
+  // Handle messaging
+  const handleMessage = async (userId, userName) => {
+    try {
+      const res = await startOrGetChatRoom({ 
+        userId2: userId, 
+        jobId: taskId 
+      });
+      
+      if (res.status === 200) {
+        navigate('ChatWindow', { 
+          roomId: res.data._id,
+          recipientName: userName
+        });
+      } else {
+        Alert.alert('Error', 'Failed to start chat');
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to start chat');
+    }
   };
 
   // Process full payment for assignment
@@ -250,20 +273,13 @@ export default function ApplicantsScreen({ route }) {
         `Assigning ${applicantName} requires payment of GH₵${task.budget}.
         \nYour payment of ₵${task.budget} will be securely held in escrow and only released to ${applicantName || 'the tasker'}
 once you both confirm the task is completed satisfactorily.`,
-        // \n\nCan you pay the full amount now?
         [
           { text: "Cancel", style: "cancel" },
-          /*{
-            text: "Can't Pay In Full?",
-            style: "default",
-            onPress: () => handleCantPayFull(applicantId, applicantName, task.budget, 'assignment')
-          },*/
           {
             text: "Yes, Pay Full Amount",
             style: "default",
             onPress: () => processFullPayment(applicantId, applicantName)
           },
-          
         ]
       );
     }
@@ -294,128 +310,21 @@ once you both confirm the task is completed satisfactorily.`,
         `Accepting ${bidderName}'s bid requires payment of GH₵${amount}.
         \nYour payment of ₵${amount} will be securely held in escrow and only released to ${bidderName || 'the tasker'}
 once you both confirm the task is completed satisfactorily.`,
-        //\n\nCan you pay the full amount now?
         [
           { text: "Cancel", style: "cancel" },
-          /*{
-            text: "Can't Pay In Full?",
-            style: "default",
-            onPress: () => handleCantPayFull(bidder._id, bidderName, amount, 'bid', bidId)
-          },*/
           { 
             text: "Yes, Pay Full Amount", 
             style: "default",
             onPress: () => processFullBidPayment(bidder, amount, bidId, bidderName)
           },
-          
         ]
       );
     }
   };
 
-  // Handle "can't pay full" scenario
-  const handleCantPayFull = (userId, userName, amount, type, bidId = null) => {
-    const taskType = type === 'assignment' ? 'assignment' : 'bid acceptance';
-    
-    Alert.alert(
-      "Need Payment Assistance?",
-      `We understand that GH₵${amount} might be a large amount to pay at once.\n\nOur support team can help you arrange a partial payment plan with ${userName}.\n\nWe'll contact the tasker on your behalf and if they agree, you can pay 50% now and 50% later.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Contact Support", 
-          onPress: () => contactSupportForPaymentPlan(userId, userName, amount, type, bidId)
-        }
-      ]
-    );
-  };
-
-  // Contact support for payment plan
-  const contactSupportForPaymentPlan = (userId, userName, amount, type, bidId = null) => {
-    const taskType = type === 'assignment' ? 'assignment' : 'bid acceptance';
-    const supportMessage = `Hello, I need help with a payment plan for task "${task?.title}".\n\nTaskId: ${task?._id}\nTasker: ${userName}\nAmount: GH₵${amount}\nTask Type: ${taskType}\nI'd like to pay 50% now and 50% later.\n\nPlease contact the tasker on my behalf.`;
-
-    Alert.alert(
-      "Contact Support",
-      "Choose how you'd like to contact our support team:",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Call Support", 
-          onPress: () => callSupport(supportMessage)
-        },
-        { 
-          text: "WhatsApp Support", 
-          onPress: () => whatsAppSupport(supportMessage)
-        },
-        { 
-          text: "Email Support", 
-          onPress: () => emailSupport(supportMessage)
-        }
-      ]
-    );
-  };
-
-  // Support contact methods
-  const callSupport = (message) => {
-    Alert.alert(
-      "Call Support",
-      "Call our support team at +233505671577 to discuss your payment plan.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Call Now", 
-          onPress: () => Linking.openURL('tel:+233505671577')
-        }
-      ]
-    );
-  };
-
-  const whatsAppSupport = (message) => {
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/233505671577?text=${encodedMessage}`;
-    
-    Alert.alert(
-      "WhatsApp Support",
-      "Open WhatsApp to message our support team about your payment plan?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Open WhatsApp", 
-          onPress: () => Linking.openURL(whatsappUrl)
-        }
-      ]
-    );
-  };
-
-  const emailSupport = (message) => {
-    const emailUrl = `mailto:workaflow726@gmail.com?subject=Payment Plan Request - Task: ${task?.title}&body=${encodeURIComponent(message)}`;
-    
-    Alert.alert(
-      "Email Support",
-      "Send an email to our support team about your payment plan?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Send Email", 
-          onPress: () => Linking.openURL(emailUrl)
-        }
-      ]
-    );
-  };
-
   const handleViewProfile = (item) => {
     const userData = biddingType === 'fixed' ? item : item.bidder;
     navigate('ApplicantProfile', { applicant: userData, taskId });
-  };
-
-  const handleChat = (item) => {
-    const userData = biddingType === 'fixed' ? item : item.bidder;
-    navigate('Chat', { 
-      userId: userData._id,
-      userName: userData.name,
-      taskId 
-    });
   };
 
   // Filter and sort data
@@ -433,6 +342,209 @@ once you both confirm the task is completed satisfactorily.`,
       return 0;
     });
 
+  // ========== ENHANCED APPLICANT CARD COMPONENT ==========
+  const ApplicantCard = ({ item }) => {
+    const userData = biddingType === 'fixed' ? item : item.bidder;
+    const isAssigned = item.isAssigned || item.isAccepted;
+    
+    // Get badge color based on status
+    const getBadgeColor = () => {
+      if (isAssigned) return '#10B981'; // Green for assigned
+      if (item.totalScore >= 80) return '#6366F1'; // Purple for high score
+      if (item.totalScore >= 60) return '#F59E0B'; // Orange for medium score
+      return '#6B7280'; // Gray for low score
+    };
+
+    // Format experience
+    const formatExperience = (exp) => {
+      if (!exp) return 'New';
+      if (exp < 1) return 'Beginner';
+      if (exp <= 3) return `${exp} year${exp !== 1 ? 's' : ''} exp`;
+      return `${exp}+ years`;
+    };
+
+    return (
+      <TouchableOpacity onPress={() => handleViewProfile(item)} style={styles.applicantCard}>
+        {/* Top Section with Image */}
+        <View style={styles.topSection}>
+          <View style={styles.profileImageContainer}>
+            <Image
+              source={{ 
+                uri: userData.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' 
+              }}
+              style={styles.profileImage}
+            />
+            
+            {/* Verified Badge */}
+            {userData.isVerified && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              </View>
+            )}
+            
+            {/* Assigned Badge */}
+            {isAssigned && (
+              <View style={styles.assignedBadge}>
+                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+              </View>
+            )}
+          </View>
+
+          {/* Rating and Score Badge */}
+          <View style={styles.ratingBadge}>
+            <View style={styles.ratingStars}>
+              <Ionicons name="star" size={14} color="#F59E0B" />
+              <Text style={styles.ratingText}>
+                {userData.rating?.toFixed(1) || '5.0'}
+              </Text>
+              {userData.numberOfRatings > 0 && (
+                <Text style={styles.ratingCount}>({userData.numberOfRatings})</Text>
+              )}
+            </View>
+            
+            {/* Score Badge */}
+            <View style={[styles.scoreBadge, { backgroundColor: getBadgeColor() }]}>
+              <Text style={styles.scoreText}>{item.totalScore || 0}</Text>
+              <Text style={styles.scoreLabel}>Score</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* User Details Section */}
+        <View style={styles.detailsSection}>
+          <View style={styles.nameAndPrice}>
+            <View style={styles.nameContainer}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {userData.name || 'Professional'}
+              </Text>
+              {userData.isPro && (
+                <View style={styles.proBadge}>
+                  <Text style={styles.proBadgeText}>PRO</Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Price/Bid Amount */}
+            {biddingType === 'open-bid' ? (
+              <Text style={styles.bidAmount}>₵{item.amount}</Text>
+            ) : (
+              <Text style={styles.budgetText}>Budget: ₵{task?.budget || '0'}</Text>
+            )}
+          </View>
+
+          {/* Primary Skill */}
+          <View style={styles.skillBadge}>
+            <Ionicons name="briefcase-outline" size={14} color="#6366F1" />
+            <Text style={styles.skillText} numberOfLines={1}>
+              {userData.skills?.[0] || 'Skilled Professional'}
+            </Text>
+          </View>
+
+          {/* Experience & Location */}
+          <View style={styles.statsRow}>
+            {userData.experience > 0 && (
+              <View style={styles.statItem}>
+                <Ionicons name="trophy-outline" size={14} color="#F59E0B" />
+                <Text style={styles.statText}>{formatExperience(userData.experience)}</Text>
+              </View>
+            )}
+            
+            <View style={styles.statItem}>
+              <Ionicons name="location-outline" size={14} color="#64748B" />
+              <Text style={styles.statText}>
+                {userData.location?.city || 'Available Nationwide'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Proposal/Bid Message */}
+          {(item.proposal || item.message) && (
+            <View style={styles.messageContainer}>
+              <Text style={styles.messageText} numberOfLines={2}>
+                "{item.proposal || item.message}"
+              </Text>
+            </View>
+          )}
+
+          {/* Stats Row (like Fiverr) */}
+          <View style={styles.performanceStats}>
+            {userData.completedJobs > 0 && (
+              <View style={styles.performanceItem}>
+                <Ionicons name="checkmark-done" size={14} color="#10B981" />
+                <Text style={styles.performanceText}>{userData.completedJobs} jobs</Text>
+              </View>
+            )}
+            
+            {userData.onTimeRate && (
+              <View style={styles.performanceItem}>
+                <Ionicons name="time-outline" size={14} color="#6366F1" />
+                <Text style={styles.performanceText}>{userData.onTimeRate}% on time</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            {/* Message Button - Always Visible */}
+            <TouchableOpacity 
+              style={styles.messageButton}
+              onPress={() => handleMessage(userData._id, userData.name)}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6366F1" />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+
+            {/* Profile Button 
+            <TouchableOpacity 
+              style={styles.profileButton}
+              onPress={() => handleViewProfile(item)}
+            >
+              <Ionicons name="person-outline" size={16} color="#6366F1" />
+              <Text style={styles.profileButtonText}>Profile</Text>
+            </TouchableOpacity>*/}
+
+            {/* Assign/Accept Button */}
+            {!isAssigned ? (
+              <TouchableOpacity 
+                style={[styles.assignButton, !canAssign && styles.disabledButton]}
+                onPress={() => {
+                  if (biddingType === 'fixed') {
+                    handleAssign(item._id, userData.name);
+                  } else {
+                    handleAcceptBid(userData, item.amount, item._id, userData.name);
+                  }
+                }}
+                disabled={processingAction === item._id || !canAssign}
+              >
+                {processingAction === item._id ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons 
+                      name={biddingType === 'fixed' ? "person-add" : "checkmark-circle"} 
+                      size={16} 
+                      color="#FFFFFF" 
+                    />
+                    <Text style={styles.assignButtonText}>
+                      {biddingType === 'fixed' ? 'Assign' : 'Accept Bid'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.assignedButton}>
+                <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                <Text style={styles.assignedButtonText}>
+                  {biddingType === 'fixed' ? 'Assigned' : 'Accepted'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderEmptyState = () => {
     const isFixedBid = biddingType === 'fixed';
     const emptyTitle = isFixedBid ? "No Applicants Yet" : "No Bids Yet";
@@ -443,12 +555,9 @@ once you both confirm the task is completed satisfactorily.`,
 
     return (
       <View style={styles.emptyState}>
-        <LinearGradient
-          colors={['#F8FAFC', '#F1F5F9']}
-          style={styles.emptyIllustration}
-        >
-          <Ionicons name={emptyIcon} size={48} color="#6366F1" />
-        </LinearGradient>
+        <View style={styles.emptyIllustration}>
+          <Ionicons name={emptyIcon} size={48} color="#CBD5E1" />
+        </View>
         
         <Text style={styles.emptyTitle}>{emptyTitle}</Text>
         <Text style={styles.emptyDescription}>{emptyDescription}</Text>
@@ -469,287 +578,10 @@ once you both confirm the task is completed satisfactorily.`,
             );
           }}
         >
-          <LinearGradient
-            colors={['#6366F1', '#4F46E5']}
-            style={styles.shareButtonGradient}
-          >
-            <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.shareButtonText}>Share Task</Text>
-          </LinearGradient>
+          <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.shareButtonText}>Share Task</Text>
         </TouchableOpacity>
-        
-        <View style={styles.tipsContainer}>
-          <Text style={styles.tipsTitle}>Tips to attract more {isFixedBid ? 'applicants' : 'bids'}:</Text>
-          <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            <Text style={styles.tipText}>Ensure your task description is clear and detailed</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            <Text style={styles.tipText}>Set a competitive budget for your task</Text>
-          </View>
-          <View style={styles.tipItem}>
-            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            <Text style={styles.tipText}>Add specific requirements and skills needed</Text>
-          </View>
-          {!isFixedBid && (
-            <View style={styles.tipItem}>
-              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-              <Text style={styles.tipText}>Consider setting a realistic timeline for completion</Text>
-            </View>
-          )}
-        </View>
       </View>
-    );
-  };
-
-  const renderApplicantCard = ({ item: applicant }) => (
-    <LinearGradient
-      colors={['#FFFFFF', '#F8FAFC']}
-      style={styles.applicantCard}
-    >
-      {/* Header Section */}
-      <View style={styles.cardHeader}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatarContainer}>
-            {applicant.profileImage ? (
-              <Image
-                source={{ uri: applicant.profileImage }}
-                style={styles.avatar}
-              />
-            ) : (
-              <LinearGradient
-                colors={['#6366F1', '#4F46E5']}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>
-                  {applicant.name?.charAt(0)?.toUpperCase() || 'A'}
-                </Text>
-              </LinearGradient>
-            )}
-            {(applicant.isAssigned || applicant.isAccepted) && (
-              <View style={styles.assignedBadge}>
-                <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.userDetails}>
-            <Text style={styles.applicantName} numberOfLines={1}>
-              {applicant.name || 'Applicant'}
-            </Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>
-                {applicant.rating ? parseFloat(applicant.rating.toFixed(1)) : 'N/A'} rating
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.scoreContainer}>
-          <LinearGradient
-            colors={['#6366F1', '#4F46E5']}
-            style={styles.scoreGradient}
-          >
-            <Text style={styles.scoreValue}>
-              {applicant.totalScore ? parseFloat(applicant.totalScore.toFixed(1)) : 'N/A'}
-            </Text>
-            <Text style={styles.scoreLabel}>Score</Text>
-          </LinearGradient>
-        </View>
-      </View>
-
-      {/* Skills */}
-      {applicant.skills && applicant.skills.length > 0 && (
-        <View style={styles.skillsContainer}>
-          <Text style={styles.sectionLabel}>Key Skills</Text>
-          <View style={styles.skillsList}>
-            {applicant.skills.slice(0, 4).map((skill, index) => (
-              <LinearGradient
-                key={index}
-                colors={['#EEF2FF', '#E0E7FF']}
-                style={styles.skillTag}
-              >
-                <Text style={styles.skillText}>{skill}</Text>
-              </LinearGradient>
-            ))}
-            {applicant.skills.length > 4 && (
-              <Text style={styles.moreSkillsText}>
-                +{applicant.skills.length - 4} more
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Proposal */}
-      {applicant.proposal && (
-        <View style={styles.proposalContainer}>
-          <Text style={styles.sectionLabel}>Proposal</Text>
-          <Text style={styles.proposalText} numberOfLines={3}>
-            "{applicant.proposal}"
-          </Text>
-        </View>
-      )}
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.secondaryButton]}
-          onPress={() => handleViewProfile(applicant)}
-        >
-          <Ionicons name="person-outline" size={16} color="#6366F1" />
-          <Text style={styles.secondaryButtonText}>View Profile</Text>
-        </TouchableOpacity>
-
-        {!applicant.isAssigned ? (
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.primaryButton, !canAssign && styles.disabledButton]}
-            onPress={() => handleAssign(applicant._id, applicant.name)}
-            disabled={processingAction === applicant._id || !canAssign}
-          >
-            {processingAction === applicant._id ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.primaryButtonText}>
-                  {!canAssign ? 'Cannot Assign' : 'Assign Task'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <View style={[styles.actionButton, styles.assignedButton]}>
-            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-            <Text style={styles.assignedButtonText}>Assigned</Text>
-          </View>
-        )}
-      </View>
-    </LinearGradient>
-  );
-
-  const renderBidCard = ({ item: bid }) => {
-    const bidder = bid?.bidder || {};
-    
-    return (
-      <LinearGradient
-        colors={['#FFFFFF', '#F8FAFC']}
-        style={styles.applicantCard}
-      >
-        {/* Header Section */}
-        <View style={styles.cardHeader}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatarContainer}>
-              {bidder?.profileImage ? (
-                <Image
-                  source={{ uri: bidder?.profileImage }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <LinearGradient
-                  colors={['#6366F1', '#4F46E5']}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {bidder?.name?.charAt(0)?.toUpperCase() || 'B'}
-                  </Text>
-                </LinearGradient>
-              )}
-              {bid?.isAccepted && (
-                <View style={styles.assignedBadge}>
-                  <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.userDetails}>
-              <Text style={styles.applicantName} numberOfLines={1}>
-                {bidder?.name || 'Bidder'}
-              </Text>
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={styles.ratingText}>
-                  {bidder?.rating ? parseFloat(bidder.rating.toFixed(1)) : 'N/A'} rating
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.scoreContainer}>
-            <LinearGradient
-              colors={['#10B981', '#059669']}
-              style={styles.scoreGradient}
-            >
-              <Text style={styles.scoreValue}>₵{bid?.amount || '0'}</Text>
-              <Text style={styles.scoreLabel}>Bid</Text>
-            </LinearGradient>
-          </View>
-        </View>
-
-        {/* Bid Details */}
-        <View style={styles.bidDetails}>
-          <View style={styles.bidMeta}>
-            {bid?.timeline && (
-              <View style={styles.bidMetaItem}>
-                <Ionicons name="time-outline" size={16} color="#6366F1" />
-                <Text style={styles.bidMetaText}>{bid.timeline}</Text>
-              </View>
-            )}
-            <View style={styles.bidMetaItem}>
-              <Ionicons name="calendar-outline" size={16} color="#8B5CF6" />
-              <Text style={styles.bidMetaText}>
-                {bid?.createdAt ? moment(bid.createdAt).fromNow() : 'Recently'}
-              </Text>
-            </View>
-          </View>
-          
-          {bid?.message && (
-            <View style={styles.proposalContainer}>
-              <Text style={styles.sectionLabel}>Bid Message</Text>
-              <Text style={styles.proposalText} numberOfLines={5}>
-                "{bid.message}"
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.secondaryButton]}
-            onPress={() => handleViewProfile(bid)}
-          >
-            <Ionicons name="person-outline" size={16} color="#6366F1" />
-            <Text style={styles.secondaryButtonText}>Profile</Text>
-          </TouchableOpacity>
-
-          {!bid.isAccepted ? (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.primaryButton, !canAssign && styles.disabledButton]}
-              onPress={() => handleAcceptBid(bidder, bid?.amount, bid?._id, bidder?.name || 'Bidder')}
-              disabled={processingAction === bid?._id || !canAssign}
-            >
-              {processingAction === bid?._id ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>
-                    {!canAssign ? 'Cannot Accept' : 'Accept Bid'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.actionButton, styles.assignedButton]}>
-              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-              <Text style={styles.assignedButtonText}>Accepted</Text>
-            </View>
-          )}
-        </View>
-      </LinearGradient>
     );
   };
 
@@ -770,10 +602,7 @@ once you both confirm the task is completed satisfactorily.`,
     }
 
     return (
-      <LinearGradient
-        colors={['#F0FDF4', '#DCFCE7']}
-        style={styles.assignedTaskerCard}
-      >
+      <View style={styles.assignedTaskerCard}>
         <View style={styles.assignedHeader}>
           <Ionicons name="checkmark-circle" size={24} color="#10B981" />
           <Text style={styles.assignedTitle}>Task Assigned</Text>
@@ -781,34 +610,31 @@ once you both confirm the task is completed satisfactorily.`,
         
         <View style={styles.assignedContent}>
           <View style={styles.assignedUser}>
-            <View style={styles.avatarContainer}>
-              {userData?.profileImage ? (
-                <Image
-                  source={{ uri: userData?.profileImage }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {userData?.name?.charAt(0)?.toUpperCase() || 'T'}
-                  </Text>
-                </LinearGradient>
-              )}
-            </View>
+            <Image
+              source={{ 
+                uri: userData?.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' 
+              }}
+              style={styles.assignedAvatar}
+            />
             <View style={styles.assignedUserInfo}>
               <Text style={styles.assignedUserName}>{userData?.name || 'Assigned Tasker'}</Text>
-              <Text style={styles.assignedUserDetail}>{userData?.email || 'No email available'}</Text>
-              <Text style={styles.assignedUserDetail}>{userData?.phone || 'No phone available'}</Text>
-              {biddingType === 'open-bid' && assignedUser?.amount && (
-                <Text style={styles.assignedBidAmount}>Accepted Bid: ₵{assignedUser.amount}</Text>
-              )}
+              <Text style={styles.assignedUserDetail}>
+                {userData?.email || 'No email available'}
+              </Text>
+               <Text style={styles.assignedUserDetail}>
+                {userData?.phone || 'No Phone Number available'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.assignedChatButton}
+                onPress={() => handleMessage(userData._id, userData.name)}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.assignedChatText}>Message Tasker</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
-      </LinearGradient>
+      </View>
     );
   };
 
@@ -846,17 +672,14 @@ once you both confirm the task is completed satisfactorily.`,
         }
       >
         {/* Task Info Header */}
-        <LinearGradient
-          colors={['#1A1F3B', '#2D1B69']}
-          style={styles.taskHeader}
-        >
+        <View style={styles.taskHeader}>
           <View style={styles.taskInfo}>
             <Text style={styles.taskTitle} numberOfLines={2}>
               {task?.title || 'Task'}
             </Text>
             <View style={styles.taskMetaRow}>
               <View style={styles.taskMeta}>
-                <Ionicons name="people-outline" size={16} color="#E0E7FF" />
+                <Ionicons name="people-outline" size={16} color="#FFFFFF" />
                 <Text style={styles.taskMetaText}>
                   {data.length} {biddingType === 'fixed' ? 'applicant' : 'bid'}{data.length !== 1 ? 's' : ''}
                 </Text>
@@ -873,7 +696,7 @@ once you both confirm the task is completed satisfactorily.`,
               </View>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Assigned Tasker Section */}
         {renderAssignedTasker()}
@@ -948,9 +771,7 @@ once you both confirm the task is completed satisfactorily.`,
         <View style={styles.dataContainer}>
           {filteredAndSortedData.length > 0 ? (
             filteredAndSortedData.map((item) => (
-              <View key={item._id}>
-                {biddingType === 'fixed' ? renderApplicantCard({ item }) : renderBidCard({ item })}
-              </View>
+              <ApplicantCard key={item._id} item={item} />
             ))
           ) : (
             renderEmptyState()
@@ -960,8 +781,6 @@ once you both confirm the task is completed satisfactorily.`,
     </SafeAreaView>
   );
 }
-
-// ... (keep all the same styles from the previous code)
 
 const styles = StyleSheet.create({
   container: {
@@ -978,20 +797,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
-  },
+  // Task Header
   taskHeader: {
     marginHorizontal: 16,
     marginTop: 16,
     padding: 20,
     borderRadius: 16,
-    shadowColor: '#6366F1',
+    backgroundColor: '#1A1F3B',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
   },
@@ -1000,7 +815,7 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 12,
     lineHeight: 28,
@@ -1026,7 +841,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 20,
     gap: 6,
   },
   budgetText: {
@@ -1034,6 +849,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  // Controls
   controlsContainer: {
     backgroundColor: '#FFFFFF',
     padding: 16,
@@ -1087,230 +903,300 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6366F1',
   },
+  // Data Container
   dataContainer: {
     padding: 16,
     paddingTop: 8,
   },
+  // Applicant Card - Enhanced Design
   applicantCard: {
     backgroundColor: '#FFFFFF',
-    padding: 20,
     borderRadius: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    overflow: 'hidden',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarContainer: {
+  // Top Section
+  topSection: {
     position: 'relative',
-    marginRight: 12,
+    height: 140,
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  profileImageContainer: {
+    width: '100%',
+    height: '130%',
+    position: 'relative',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: '#10B981',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   assignedBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#10B981',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 2,
   },
-  userDetails: {
-    flex: 1,
+  ratingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    alignItems: 'flex-end',
+    gap: 6,
   },
-  applicantName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  ratingContainer: {
+  ratingStars: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     gap: 4,
   },
   ratingText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  completedText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  scoreContainer: {
-    alignItems: 'center',
-  },
-  scoreGradient: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    alignItems: 'center',
-    minWidth: 70,
-  },
-  scoreValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 2,
-  },
-  scoreLabel: {
-    fontSize: 12,
-    color: '#E0E7FF',
-    fontWeight: '500',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    gap: 8,
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 14,
     fontWeight: '700',
     color: '#1E293B',
-    marginTop: 6,
-    marginBottom: 4,
   },
-  statLabel: {
+  ratingCount: {
     fontSize: 12,
     color: '#64748B',
     fontWeight: '500',
   },
-  skillsContainer: {
-    marginBottom: 16,
+  scoreBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  sectionLabel: {
+  scoreText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  skillsList: {
+  scoreLabel: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  // Details Section
+  detailsSection: {
+    padding: 16,
+  },
+  nameAndPrice: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
     gap: 8,
   },
-  skillTag: {
-    paddingHorizontal: 12,
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+  },
+  proBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  proBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  bidAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  budgetText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  // Skill Badge
+  skillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    gap: 6,
+    marginBottom: 10,
   },
   skillText: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#6366F1',
   },
-  moreSkillsText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontStyle: 'italic',
-    alignSelf: 'center',
-    marginLeft: 4,
-  },
-  proposalContainer: {
-    marginBottom: 16,
-  },
-  proposalText: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  bidDetails: {
-    marginBottom: 16,
-  },
-  bidMeta: {
+  // Stats Row
+  statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
     marginBottom: 12,
   },
-  bidMetaItem: {
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  bidMetaText: {
-    fontSize: 14,
-    fontWeight: '500',
+  statText: {
+    fontSize: 12,
     color: '#64748B',
+    fontWeight: '500',
   },
+  // Message Container
+  messageContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
+  },
+  messageText: {
+    fontSize: 13,
+    color: '#475569',
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  // Performance Stats
+  performanceStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  performanceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  performanceText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  // Action Buttons
   actionButtons: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
   },
-  actionButton: {
+  messageButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 10,
+    borderRadius: 8,
     gap: 6,
-    minHeight: 44,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
   },
-  secondaryButton: {
+  messageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+  profileButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  secondaryButtonText: {
+  profileButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#475569',
   },
-  primaryButton: {
+  assignButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
   },
-  primaryButtonText: {
+  assignButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
   assignedButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#D1FAE5',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
@@ -1319,10 +1205,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#065F46',
   },
-  disabledButton: {
-    backgroundColor: '#9CA3AF',
-    opacity: 0.6,
-  },
+  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: 40,
@@ -1344,8 +1227,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
+    backgroundColor: '#F1F5F9',
     borderWidth: 2,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
   },
   emptyTitle: {
     fontSize: 20,
@@ -1362,56 +1246,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   shareButton: {
-    width: '100%',
-    marginBottom: 32,
-  },
-  shareButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#6366F1',
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     gap: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    width: '100%',
   },
   shareButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  tipsContainer: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  tipsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  tipItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 8,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-  },
+  // Assigned Tasker Card
   assignedTaskerCard: {
+    backgroundColor: '#FFFFFF',
     padding: 20,
     marginHorizontal: 16,
     marginTop: 16,
@@ -1443,6 +1295,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  assignedAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
   assignedUserInfo: {
     flex: 1,
   },
@@ -1455,13 +1312,24 @@ const styles = StyleSheet.create({
   assignedUserDetail: {
     fontSize: 14,
     color: '#64748B',
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  assignedBidAmount: {
+  assignedChatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  assignedChatText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#10B981',
+    color: '#FFFFFF',
   },
+  // Status Warning
   statusWarning: {
     flexDirection: 'row',
     alignItems: 'center',
