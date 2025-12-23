@@ -277,7 +277,7 @@ const TaskerCard = ({ tasker }) => {
         {/* Large Profile Image */}
         <View style={styles.profileImageContainer}>
           <Image
-            source={{ uri: tasker.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' }}
+            source={{ uri: tasker.profileImage || 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1766495900/DefaultiImagePlaceHolder_r6ai4x.jpg'}}
             style={styles.profileImage}
           />
           
@@ -328,13 +328,13 @@ const TaskerCard = ({ tasker }) => {
           <Text style={styles.hourlyRate}>{formatRate()}</Text>
         </View>
 
-        {/* Primary Skill */}
+        {/* Primary Skill 
         <View style={styles.skillBadge}>
           <Ionicons name="briefcase-outline" size={14} color={getServiceBadgeColor()} />
           <Text style={[styles.skillText, { color: getServiceBadgeColor() }]} numberOfLines={1}>
             {getPrimarySkill()}
           </Text>
-        </View>
+        </View>*/}
 
         {/* Location */}
         <View style={styles.locationRow}>

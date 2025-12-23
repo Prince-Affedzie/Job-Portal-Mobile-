@@ -106,7 +106,7 @@ const OfferCard = ({ offer, request, canAccept, hasAccepted, onAccept, onDecline
           {userData?.profileImage ? (
             <Image
               source={{ 
-                uri: userData.profileImage || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80' 
+                uri: userData.profileImage || 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1766495900/DefaultiImagePlaceHolder_r6ai4x.jpg'
               }}
               style={styles.profileImage}
             />

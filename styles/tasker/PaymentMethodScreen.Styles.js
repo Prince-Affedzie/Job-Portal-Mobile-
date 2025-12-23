@@ -1,98 +1,191 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions,Platform } from 'react-native';
 
 const { width } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
+
+
 
 export const styles = StyleSheet.create({
-  container: {
+ 
+  modalOverlay: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
+ modalContent: {
+  backgroundColor: '#FFFFFF',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  maxHeight: height * 0.9,    // ← Use maxHeight instead of fixed height
+  flex: 1,                    // ← Allow it to grow
+  justifyContent: 'space-between',
+},
 
-  // Header Add Button
-  addButton: {
+scrollContent: {
+  paddingHorizontal: 20,
+  paddingTop: 10,
+  paddingBottom: 20,          // Extra bottom padding for breathing room
+},
+
+modalActions: {
+  flexDirection: 'row',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderTopWidth: 1,
+  borderTopColor: '#F3F4F6',
+  backgroundColor: '#FFFFFF', // Ensure it's not transparent
+  gap: 12,
+  bottom:28,
+},
+modalContainer: {
+  flex: 1, // This will make the content area flexible
+  
+},
+modalScrollView: {
+  flex: 1,
+},
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
+    flex: 1,
   },
-  addButtonText: {
-    color: '#FFFFFF',
+  modalBackButton: {
+    marginRight: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+  },
+
+  paymentTypeInfo: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+  backgroundColor: '#F3F4F6',
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  borderRadius: 12,
+  minHeight: 52,
+},
+paymentTypeIcon: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: '#EEF2FF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 12,
+},
+paymentTypeText: {
+  fontSize: 16,
+  color: '#111827',
+  fontWeight: '500',
+  flex: 1,
+},
+onlyOptionBadge: {
+  backgroundColor: '#6366F1',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+},
+onlyOptionText: {
+  fontSize: 12,
+  color: '#FFFFFF',
+  fontWeight: '600',
+},
+paymentTypeDescription: {
+  fontSize: 14,
+  color: '#6B7280',
+  marginTop: 8,
+  marginLeft: 4,
+},
+
+  // Form Styles
+  formSection: {
+    marginBottom: 24,
+  },
+  formLabel: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+
+  // Type Selector
+  typeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    minHeight: 52,
+  },
+  typeSelectorLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  typePreviewIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  typePreviewText: {
+    fontSize: 16,
+    color: '#111827',
     fontWeight: '500',
   },
 
-  // Introduction Section
-  introSection: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  introTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  introDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  // Section Styles
-  section: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 16,
-  },
-
-  // Payment Method Card
-  paymentMethodCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  paymentMethodHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  paymentMethodInfo: {
+  // Provider Selector
+  providerSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    minHeight: 52,
   },
-  providerIcon: {
+  providerSelectorEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    minHeight: 52,
+  },
+  providerSelectorEmptyText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginLeft: 12,
+  },
+  providerPreviewIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -100,303 +193,212 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  paymentMethodDetails: {
+  providerPreviewInfo: {
     flex: 1,
   },
-  providerName: {
+  providerPreviewName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: '500',
+    color: '#111827',
     marginBottom: 2,
   },
-  accountNumber: {
-    fontSize: 14,
-    color: '#374151',
-    marginBottom: 2,
-  },
-  accountName: {
+  providerPreviewDescription: {
     fontSize: 12,
-    color: '#64748B',
-  },
-  defaultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  defaultBadgeText: {
-    fontSize: 12,
-    color: '#065F46',
-    fontWeight: '500',
-  },
-  paymentMethodActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  setDefaultButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  setDefaultText: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  editText: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  removeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  removeText: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontWeight: '500',
+    color: '#6B7280',
   },
 
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  emptyStateButton: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyStateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  // Security Section
-  securitySection: {
+  // Input Fields
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  securityText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  securityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#065F46',
-    marginBottom: 2,
-  },
-  securityDescription: {
-    fontSize: 12,
-    color: '#047857',
-    lineHeight: 16,
-  },
-
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
+    overflow: 'hidden',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  modalForm: {
-    padding: 20,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    marginBottom:28,
-    gap: 12,
-  },
-
-  // Form Styles
-  formSection: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
+  inputIcon: {
+    marginLeft: 16,
   },
   formInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 12,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#1E293B',
+    color: '#111827',
+    minHeight: 52,
+  },
+  inputHelper: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 6,
+    marginLeft: 4,
   },
 
-  // Type Options
-  typeOptions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  typeOption: {
-    flex: 1,
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-  },
-  typeOptionSelected: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
-  },
-  typeOptionText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  typeOptionTextSelected: {
-    color: '#6366F1',
-  },
-
-  // Provider Options
-  providerOptions: {
-    gap: 8,
-  },
-  providerOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  providerOptionSelected: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
-  },
-  providerOptionText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
-    marginLeft: 12,
-  },
-
-  // Toggle Styles
+  // Toggle
   toggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
+  },
+  toggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  toggleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   toggleText: {
     flex: 1,
   },
   toggleLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 2,
   },
   toggleDescription: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 18,
   },
 
-  // Button Styles
+  // Security Note
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F0FDF4',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    marginTop: 8,
+  },
+  securityNoteText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#065F46',
+    marginLeft: 12,
+    lineHeight: 20,
+  },
+
   cancelButton: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+    paddingVertical: 14,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
     alignItems: 'center',
   },
   cancelButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#64748B',
+    fontWeight: '600',
+    color: '#374151',
   },
   saveButton: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 14,
     backgroundColor: '#6366F1',
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   saveButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#A5B4FC',
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#FFFFFF',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+
+  // Dropdown Styles
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: height * 0.6,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  dropdownList: {
+    padding: 20,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dropdownProviderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dropdownTypeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  dropdownItemDescription: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });
