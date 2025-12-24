@@ -944,20 +944,6 @@ const TaskerProfileScreen = ({ navigation }) => {
               containerStyle={styles.formField}
             />
             
-            <ProfileField
-              label="Hourly Rate (₵)"
-              value={profileData.hourlyRate?.toString()}
-              editable={editingSections.personalInfo}
-              onChange={(text) => setProfileData({ 
-                ...profileData, 
-                hourlyRate: text.replace(/[^0-9]/g, '') 
-              })}
-              placeholder="0"
-              editing={editingSections.personalInfo}
-              setProfileData={setProfileData}
-              keyboardType="numeric"
-              containerStyle={styles.formField}
-            />
           </View>
 
           {/* Location Fields */}
