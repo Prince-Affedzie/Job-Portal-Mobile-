@@ -517,8 +517,8 @@ const AppliedTaskDetailsScreen = ({ route, navigation }) => {
           />
           {isAssignedToUser && !isTaskCompleted && (
             <TabButton
-              title="Employer"
-              icon="business-outline"
+              title="Client"
+              icon="person-outline"
               isActive={activeTab === 'employer'}
               onPress={() => setActiveTab('employer')}
             />
