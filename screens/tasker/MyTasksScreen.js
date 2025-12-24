@@ -401,48 +401,6 @@ const TaskerTasksScreen = () => {
         </View>
       </View>
 
-      {/* Stats Overview 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <MaterialIcons name="list-alt" size={20} color="#4F46E5" />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statValue}>{stats.total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statCard}>
-         <View style={styles.statIconContainer}>
-            <MaterialIcons name="check-circle" size={20} color="#10B981" />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statValue}>{stats.accepted}</Text>
-            <Text style={styles.statLabel}>Accepted</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <MaterialIcons name="pending" size={20} color="#F59E0B" />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statValue}>{stats.pending}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <MaterialIcons name="trending-up" size={20} color="#8B5CF6" />
-          </View>
-          <View style={styles.statContent}>
-            <Text style={styles.statValue}>{stats.successRate}%</Text>
-            <Text style={styles.statLabel}>Success Rate</Text>
-          </View>
-        </View>
-      </View>*/}
 
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
