@@ -915,6 +915,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 8,
+    borderRadius:34,
   },
   heroGradient: {
     padding: 20,

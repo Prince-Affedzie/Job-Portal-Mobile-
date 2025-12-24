@@ -337,7 +337,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
               <View style={styles.bidMetaItem}>
                 <Ionicons name="calendar" size={18} color="#6366F1" />
                 <Text style={styles.bidMetaLabel}>Timeline</Text>
-                <Text style={styles.bidMetaValue}>{bid.timeline} days</Text>
+                <Text style={styles.bidMetaValue}>{bid.timeline} </Text>
               </View>
               <View style={styles.bidMetaItem}>
                 <Ionicons name="time" size={18} color="#6366F1" />
@@ -672,17 +672,17 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Timeline (Days) *</Text>
+                  <Text style={styles.formLabel}>Timeline </Text>
                   <View style={styles.timelineInputContainer}>
                     <TextInput
                       style={styles.timelineInput}
                       value={editingBid.timeline}
                       onChangeText={(text) => setEditingBid(prev => ({ ...prev, timeline: text }))}
-                      placeholder="e.g., 3"
-                      keyboardType="numeric"
+                      placeholder="e.g., 3 hours"
+                     
                       editable={!updating}
                     />
-                    <Text style={styles.timelineSuffix}>days</Text>
+                    
                   </View>
                 </View>
 
