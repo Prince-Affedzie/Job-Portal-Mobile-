@@ -8,11 +8,12 @@ import {
   Image,
   Alert,
   RefreshControl,
+  SafeAreaView,
   Modal,
   TextInput,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from '../../component/tasker/Header';

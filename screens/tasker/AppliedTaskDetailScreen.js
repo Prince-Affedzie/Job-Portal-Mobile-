@@ -7,10 +7,11 @@ import {
   StyleSheet,
   Image,
   Alert,
+  SafeAreaView,
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from '../../component/tasker/Header';
@@ -41,7 +42,7 @@ const formatFullAddress = (address) => {
   return parts.join(', ');
 };
 
-const AppliedTaskDetailsScreen = ({ route, navigation }) => {
+   const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
