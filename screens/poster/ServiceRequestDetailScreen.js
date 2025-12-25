@@ -6,34 +6,30 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
-  Dimensions,
   Alert,
   RefreshControl,
-  Animated,
-  TouchableWithoutFeedback,
+  Modal,
+  TextInput,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons, MaterialIcons, FontAwesome, Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import {styles} from '../../styles/poster/ServiceRequestDetailsScreen.Styles'
+import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
 import ReportForm from '../../component/common/reportForm';
 import { AuthContext } from '../../context/AuthContext';
-import { ServiceRequestContext } from '../../context/ServiceRequestContext';
-import { navigate } from '../../services/navigationService'
-import LoadingIndicator from '../../component/common/LoadingIndicator';
-import RatingModal from '../../component/common/RatingModal';
-import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
-import {acceptOffer,markServiceDone} from '../../api/serviceRequestAPI/clientAPI'
+import { useServiceRequest } from '../../context/ServiceRequestContext';
+import { acceptOffer, markServiceDone } from '../../api/serviceRequestAPI/clientAPI';
 import { triggerPayment } from '../../services/PaymentServices';
 import { usePaystack } from "react-native-paystack-webview";
 import { startOrGetChatRoom } from '../../api/chatApi';
+import { navigate } from '../../services/navigationService';
+import LoadingIndicator from '../../component/common/LoadingIndicator';
+import RatingModal from '../../component/common/RatingModal';
+import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
 import ServiceRequestRefundNoticeCard from '../../component/client/ServiceRequestRefundNotificationCard';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const ServiceRequestDetailScreen = ({ route, navigation }) => {
   const { requestId } = route.params;
@@ -41,26 +37,12 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const { user } = useContext(AuthContext);
-  const { getServiceRequestDetails, updateServiceRequest } = useContext(ServiceRequestContext);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [fabExpanded, setFabExpanded] = useState(false);
-  const [fabAnimation] = useState(new Animated.Value(0));
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [headerScroll] = useState(new Animated.Value(0));
-  const { popup } = usePaystack();
+  const {getServiceRequestDetails} = useServiceRequest()
 
-  // Enhanced FAB animation
-  const toggleFAB = () => {
-    const toValue = fabExpanded ? 0 : 1;
-    setFabExpanded(!fabExpanded);
-    Animated.spring(fabAnimation, {
-      toValue,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 8,
-    }).start();
-  };
+  const { user } = useContext(AuthContext);
+  const { popup } = usePaystack();
 
   useEffect(() => {
     loadRequestDetails();
@@ -77,40 +59,31 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Error loading service request details:', error);
-      Alert.alert('Error', 'Failed to load service request details');
+      console.log(error)
+      Alert.alert('Error', 'Failed to load service request');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await loadRequestDetails();
+    loadRequestDetails();
   };
 
-  // NEW: Message Tasker Functionality
   const handleMessageTasker = async () => {
+    if (!request?.assignedTasker?._id) return;
     try {
-      if (!request?.assignedTasker?._id) {
-        Alert.alert('Error', 'Tasker information not available');
-        return;
-      }
-
-      const res = await startOrGetChatRoom({ 
-        userId2: request.assignedTasker._id, 
-        jobId: request._id 
+      const res = await startOrGetChatRoom({
+        userId2: request.assignedTasker._id,
+        jobId: request._id,
       });
-      
       if (res.status === 200) {
-        const roomId = res.data._id;
-        toggleFAB(); // Close FAB menu
-        navigate('ChatWindow', { roomId: roomId });
+        navigate('ChatWindow', { roomId: res.data._id });
       }
     } catch (error) {
-      console.error('Error starting chat:', error);
-      Alert.alert('Error', 'Failed to start chat with tasker');
+      Alert.alert('Error', 'Failed to start chat');
     }
   };
 
@@ -122,170 +95,110 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
     navigate('ServiceRequestOffers', {
       requestId: request._id,
       offers: request.offers || [],
-      request: request
+      request: request,
     });
   };
 
-  const handleMarkAsDone = async () => {
-    try {
-      Alert.alert(
-        "Mark as Done",
-        "Are you sure you want to mark this service request as completed? This will release payment to the tasker.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Mark as Done",
-            style: "default",
-            onPress: async () => {
-              const res = await markServiceDone(requestId);
-              if (res.status === 200) {
-                Alert.alert("Success", "Service request marked as completed!");
-                setTimeout(() => {
-                  setRatingModalVisible(true);
-                }, 750);
-                loadRequestDetails();
-              }
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error || 'Error marking service request as done';
-      console.error(errorMessage);
-      Alert.alert(errorMessage);
-    }
-  };
-
-  const handleReportPress = () => {
-    setShowReportModal(true);
-  };
-
-  const handleReportSubmitted = () => {
-    Alert.alert('Success', 'Your report has been submitted successfully!');
+  const handleViewSubmissions = () => {
+    navigation.navigate('TaskSubmissions', { taskId: request._id, taskTitle: request.type });
   };
 
   const handleAcceptOffer = async (offer) => {
-    try {
-      Alert.alert(
-        "Accept Offer",
-         `Accept ${offer.tasker?.name || 'tasker'}'s offer of ₵${offer.amount}?
+    Alert.alert(
+      "Accept Offer",
+      `Accept ${offer.tasker?.name || 'tasker'}'s offer of ₵${offer.amount}?\n\nPayment will be held securely in escrow until completion.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Accept & Pay",
+          onPress: async () => {
+            const paymentSuccess = await triggerPayment({
+              popup,
+              email: user.email,
+              phone: user.phone,
+              amount: offer.amount,
+              taskId: requestId,
+              beneficiary: offer.tasker._id,
+            });
 
-Your payment of ₵${offer.amount} will be securely held in escrow and only released to ${offer.tasker?.name || 'the tasker'}
-once you both confirm the task is completed satisfactorily.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Accept Offer",
-            style: "default",
-            onPress: async () => {
-              let paymentSuccess = true;
-                  paymentSuccess = await triggerPayment({
-                  popup,
-                  email: user.email,
-                  phone: user.phone,
-                  amount: offer.amount,
-                  taskId: requestId,
-                  beneficiary:offer.tasker._id,
-                  });
-                                            
-                  if (!paymentSuccess) {
-                   Alert.alert(
-                  "Payment Not Completed",
-                  "Task assignment has been cancelled since payment was not successful."
-                   );
-                  return; 
-                  }
-                             
-              const res = await acceptOffer(requestId,offer._id);
+            if (!paymentSuccess) {
+              Alert.alert("Payment Failed", "Offer acceptance cancelled.");
+              return;
+            }
+
+            try {
+              const res = await acceptOffer(requestId, offer._id);
               if (res.status === 200) {
-                Alert.alert("Success", "Offer accepted successfully!");
+                Alert.alert("Success", "Offer accepted! Tasker assigned.");
                 loadRequestDetails();
               }
+            } catch (err) {
+              Alert.alert("Error", "Failed to accept offer");
             }
-          }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error || 'Error accepting offer';
-      Alert.alert("Error", errorMessage);
-    }
+          },
+        },
+      ]
+    );
   };
 
+  const handleMarkAsDone = async () => {
+    Alert.alert(
+      "Mark as Done",
+      "This will release payment to the tasker.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm & Release",
+          onPress: async () => {
+            const res = await markServiceDone(requestId);
+            if (res.status === 200) {
+              Alert.alert("Success", "Service marked as completed!");
+              setTimeout(() => setRatingModalVisible(true), 800);
+              loadRequestDetails();
+            }
+          },
+        },
+      ]
+    );
+  };
 
-  const handleViewSubmissions = () => {
-      navigation.navigate('TaskSubmissions', { taskId: request._id, taskTitle: request.type });
-    };
+  const formatDate = (date) => moment(date).format("MMM D, YYYY");
+  const formatFullAddress = (address) =>
+    !address || (!address.region && !address.city && !address.suburb)
+      ? "Remote"
+      : [address.region, address.city, address.suburb].filter(Boolean).join(', ');
 
   const getStatusColor = (status) => {
-    const colors = {
-      'pending': '#F97316',
-      'quoted': '#8B5CF6',
-      'booked': '#3B82F6',
+    const map = {
+      pending: '#F97316',
+      quoted: '#8B5CF6',
+      booked: '#3B82F6',
       'in-progress': '#F59E0B',
-      'review': '#8B5CF6',
-      'completed': '#10B981',
-      'closed': '#6B7280',
-      'canceled': '#EF4444'
+      review: '#8B5CF6',
+      completed: '#10B981',
+      closed: '#6B7280',
+      canceled: '#EF4444',
     };
-    return colors[status?.toLowerCase()] || '#6B7280';
-  };
-
-  const getStatusIcon = (status) => {
-    const icons = {
-      'pending': 'time',
-      'quoted': 'chatbubble',
-      'booked': 'bookmark',
-      'in-progress': 'timer',
-      'review': 'eye',
-      'completed': 'checkmark-circle',
-      'closed': 'lock-closed',
-      'canceled': 'close-circle'
-    };
-    return icons[status?.toLowerCase()] || 'help-circle';
-  };
-
-  const formatDate = (date) => {
-    return moment(date).format("MMM DD, YYYY");
-  };
-
-  const formatDateTime = (date) => {
-    return moment(date).format("MMM DD, YYYY [at] h:mm A");
+    return map[status?.toLowerCase()] || '#6B7280';
   };
 
   const getUrgencyColor = (urgency) => {
-    const colors = {
-      'flexible': '#10B981',
-      'urgent': '#EF4444',
-      'scheduled': '#3B82F6'
-    };
-    return colors[urgency] || '#6B7280';
+    const map = { flexible: '#10B981', urgent: '#EF4444', scheduled: '#3B82F6' };
+    return map[urgency] || '#6B7280';
   };
 
   const hasOffers = request?.offers && request.offers.length > 0;
-  const isAssigned = request?.assignedTasker && !['Pending', 'Canceled'].includes(request.status);
+  const isAssigned = request?.assignedTasker && request.status !== 'Pending';
   const isCompleted = request?.status?.toLowerCase() === 'completed';
-  const canMarkAsDone = isAssigned && !isCompleted && request?.markedDoneByEmployer === false;
-  const hasActiveOffers = hasOffers && request.status === 'Pending';
-  
-  // NEW: Check if client can message tasker
+  const canMarkAsDone = isAssigned && !isCompleted && !request?.markedDoneByEmployer;
   const canMessageTasker = isAssigned && !isCompleted;
-
-  // Header animation values
-  const headerOpacity = headerScroll.interpolate({
-    inputRange: [0, 100],
-    outputRange: [1, 0],
-    extrapolate: 'clamp'
-  });
+  const canViewSubmissions = isAssigned ;
 
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.scrollView}>
-          <Header title="Service Request" showBackButton={true} />
-          <LoadingIndicator text='Loading Service Request Details...' />
-        </View>
+        <Header title="Service Request" showBackButton />
+        <LoadingIndicator text="Loading request..." />
       </SafeAreaView>
     );
   }
@@ -293,780 +206,381 @@ once you both confirm the task is completed satisfactorily.`,
   if (!request) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView}>
-          <Header title="Service Request" showBackButton={true} />
-          <View style={styles.errorContainer}>
-            <Ionicons name="sad-outline" size={64} color="#94A3B8" />
-            <Text style={styles.errorTitle}>Request Not Found</Text>
-            <Text style={styles.errorSubtitle}>
-              The service request you're looking for doesn't exist or has been removed.
-            </Text>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-              <Text style={styles.backButtonText}>Go Back</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        <Header title="Service Request" showBackButton />
+        <View style={styles.emptyState}>
+          <Ionicons name="briefcase-outline" size={80} color="#CBD5E1" />
+          <Text style={styles.emptyTitle}>Request Not Found</Text>
+          <Text style={styles.emptySubtitle}>This service request may have been removed.</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
 
-  // Enhanced Components
-  const TabButton = ({ title, icon, isActive, onPress, badge }) => (
-    <TouchableOpacity
-      style={[styles.tabButton, isActive && styles.tabButtonActive]}
-      onPress={onPress}
-    >
-      <View style={styles.tabIconContainer}>
-        <Ionicons
-          name={icon}
-          size={20}
-          color={isActive ? '#FFFFFF' : '#6B7280'}
-        />
-        {badge && (
-          <View style={styles.tabBadge}>
-            <Text style={styles.tabBadgeText}>{badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const InfoCard = ({ icon, title, value, color = '#6366F1', subtitle }) => (
-    <View style={styles.infoCard}>
-      <LinearGradient
-        colors={[color + '20', color + '10']}
-        style={[styles.infoIcon, { borderColor: color + '40' }]}
-      >
-        <Ionicons name={icon} size={20} color={color} />
-      </LinearGradient>
-      <View style={styles.infoContent}>
-        <Text style={styles.infoTitle}>{title}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
-        {subtitle && <Text style={styles.infoSubtitle}>{subtitle}</Text>}
-      </View>
-    </View>
-  );
-
-  const ProgressStep = ({ completed, current, label, date }) => (
-    <View style={styles.progressStep}>
-      <View style={[
-        styles.progressDot,
-        completed && styles.progressDotCompleted,
-        current && styles.progressDotCurrent
-      ]}>
-        {completed && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-      </View>
-      <View style={styles.progressContent}>
-        <Text style={[
-          styles.progressLabel,
-          completed && styles.progressLabelCompleted,
-          current && styles.progressLabelCurrent
-        ]}>
-          {label}
-        </Text>
-        {date && (
-          <Text style={styles.progressDate}>
-            {formatDateTime(date)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const OfferItem = ({ offer, index }) => (
-    <View style={styles.offerCard}>
-      <View style={styles.offerHeader}>
-        <View style={styles.offerTaskerInfo}>
-          <View style={styles.offerAvatar}>
-            {offer.tasker?.profileImage ? (
-              <Image
-                source={{ uri: offer.tasker.profileImage }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <Text style={styles.avatarText}>
-                {offer.tasker?.name?.charAt(0)?.toUpperCase() || 'T'}
-              </Text>
-            )}
-          </View>
-          <View style={styles.offerTaskerDetails}>
-            <Text style={styles.offerTaskerName}>
-              {offer.tasker?.name || 'Tasker'}
-            </Text>
-            <Text style={styles.offerTaskerRating}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              {offer.tasker?.rating?.toFixed(1) || 'N/A'}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.offerAmount}>₵{offer.amount}</Text>
-      </View>
-      
-      {offer.message && (
-        <Text style={styles.offerMessage}>{offer.message}</Text>
-      )}
-      
-      <View style={styles.offerFooter}>
-        <Text style={styles.offerDate}>
-          {formatDateTime(offer.createdAt)}
-        </Text>
-        {request.status === 'Pending' && (
-          <TouchableOpacity
-            style={styles.acceptOfferButton}
-            onPress={() => handleAcceptOffer(offer)}
-          >
-            <Text style={styles.acceptOfferText}>Accept Offer</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-  );
-
-  const RequirementItem = ({ requirement, index }) => (
-    <View style={styles.requirementItem}>
-      <View style={styles.requirementBullet}>
-        <Ionicons name="ellipse" size={8} color="#10B981" />
-      </View>
-      <Text style={styles.requirementText}>{requirement}</Text>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Service Request" showBackButton={true} transparent />
+      <Header title={request.type} showBackButton />
+
       <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: headerScroll } } }],
-          { useNativeDriver: false }
-        )}
-        scrollEventThrottle={16}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.scrollContent}
       >
-        
-        {/* Main Content */}
-        <View style={styles.content}>
-
-          {/* Enhanced Request Header Card */}
-          <View style={styles.heroCard}>
-            <LinearGradient
-              colors={['#1A1F3B', '#2D1B69']}
-              style={styles.heroGradient}
-            >
-              <View style={styles.heroHeader}>
-                <View style={styles.heroTitleContainer}>
-                  <Text style={styles.heroTitle} numberOfLines={2}>{request.type}</Text>
-                  <View style={styles.heroMeta}>
-                    <View style={styles.heroMetaItem}>
-                      <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(request.status) }]} />
-                      <Text style={styles.heroMetaText}>Status: {request.status}</Text>
-                    </View>
-                    <View style={styles.heroMetaItem}>
-                      <Ionicons name="calendar-outline" size={14} color="#E0E7FF" />
-                      <Text style={styles.heroMetaText}>Posted {formatDate(request.createdAt)}</Text>
-                    </View>
-                    {request.preferredDate && (
-                      <View style={styles.heroMetaItem}>
-                        <Ionicons name="time-outline" size={14} color="#E0E7FF" />
-                        <Text style={styles.heroMetaText}>Preferred {formatDate(request.preferredDate)}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.heroEditButton}
-                  onPress={handleEditRequest}
-                >
-                  <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Quick Stats */}
-              <View style={styles.quickStats}>
-                <View style={styles.quickStat}>
-                  <Text style={styles.quickStatValue}>{request.offers?.length || 0}</Text>
-                  <Text style={styles.quickStatLabel}>Offers</Text>
-                </View>
-               
-                <View style={styles.quickStat}>
-                  <Text style={styles.quickStatValue}>
-                    {request.budget ? `₵${request.budget}` : 'Flexible'}
-                  </Text>
-                  <Text style={styles.quickStatLabel}>Budget</Text>
-                </View>
-                
-                <View style={styles.quickStat}>
-                  <View style={[
-                    styles.urgencyBadge,
-                    { backgroundColor: getUrgencyColor(request.urgency) + '40' }
-                  ]}>
-                    <Text style={[
-                      styles.urgencyText,
-                      { color: getUrgencyColor(request.urgency) }
-                    ]}>
-                      {request.urgency}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
+        {/* Hero */}
+        <View style={styles.heroCard}>
+          <Text style={styles.title}>{request.type}</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor(request.status) }]} />
+            <Text style={styles.statusText}>{request.status.replace('-', ' ')}</Text>
+            {isAssigned && <Text style={styles.assignedBadge}>• Assigned</Text>}
+            {hasOffers && !isAssigned && <Text style={styles.pendingBadge}>• Offers Received</Text>}
+            <Text style={styles.metaText}>• Posted {formatDate(request.createdAt)}</Text>
           </View>
+        </View>
 
-          {/* Enhanced Completion Status */}
-          
-          {isAssigned && (
-            <View style={styles.completionCard}>
-              <Text style={styles.completionTitle}>Completion Progress</Text>
-              <View style={styles.progressContainer}>
-                <ProgressStep
-                  completed={request.markedDoneByEmployer}
-                  current={!request.markedDoneByEmployer && !request.markedDoneByTasker}
-                  label="You marked as done"
-                  date={request.employerDoneAt}
-                />
-                <View style={styles.progressLine} />
-                <ProgressStep
-                  completed={request.markedDoneByTasker}
-                  current={request.markedDoneByEmployer && !request.markedDoneByTasker}
-                  label="Tasker marked as done"
-                  date={request.taskerDoneAt}
-                />
-              </View>
+        
 
-              {request.markedDoneByEmployer && request.markedDoneByTasker && (
-                <View style={styles.mutualCompletion}>
-                  <Ionicons name="checkmark-done" size={20} color="#10B981" />
-                  <Text style={styles.mutualCompletionText}>
-                    Service completed successfully!
-                  </Text>
+        {/* Info Grid */}
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Ionicons name="cash-outline" size={28} color="#10B981" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Budget</Text>
+              <Text style={styles.infoValue}>{request.budget ? `₵${request.budget}` : 'Flexible'}</Text>
+            </View>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="calendar-outline" size={28} color="#F59E0B" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Preferred Date</Text>
+              <Text style={styles.infoValue}>{request.preferredDate ? formatDate(request.preferredDate) : 'Flexible'}</Text>
+            </View>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="location-outline" size={28} color="#6366F1" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Location</Text>
+              <Text style={styles.infoValue}>{formatFullAddress(request.address)}</Text>
+            </View>
+          </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="speedometer-outline" size={28} color={getUrgencyColor(request.urgency)} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Urgency</Text>
+              <Text style={styles.infoValue}>{request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Horizontal Scrollable Tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollContainer}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+              onPress={() => setActiveTab('overview')}
+            >
+              <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
+            </TouchableOpacity>
+
+            {hasOffers && !isAssigned && (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'offers' && styles.activeTab]}
+                onPress={() => setActiveTab('offers')}
+              >
+                <Text style={[styles.tabText, activeTab === 'offers' && styles.activeTabText]}>
+                  Offers ({request.offers.length})
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {isAssigned && (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'tasker' && styles.activeTab]}
+                onPress={() => setActiveTab('tasker')}
+              >
+                <Text style={[styles.tabText, activeTab === 'tasker' && styles.activeTabText]}>Tasker</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'requirements' && styles.activeTab]}
+              onPress={() => setActiveTab('requirements')}
+            >
+              <Text style={[styles.tabText, activeTab === 'requirements' && styles.activeTabText]}>Requirements</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        {/* Tab Content */}
+        <View style={styles.tabContent}>
+          {activeTab === 'overview' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.description}>{request.description}</Text>
+              <MediaDisplay media={request.media} />
+            </View>
+          )}
+
+          {activeTab === 'offers' && hasOffers && !isAssigned && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Offers Received</Text>
+              {request.offers.map((offer, i) => (
+                <View key={i} style={styles.offerItem}>
+                  <View style={styles.offerHeader}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarInitial}>
+                        {offer.tasker?.name?.[0]?.toUpperCase() || 'T'}
+                      </Text>
+                    </View>
+                    <View style={styles.offerInfo}>
+                      <Text style={styles.offerName}>{offer.tasker?.name || 'Tasker'}</Text>
+                      <Text style={styles.offerRating}>★ {offer.tasker?.rating?.toFixed(1) || 'New'}</Text>
+                    </View>
+                    <Text style={styles.offerAmount}>₵{offer.amount}</Text>
+                  </View>
+                  {offer.message && <Text style={styles.offerMessage}>"{offer.message}"</Text>}
+                  <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAcceptOffer(offer)}>
+                    <Text style={styles.acceptText}>Accept Offer</Text>
+                  </TouchableOpacity>
                 </View>
+              ))}
+            </View>
+          )}
+
+          {activeTab === 'tasker' && isAssigned && request.assignedTasker && (
+  <View style={styles.sectionCard}>
+    <Text style={styles.sectionTitle}>Assigned Tasker</Text>
+    <TouchableOpacity
+      style={styles.taskerProfile}
+      onPress={() => navigate('ApplicantProfile', { applicant: request.assignedTasker, requestId })}
+    >
+      <View style={styles.taskerHeader}>
+        <View style={styles.avatarContainer}>
+          {request.assignedTasker.profileImage ? (
+            <Image 
+              source={{ uri: request.assignedTasker.profileImage }} 
+              style={styles.avatarImage} 
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitial}>
+                {request.assignedTasker.name?.[0]?.toUpperCase() || 'T'}
+              </Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.taskerBasicInfo}>
+          <Text style={styles.taskerName}>{request.assignedTasker.name}</Text>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={16} color="#F59E0B" />
+            <Text style={styles.ratingText}>
+              {request.assignedTasker.rating?.toFixed(1) || 'New'} 
+              {request.assignedTasker.numberOfRatings ? 
+                ` (${request.assignedTasker.numberOfRatings} reviews)` : 
+                ' (No reviews yet)'
+              }
+            </Text>
+          </View>
+          {request.assignedTasker.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              <Text style={styles.verifiedText}>Verified Tasker</Text>
+            </View>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+      </View>
+
+      {/* Tasker Contact Information */}
+      <View style={styles.contactInfoSection}>
+        {request.assignedTasker.email && (
+          <View style={styles.contactRow}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="mail" size={16} color="#6366F1" />
+            </View>
+            <View style={styles.contactDetails}>
+              <Text style={styles.contactLabel}>Email</Text>
+              <Text style={styles.contactValue}>{request.assignedTasker.email}</Text>
+            </View>
+          </View>
+        )}
+
+        {request.assignedTasker.phone && (
+          <View style={styles.contactRow}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="call" size={16} color="#6366F1" />
+            </View>
+            <View style={styles.contactDetails}>
+              <Text style={styles.contactLabel}>Phone</Text>
+              <Text style={styles.contactValue}>{request.assignedTasker.phone}</Text>
+            </View>
+          </View>
+        )}
+
+        {request.assignedTasker.bio && (
+          <View style={styles.contactRow}>
+            <View style={styles.contactIcon}>
+              <Ionicons name="information-circle" size={16} color="#6366F1" />
+            </View>
+            <View style={styles.contactDetails}>
+              <Text style={styles.contactLabel}>About</Text>
+              <Text style={styles.contactValue} numberOfLines={3}>
+                {request.assignedTasker.bio}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {request.assignedTasker.skills && request.assignedTasker.skills.length > 0 && (
+          <View style={styles.skillsContainer}>
+            <Text style={styles.skillsLabel}>Skills:</Text>
+            <View style={styles.skillsList}>
+              {request.assignedTasker.skills.slice(0, 3).map((skill, index) => (
+                <View key={index} style={styles.skillTag}>
+                  <Text style={styles.skillText}>{skill}</Text>
+                </View>
+              ))}
+              {request.assignedTasker.skills.length > 3 && (
+                <Text style={styles.moreSkillsText}>
+                  +{request.assignedTasker.skills.length - 3} more
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        <Text style={styles.viewProfileText}>
+          Tap to view full profile and portfolio →
+        </Text>
+      </View>
+    </TouchableOpacity>
+  </View>
+)}
+          {activeTab === 'requirements' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Requirements</Text>
+              {(request.requirements || []).length > 0 ? (
+                request.requirements.map((req, i) => (
+                  <View key={i} style={styles.reqItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.reqText}>{req}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.placeholderText}>No specific requirements listed.</Text>
               )}
             </View>
           )}
-
-          {/* Enhanced Tab Navigation */}
-          <View style={styles.tabContainer}>
-            <TabButton
-              title="Overview"
-              icon="document-text-outline"
-              isActive={activeTab === 'overview'}
-              onPress={() => setActiveTab('overview')}
-            />
-            {hasOffers && !isAssigned &&(
-              <TabButton
-                title="Offers"
-                icon="chatbubble-outline"
-                isActive={activeTab === 'offers'}
-                onPress={() => setActiveTab('offers')}
-                badge={request.offers?.length || null}
-              />
-            )}
-            {isAssigned && (
-              <TabButton
-                title="Tasker"
-                icon="person-outline"
-                isActive={activeTab === 'tasker'}
-                onPress={() => setActiveTab('tasker')}
-                badge={request.assignedTasker ? "1" : null}
-              />
-            )}
-            <TabButton
-              title="Requirements"
-              icon="checkmark-done-outline"
-              isActive={activeTab === 'requirements'}
-              onPress={() => setActiveTab('requirements')}
-              badge={request.requirements?.length || null}
-            />
-          </View>
-
-          {/* Tab Content */}
-          <View style={styles.tabContent}>
-            {activeTab === 'overview' && (
-              <>
-                {/* Enhanced Request Overview */}
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="information-circle" size={22} color="#6366F1" />
-                    <Text style={styles.sectionTitle}>Service Description</Text>
-                  </View>
-                  <Text style={styles.taskDescription}>{request.description}</Text>
-                  
-                  {/* Media Display */}
-                  <MediaDisplay media={request.media} />
-
-                  {/* Key Information Grid */}
-                  <View style={styles.infoGrid}>
-                    <InfoCard
-                      icon="cash-outline"
-                      title="Budget"
-                      value={request.budget ? `₵${request.budget}` : 'Flexible'}
-                      color="#10B981"
-                      subtitle={request.finalCost ? `Final: ₵${request.finalCost}` : 'Estimated'}
-                    />
-                    
-                    {request.preferredDate && (
-                      <InfoCard
-                        icon="calendar-outline"
-                        title="Preferred Date"
-                        value={formatDate(request.preferredDate)}
-                        color="#F59E0B"
-                        subtitle={request.preferredTime || 'Any time'}
-                      />
-                    )}
-                    
-                    <InfoCard
-                      icon="location-outline"
-                      title="Location"
-                      value={request.address?.city || request.address?.region || 'Not specified'}
-                      color="#6366F1"
-                      subtitle={request.address?.suburb || 'Location details'}
-                    />
-                    
-                    <InfoCard
-                      icon="speedometer-outline"
-                      title="Urgency"
-                      value={request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1)}
-                      color={getUrgencyColor(request.urgency)}
-                      subtitle="Service priority"
-                    />
-                  </View>
-                </View>
-
-                {/* Enhanced Timeline */}
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="time-outline" size={22} color="#6366F1" />
-                    <Text style={styles.sectionTitle}>Timeline</Text>
-                  </View>
-                  <View style={styles.timeline}>
-                    <View style={styles.timelineItem}>
-                      <View style={styles.timelineDot} />
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Request Created</Text>
-                        <Text style={styles.timelineDate}>{formatDateTime(request.createdAt)}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.timelineConnector} />
-                    {request.preferredDate && (
-                      <>
-                        <View style={styles.timelineItem}>
-                          <View style={styles.timelineDot} />
-                          <View style={styles.timelineContent}>
-                            <Text style={styles.timelineLabel}>Preferred Date</Text>
-                            <Text style={styles.timelineDate}>{formatDateTime(request.preferredDate)}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.timelineConnector} />
-                      </>
-                    )}
-                    <View style={styles.timelineItem}>
-                      <View style={styles.timelineDot} />
-                      <View style={styles.timelineContent}>
-                        <Text style={styles.timelineLabel}>Last Updated</Text>
-                        <Text style={styles.timelineDate}>{formatDateTime(request.updatedAt)}</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </>
-            )}
-
-            {activeTab === 'offers' && hasOffers && (
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="chatbubble" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>
-                    Received Offers ({request.offers.length})
-                  </Text>
-                </View>
-
-                <View style={styles.offersList}>
-                  {request.offers.map((offer, index) => (
-                    <OfferItem key={offer._id || index} offer={offer} index={index} />
-                  ))}
-                </View>
-
-                {request.status === 'Pending' && (
-                  <View style={styles.offersNote}>
-                    <Ionicons name="information-circle" size={16} color="#6366F1" />
-                    <Text style={styles.offersNoteText}>
-                      Accept an offer to assign a tasker to your service request.
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {activeTab === 'tasker' && isAssigned && request.assignedTasker && (
-              <TouchableOpacity
-                onPress={() => navigate('ApplicantProfile', { applicant: request.assignedTasker, requestId })}
-                style={styles.sectionCard}
-              >
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="person" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>Assigned Tasker</Text>
-                </View>
-
-                <View style={styles.taskerCard}>
-                  <View style={styles.taskerHeader}>
-                    <View style={styles.taskerAvatar}>
-                      {request.assignedTasker.profileImage ? (
-                        <Image
-                          source={{ uri: request.assignedTasker.profileImage }}
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <Text style={styles.avatarText}>
-                          {request.assignedTasker.name?.charAt(0)?.toUpperCase() || 'T'}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.taskerInfo}>
-                      <Text style={styles.taskerName}>
-                        {request.assignedTasker.name || 'Tasker'}
-                      </Text>
-                      <Text style={styles.taskerEmail}>
-                        {request.assignedTasker.email}
-                      </Text>
-                      {request.assignedTasker.phone && (
-                        <Text style={styles.taskerPhone}>
-                          {request.assignedTasker.phone}
-                        </Text>
-                      )}
-                    </View>
-                    <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-                  </View>
-
-                  <View style={styles.taskerStats}>
-                    <View style={styles.taskerStat}>
-                      <Ionicons name="star" size={16} color="#F59E0B" />
-                      <Text style={styles.taskerStatValue}>
-                        {request.assignedTasker.rating?.toFixed(1) || 'N/A'}
-                      </Text>
-                      <Text style={styles.taskerStatLabel}>Rating</Text>
-                    </View>
-                    <View style={styles.taskerStat}>
-                      <Ionicons name="checkmark-done" size={16} color="#10B981" />
-                      <Text style={styles.taskerStatValue}>
-                        {request.assignedTasker.completedTasks || '0'}
-                      </Text>
-                      <Text style={styles.taskerStatLabel}>Completed</Text>
-                    </View>
-                    <View style={styles.taskerStat}>
-                      <Ionicons name="trending-up" size={16} color="#6366F1" />
-                      <Text style={styles.taskerStatValue}>
-                        {request.assignedTasker.completionRate ? `${request.assignedTasker.completionRate}%` : 'N/A'}
-                      </Text>
-                      <Text style={styles.taskerStatLabel}>Success Rate</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-
-            {activeTab === 'requirements' && (
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="checkmark-done" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>Service Requirements</Text>
-                </View>
-
-                {/* Requirements Section */}
-                <View style={styles.requirementsSection}>
-                  <Text style={styles.subsectionTitle}>Specific Requirements</Text>
-                  <View style={styles.requirementsList}>
-                    {request.requirements && request.requirements.length > 0 ? (
-                      request.requirements.map((requirement, index) => (
-                        <RequirementItem 
-                          key={index} 
-                          requirement={requirement} 
-                          index={index} 
-                        />
-                      ))
-                    ) : (
-                      <Text style={styles.noRequirementsText}>
-                        No specific requirements listed. Taskers will contact you for details.
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Service Type Information */}
-                <View style={styles.serviceTypeSection}>
-                  <Text style={styles.subsectionTitle}>Service Type</Text>
-                  <View style={styles.serviceTypeCard}>
-                    <Ionicons name="build-outline" size={20} color="#6366F1" />
-                    <Text style={styles.serviceTypeText}>{request.type}</Text>
-                  </View>
-                </View>
-
-                {/* Funding Status */}
-                {request.funded !== undefined && (
-                  <View style={styles.fundingSection}>
-                    <Ionicons 
-                      name={request.funded ? "checkmark-circle" : "time-outline"} 
-                      size={20} 
-                      color={request.funded ? "#10B981" : "#F59E0B"} 
-                    />
-                    <View style={styles.fundingContent}>
-                      <Text style={styles.fundingTitle}>
-                        {request.funded ? 'Payment Secured' : 'Payment Pending'}
-                      </Text>
-                      <Text style={styles.fundingText}>
-                        {request.funded 
-                          ? 'Your payment is secured and ready for release upon completion.'
-                          : 'Payment will be processed once you accept an offer.'
-                        }
-                      </Text>
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Enhanced Offers Preview */}
-          {hasActiveOffers && (
-            <View style={styles.offersPreview}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="chatbubble" size={22} color="#6366F1" />
-                <Text style={styles.sectionTitle}>Recent Offers</Text>
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  onPress={handleViewOffers}
-                >
-                  <Text style={styles.viewAllText}>View All</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#6366F1" />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.offersScroll}
-              >
-                {request.offers.slice(0, 3).map((offer, index) => (
-                  <View key={index} style={styles.offerPreviewCard}>
-                    <View style={styles.offerPreviewAvatar}>
-                      <Text style={styles.offerPreviewAvatarText}>
-                        {offer.tasker?.name?.charAt(0)?.toUpperCase() || 'T'}
-                      </Text>
-                    </View>
-                    <Text style={styles.offerPreviewName} numberOfLines={1}>
-                      {offer.tasker?.name || 'Tasker'}
-                    </Text>
-                    <Text style={styles.offerPreviewAmount}>₵{offer.amount}</Text>
-                    <Text style={styles.offerPreviewDate}>
-                      {offer.createdAt ? moment(offer.createdAt).fromNow() : 'Recently'}
-                    </Text>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          )}
         </View>
-      
-      </ScrollView>
-      <ServiceRequestRefundNoticeCard serviceRequest={request} isTaskOwner={true}/>
-      {/* Enhanced FAB with Message Tasker Functionality */}
-      <View style={styles.fabContainer}>
-        {/* Backdrop */}
-        {fabExpanded && (
-          <TouchableWithoutFeedback onPress={toggleFAB}>
-            <View style={styles.fabBackdrop} />
-          </TouchableWithoutFeedback>
+
+        {/* Completion Progress */}
+        {isAssigned && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Completion Progress</Text>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressStep}>
+                <View style={[styles.progressDot, request.markedDoneByEmployer && styles.progressDotCompleted]}>
+                  {request.markedDoneByEmployer && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                </View>
+                <Text style={[styles.progressLabel, request.markedDoneByEmployer && styles.progressLabelCompleted]}>
+                  You marked as done
+                </Text>
+              </View>
+              <View style={styles.progressLine} />
+              <View style={styles.progressStep}>
+                <View style={[styles.progressDot, request.markedDoneByTasker && styles.progressDotCompleted]}>
+                  {request.markedDoneByTasker && <Ionicons name="checkmark" size={14} color="#FFF" />}
+                </View>
+                <Text style={[styles.progressLabel, request.markedDoneByTasker && styles.progressLabelCompleted]}>
+                  Tasker marked as done
+                </Text>
+              </View>
+            </View>
+            {request.markedDoneByEmployer && request.markedDoneByTasker && (
+              <View style={styles.completionSuccess}>
+                <Ionicons name="checkmark-done" size={24} color="#10B981" />
+                <Text style={styles.completionText}>Service Completed!</Text>
+              </View>
+            )}
+          </View>
         )}
 
-        {/* Action Buttons with Improved Staggering */}
-        <Animated.View
-          style={[
-            styles.fabActionButtons,
-            {
-              opacity: fabAnimation,
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [80, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          {/* NEW: Message Tasker Button - Top Priority */}
+        {/* Safety Guidelines */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Safety Guidelines</Text>
+          <View style={styles.safetyGrid}>
+            <View style={styles.safetyItemRed}>
+              <Ionicons name="warning" size={24} color="#DC2626" />
+              <Text style={styles.safetyText}>Never pay outside the platform</Text>
+            </View>
+            <View style={styles.safetyItemBlue}>
+              <Ionicons name="location" size={24} color="#2563EB" />
+              <Text style={styles.safetyText}>Meet in safe, public places</Text>
+            </View>
+            <View style={styles.safetyItemGreen}>
+              <Ionicons name="chatbubble" size={24} color="#059669" />
+              <Text style={styles.safetyText}>Keep communication here</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+      {/* Funding Notice */}
+        <ServiceRequestRefundNoticeCard serviceRequest={request} isTaskOwner={true} />
+
+      {/* Bottom Action Bar */}
+      <View style={styles.bottomBar}>
+        <View style={styles.primaryActions}>
           {canMessageTasker && (
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <TouchableOpacity
-                style={[styles.fabActionButton, styles.fabMessage]}
-                onPress={handleMessageTasker}
-              >
-                  <Ionicons name="chatbubble-ellipses" size={20} color="#FFFFFF" />
-                  <Text style={styles.fabMessageText}>Message Tasker</Text>
-                
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-
-          {hasOffers && request.status === 'Pending' && (
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [25, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <TouchableOpacity
-                style={[styles.fabActionButton, styles.fabOffers]}
-                onPress={() => {
-                  toggleFAB();
-                  handleViewOffers();
-                }}
-              >
-                <Ionicons name="chatbubble" size={20} color="#FFFFFF" />
-                <Text style={styles.fabActionText}>
-                  Offers ({request.offers?.length || 0})
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-
-          <Animated.View style={{
-            transform: [{
-              translateY: fabAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0]
-              })
-            }],
-            opacity: fabAnimation
-          }}>
-            <TouchableOpacity
-              style={[styles.fabActionButton, styles.fabEdit]}
-              onPress={() => {
-                toggleFAB();
-                handleEditRequest();
-              }}
-            >
-              <Ionicons name="create" size={20} color="#FFFFFF" />
-              <Text style={styles.fabActionText}>Edit Request</Text>
+            <TouchableOpacity style={[styles.primaryBtn, styles.messageBtn]} onPress={handleMessageTasker}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Message Tasker</Text>
             </TouchableOpacity>
-          </Animated.View>
-
-          {(request.status === "Booked" || request.status === "In-progress") && (
-            <>
-            <Animated.View style={{
-            transform: [{
-             translateY: fabAnimation.interpolate({
-             inputRange: [0, 1],
-             outputRange: [15, 0]
-              })
-              }],
-              opacity: fabAnimation
-               }}>
-              <TouchableOpacity
-               style={[styles.fabActionButton, styles.fabSubmissions]}
-              onPress={() => {
-              toggleFAB();
-              handleViewSubmissions();
-               }}
-              >
-             <Ionicons name="document-text" size={20} color="#FFFFFF" />
-             <Text style={styles.fabActionText}>Submissions</Text>
-              </TouchableOpacity>
-              </Animated.View>
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [15, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <TouchableOpacity
-                style={[styles.fabActionButton, styles.fabReport]}
-                onPress={() => {
-                  toggleFAB();
-                  handleReportPress();
-                }}
-              >
-                <Ionicons name="flag" size={20} color="#FFFFFF" />
-                <Text style={styles.fabActionText}>Report Issue</Text>
-              </TouchableOpacity>
-            </Animated.View>
-            </>
           )}
 
           {canMarkAsDone && (
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [10, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <TouchableOpacity
-                style={[styles.fabActionButton, styles.fabComplete]}
-                onPress={() => {
-                  toggleFAB();
-                  handleMarkAsDone();
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.fabActionText}>Mark Complete</Text>
-              </TouchableOpacity>
-            </Animated.View>
+            <TouchableOpacity style={[styles.primaryBtn, styles.completeBtn]} onPress={handleMarkAsDone}>
+              <Ionicons name="checkmark-done" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Mark as Completed</Text>
+            </TouchableOpacity>
           )}
-        </Animated.View>
 
-        {/* Main FAB */}
-        <TouchableOpacity
-          style={[styles.mainFAB, fabExpanded && styles.mainFABExpanded]}
-          onPress={toggleFAB}
-          activeOpacity={0.8}
-        >
-          <Animated.View style={{
-            transform: [{
-              rotate: fabAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0deg', '45deg']
-              })
-            }]
-          }}>
-            <Ionicons
-              name={fabExpanded ? "close" : "ellipsis-horizontal"}
-              size={24}
-              color="#FFFFFF"
-            />
-          </Animated.View>
-        </TouchableOpacity>
+          {hasOffers && !isAssigned && (
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleViewOffers}>
+              <Ionicons name="pricetag" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>View Offers ({request.offers.length})</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.secondaryActions}>
+          <TouchableOpacity style={styles.secItem} onPress={handleEditRequest}>
+            <Ionicons name="create-outline" size={24} color="#6366F1" />
+            <Text style={styles.secLabel}>Edit</Text>
+          </TouchableOpacity>
+
+          {canViewSubmissions && (
+            <TouchableOpacity style={styles.secItem} onPress={handleViewSubmissions}>
+              <Ionicons name="document-attach-outline" size={24} color="#6366F1" />
+              <Text style={styles.secLabel}>Submissions</Text>
+            </TouchableOpacity>
+          )}
+
+          {isAssigned && (
+            <TouchableOpacity style={styles.secItem} onPress={() => setShowReportModal(true)}>
+              <Ionicons name="flag-outline" size={24} color="#EF4444" />
+              <Text style={[styles.secLabel, { color: '#EF4444' }]}>Report</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ReportForm
         isVisible={showReportModal}
         onClose={() => setShowReportModal(false)}
         task={request}
-        onReportSubmitted={handleReportSubmitted}
+        onReportSubmitted={() => Alert.alert('Success', 'Report submitted')}
       />
 
       <RatingModal
@@ -1074,12 +588,290 @@ once you both confirm the task is completed satisfactorily.`,
         onClose={() => setRatingModalVisible(false)}
         userId={request.assignedTasker?._id}
         userName={request.assignedTasker?.name}
-        userRole='tasker'
+        userRole="tasker"
       />
-
-     
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  scrollContent: { paddingBottom: 160 },
+
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    margin: 16,
+    padding: 24,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  title: { fontSize: 26, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  assignedBadge: { fontSize: 14, color: '#10B981', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: '600' },
+  pendingBadge: { fontSize: 14, color: '#F59E0B', backgroundColor: '#FFFBEB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: '600' },
+  metaText: { fontSize: 14, color: '#64748B' },
+
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 12, marginBottom: 24 },
+  infoItem: {
+    width: (width - 56) / 2,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  infoContent: { flex: 1 },
+  infoLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', textTransform: 'uppercase' },
+  infoValue: { fontSize: 18, fontWeight: '600', color: '#1E293B', marginTop: 6 },
+
+  tabScrollContainer: { marginBottom: 8 },
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12 },
+  tab: { paddingHorizontal: 16, paddingBottom: 12 },
+  activeTab: { borderBottomWidth: 3, borderBottomColor: '#6366F1' },
+  tabText: { fontSize: 16, fontWeight: '600', color: '#64748B' },
+  activeTabText: { color: '#6366F1', fontWeight: '700' },
+
+  tabContent: { paddingHorizontal: 16 },
+  sectionCard: { backgroundColor: '#FFFFFF', marginBottom: 24, padding: 24, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B', marginBottom: 16 },
+  description: { fontSize: 15.5, color: '#475569', lineHeight: 24, marginBottom: 20 },
+
+  offerItem: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16, marginBottom: 16 },
+  offerHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6366F1', justifyContent: 'center', alignItems: 'center' },
+  avatarInitial: { color: '#FFF', fontSize: 24, fontWeight: '700' },
+  offerInfo: { flex: 1, marginLeft: 16 },
+  offerName: { fontSize: 17, fontWeight: '700', color: '#1E293B' },
+  offerRating: { fontSize: 14, color: '#64748B', marginTop: 4 },
+  offerAmount: { fontSize: 22, fontWeight: '900', color: '#10B981' },
+  offerMessage: { fontSize: 15, color: '#475569', fontStyle: 'italic', marginVertical: 12 },
+  acceptBtn: { backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  acceptText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+  taskerRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  taskerInfo: { flex: 1 },
+  taskerName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  taskerMeta: { fontSize: 14, color: '#64748B', marginTop: 4 },
+
+  reqItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  reqText: { flex: 1, fontSize: 15, color: '#475569', lineHeight: 22 },
+  placeholderText: { fontSize: 15, color: '#94A3B8', fontStyle: 'italic' },
+
+  progressContainer: { gap: 12 },
+  progressStep: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  progressDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' },
+  progressDotCompleted: { backgroundColor: '#10B981' },
+  progressLabel: { fontSize: 16, fontWeight: '600', color: '#64748B' },
+  progressLabelCompleted: { color: '#10B981' },
+  progressLine: { width: 3, height: 28, backgroundColor: '#E2E8F0', marginLeft: 14.5 },
+  completionSuccess: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F0FDF4', padding: 16, borderRadius: 16, marginTop: 16 },
+  completionText: { fontSize: 18, fontWeight: '800', color: '#065F46' },
+
+  safetyGrid: { gap: 16 },
+  safetyItemRed: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyItemBlue: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyItemGreen: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1E293B' },
+
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    borderTopWidth: 2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  primaryActions: { gap: 12, marginBottom: 24 },
+  primaryBtn: { flexDirection: 'row', backgroundColor: '#6366F1', paddingVertical: 18, borderRadius: 18, justifyContent: 'center', alignItems: 'center', gap: 12, shadowColor: '#6366F1', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  messageBtn: { backgroundColor: '#3B82F6', shadowColor: '#3B82F6' },
+  completeBtn: { backgroundColor: '#10B981', shadowColor: '#10B981' },
+  primaryBtnText: { color: '#FFF', fontSize: 17, fontWeight: '800' },
+
+  secondaryActions: { flexDirection: 'row', justifyContent: 'space-around' },
+  secItem: { alignItems: 'center', gap: 8 },
+  secLabel: { fontSize: 13, color: '#475569', fontWeight: '600' },
+
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyTitle: { fontSize: 24, fontWeight: '800', color: '#1E293B', marginTop: 20 },
+  emptySubtitle: { fontSize: 16, color: '#64748B', textAlign: 'center', marginVertical: 12 },
+  backBtn: { backgroundColor: '#6366F1', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, marginTop: 20 },
+  backBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  taskerProfile: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  taskerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  avatarContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+  },
+  avatarFallback: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  taskerBasicInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  taskerName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  verifiedText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '500',
+  },
+
+  // Contact Information Styles
+  contactInfoSection: {
+    paddingTop: 16,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    gap: 12,
+  },
+  contactIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  contactDetails: {
+    flex: 1,
+  },
+  contactLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  contactValue: {
+    fontSize: 15,
+    color: '#475569',
+    fontWeight: '400',
+    lineHeight: 20,
+  },
+
+  // Skills Styles
+  skillsContainer: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  skillsLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  skillsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+  },
+  skillTag: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  skillText: {
+    fontSize: 13,
+    color: '#4F46E5',
+    fontWeight: '500',
+  },
+  moreSkillsText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+  },
+
+  viewProfileText: {
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+
+});
 
 export default ServiceRequestDetailScreen;

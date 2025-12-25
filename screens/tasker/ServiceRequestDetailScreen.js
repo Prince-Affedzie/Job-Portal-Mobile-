@@ -1,5 +1,4 @@
-// screens/tasker/ServiceRequestDetailScreen.js
-import React, { useState, useEffect, useContext,useRef } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -7,34 +6,26 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
-  TouchableWithoutFeedback,
-  Dimensions,
-  Animated,
-  StatusBar,
   Alert,
+  RefreshControl,
   Modal,
   TextInput,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import {styles} from '../../styles/tasker/ServiceRequestDetailScreen.Styles'
+import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from '../../component/tasker/Header';
 import ReportForm from '../../component/common/reportForm';
+import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal';
+import ServiceRequestFundingNoticeCard from '../../component/tasker/ServiceRequestFundingNoticeCard';
 import { AuthContext } from '../../context/AuthContext';
-import { ServiceRequestContext } from '../../context/ServiceRequestContext';
+import { serviceRequestDetail, submitOffer, updateOffer, markServiceComplete } from '../../api/serviceRequestAPI/taskerAPI';
+import { startOrGetChatRoom } from '../../api/chatApi';
 import { navigate } from '../../services/navigationService';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
 import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
-import {serviceRequestDetail,submitOffer,updateOffer,markServiceComplete} from '../../api/serviceRequestAPI/taskerAPI'
-import {startOrGetChatRoom} from '../../api/chatApi'
-import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal'
-import ServiceRequestFundingNoticeCard from '../../component/tasker/ServiceRequestFundingNoticeCard';
-
-
 
 const { width } = Dimensions.get('window');
 
@@ -42,46 +33,18 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
   const { requestId } = route.params;
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const { user } = useContext(AuthContext);
- 
-  const [showReportModal, setShowReportModal] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
-  const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [showWorkModal, setShowWorkModal] = useState(false);
-  //const [fabExpanded, setFabExpanded] = useState(false);
-  //const [fabAnimation] = useState(new Animated.Value(0));
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+
   const [offerAmount, setOfferAmount] = useState('');
   const [offerMessage, setOfferMessage] = useState('');
   const [editingOffer, setEditingOffer] = useState(null);
 
- // FIXED: Use useRef for animations, useState for state
-const [fabExpanded, setFabExpanded] = useState(false);
-const fabAnimation = useRef(new Animated.Value(0)).current; // CHANGED to useRef
-
-const toggleFAB = () => {
-  if (fabExpanded) {
-    // Close animation
-    Animated.timing(fabAnimation, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setFabExpanded(false);
-    });
-  } else {
-    // Open animation - set state first, then animate
-    setFabExpanded(true);
-    // Use setTimeout to ensure state is updated before animation starts
-    setTimeout(() => {
-      Animated.timing(fabAnimation, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }, 10);
-  }
-};
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
     loadRequestDetails();
@@ -90,13 +53,9 @@ const toggleFAB = () => {
   const loadRequestDetails = async () => {
     try {
       setLoading(true);
-      console.log(requestId)
       const response = await serviceRequestDetail(requestId);
-      
       if (response.status === 200) {
         setRequest(response.data);
-        console.log(response.data)
-        // Pre-fill offer amount with budget if available
         if (response.data.budget && !offerAmount) {
           setOfferAmount(response.data.budget.toString());
         }
@@ -105,37 +64,48 @@ const toggleFAB = () => {
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Error loading service request details:', error);
-      Alert.alert('Error', 'Failed to load service request details');
+      Alert.alert('Error', 'Failed to load service request');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadRequestDetails();
+  };
+
+  const handleMessageClient = async () => {
+    try {
+      const res = await startOrGetChatRoom({
+        userId2: request.client?._id,
+        jobId: requestId,
+      });
+      if (res.status === 200) {
+        navigate('ChatWindow', { roomId: res.data._id });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start chat');
     }
   };
 
   const handleSubmitOffer = async () => {
     if (!offerAmount || parseFloat(offerAmount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid offer amount');
+      Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
-
     try {
       const offerData = {
         amount: parseFloat(offerAmount),
-        message: offerMessage.trim() || undefined
+        message: offerMessage.trim() || undefined,
       };
+      const res = editingOffer
+        ? await updateOffer(requestId, editingOffer._id, offerData)
+        : await submitOffer(requestId, offerData);
 
-      let response;
-      if (editingOffer) {
-        response = await updateOffer(requestId, editingOffer._id, offerData);
-      } else {
-        response = await submitOffer(requestId, offerData);
-      }
-
-      if (response.status === 200 || response.status === 201) {
-        Alert.alert(
-          'Success', 
-          editingOffer ? 'Offer updated successfully!' : 'Offer submitted successfully!'
-        );
+      if (res.status === 200 || res.status === 201) {
+        Alert.alert('Success', editingOffer ? 'Offer updated!' : 'Offer submitted!');
         setShowOfferModal(false);
         setOfferAmount('');
         setOfferMessage('');
@@ -143,9 +113,7 @@ const toggleFAB = () => {
         loadRequestDetails();
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error || 'Error submitting offer';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to submit offer');
     }
   };
 
@@ -157,147 +125,50 @@ const toggleFAB = () => {
   };
 
   const handleMarkAsDone = async () => {
-    try {
-      Alert.alert(
-        "Mark as Done",
-        "Are you sure you want to mark this service request as completed?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Mark as Done", 
-            style: "default",
-            onPress: async () => {
-              const res = await markServiceComplete(requestId);
-              if (res.status === 200) {
-                Alert.alert("Success", "Service request marked as completed!");
-                setTimeout(() => {
-                setRatingModalVisible(true);
-                }, 750);
-                loadRequestDetails();
-              }
+    Alert.alert(
+      "Mark as Done",
+      "Are you sure you want to mark this service as completed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            const res = await markServiceComplete(requestId);
+            if (res.status === 200) {
+              Alert.alert("Success", "Service marked as completed!");
+              setTimeout(() => setRatingModalVisible(true), 800);
+              loadRequestDetails();
             }
-          }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-        error.response?.data?.error || 'Error marking service request as done';
-      console.error(errorMessage);
-      Alert.alert(errorMessage);
-    }
+          },
+        },
+      ]
+    );
   };
 
-  const handleReportPress = () => {
-    if (!isAssignedToUser) {
-      Alert.alert(
-        'Not Assigned',
-        'You can only report issues for service requests assigned to you.'
-      );
-      return;
-    }
-    setShowReportModal(true);
-  };
+  const formatDate = (date) => moment(date).format("MMM D, YYYY");
+  const formatFullAddress = (address) =>
+    !address || (!address.region && !address.city && !address.suburb)
+      ? "Remote"
+      : [address.region, address.city, address.suburb].filter(Boolean).join(', ');
 
-  const handleReportSubmitted = () => {
-    Alert.alert('Success', 'Your report has been submitted successfully!');
-  };
-
-  const handleMessageClient = async () => {
-    try {
-      // Navigate to chat with client
-      const res = await startOrGetChatRoom({userId2: request.client?._id,jobId: requestId})
-      if(res.status === 200) {
-        const roomId = res.data._id
-         navigate('ChatWindow', { 
-         roomId: roomId 
-    });
-      }
-      
-    } catch (error) {
-      console.error('Error starting chat:', error);
-      Alert.alert('Error', 'Failed to start chat with client');
-    }
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'pending': '#F97316',
-      'quoted': '#8B5CF6',
-      'booked': '#3B82F6',
-      'in-progress': '#F59E0B',
-      'review': '#8B5CF6',
-      'completed': '#10B981',
-      'closed': '#6B7280',
-      'canceled': '#EF4444'
-    };
-    return colors[status?.toLowerCase()] || '#6B7280';
-  };
-
-  const getStatusIcon = (status) => {
-    const icons = {
-      'pending': 'time',
-      'quoted': 'chatbubble',
-      'booked': 'bookmark',
-      'in-progress': 'timer',
-      'review': 'eye',
-      'completed': 'checkmark-circle',
-      'closed': 'lock-closed',
-      'canceled': 'close-circle'
-    };
-    return icons[status?.toLowerCase()] || 'help-circle';
-  };
-
-  const getUrgencyColor = (urgency) => {
-    const colors = {
-      'flexible': '#10B981',
-      'urgent': '#EF4444',
-      'scheduled': '#3B82F6'
-    };
-    return colors[urgency] || '#6B7280';
-  };
-
-  const formatDate = (date) => {
-    return moment(date).format("MMM DD, YYYY");
-  };
-
-  const formatDateTime = (date) => {
-    return moment(date).format("MMM DD, YYYY [at] h:mm A");
-  };
-
-  const formatFullAddress = (address) => {
-    if (!address || (!address.region && !address.city && !address.suburb)) {
-      return "Remote";
-    }
-    
-    const parts = [
-      address.region,
-      address.city, 
-      address.suburb
-    ].filter(part => part && part.trim() !== '');
-    
-    return parts.join(', ');
-  };
-
-  // Helper functions
   const isAssignedToUser = request?.assignedTasker && String(request.assignedTasker) === String(user?._id);
-  const userOffer = request?.offers?.find(offer => String(offer.tasker?._id) === String(user?._id));
+  const userOffer = request?.offers?.find(o => String(o.tasker?._id) === String(user?._id));
   const hasUserOffered = !!userOffer;
   const isOfferAccepted = userOffer?.status === 'accepted';
   const isOfferPending = userOffer?.status === 'pending';
   const canSubmitOffer = !isAssignedToUser && !hasUserOffered && request?.status === 'Pending';
   const canEditOffer = hasUserOffered && isOfferPending;
   const isCompleted = request?.status?.toLowerCase() === 'completed';
-  const canMarkAsDone = isAssignedToUser && !isCompleted && request?.markedDoneByTasker === false;
-  const hasTaskerMarkedDone = request?.markedDoneByTasker === true;
+  const canMarkAsDone = isAssignedToUser && !isCompleted && !request?.markedDoneByTasker;
   const canSubmitWork = isAssignedToUser && !isCompleted;
+  const canViewSubmissions = isAssignedToUser && !isCompleted;
+  const canMessageClient = isAssignedToUser || hasUserOffered;
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.container1}>
-          <Header title={"Service Request"} showBackButton={true} />
-          <LoadingIndicator text='Loading Service Request Details...' logoStyle="glow"/>
-        </View>
+        <Header title="Service Request" showBackButton />
+        <LoadingIndicator text="Loading details..." />
       </SafeAreaView>
     );
   }
@@ -305,990 +176,536 @@ const toggleFAB = () => {
   if (!request) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.container1}>
-          <Header title={"Service Request"} showBackButton={true} />
-          <View style={styles.errorContainer}>
-            <Ionicons name="sad-outline" size={48} color="#94A3B8" />
-            <Text style={styles.errorText}>Service request not found</Text>
-          </View>
+        <Header title="Service Request" showBackButton />
+        <View style={styles.emptyState}>
+          <Ionicons name="briefcase-outline" size={80} color="#CBD5E1" />
+          <Text style={styles.emptyTitle}>Request Not Found</Text>
+          <Text style={styles.emptySubtitle}>This service request may no longer be available.</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Enhanced Components
-  const TabButton = ({ title, icon, isActive, onPress, badge }) => (
-    <TouchableOpacity
-      style={[styles.tabButton, isActive && styles.tabButtonActive]}
-      onPress={onPress}
-    >
-      <View style={styles.tabIconContainer}>
-        <Ionicons 
-          name={icon} 
-          size={20} 
-          color={isActive ? '#FFFFFF' : '#6B7280'} 
-        />
-        {badge && (
-          <View style={styles.tabBadge}>
-            <Text style={styles.tabBadgeText}>{badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const InfoCard = ({ icon, title, value, color = '#6366F1', subtitle }) => (
-    <View style={styles.infoCard}>
-      <LinearGradient
-        colors={[color + '20', color + '10']}
-        style={[styles.infoIcon, { borderColor: color + '40' }]}
-      >
-        <Ionicons name={icon} size={20} color={color} />
-      </LinearGradient>
-      <View style={styles.infoContent}>
-        <Text style={styles.infoTitle}>{title}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
-        {subtitle && <Text style={styles.infoSubtitle}>{subtitle}</Text>}
-      </View>
-    </View>
-  );
-
-  const ProgressStep = ({ completed, current, label, date }) => (
-    <View style={styles.progressStep}>
-      <View style={[
-        styles.progressDot,
-        completed && styles.progressDotCompleted,
-        current && styles.progressDotCurrent
-      ]}>
-        {completed && <Ionicons name="checkmark" size={12} color="#FFFFFF" />}
-      </View>
-      <View style={styles.progressContent}>
-        <Text style={[
-          styles.progressLabel,
-          completed && styles.progressLabelCompleted,
-          current && styles.progressLabelCurrent
-        ]}>
-          {label}
-        </Text>
-        {date && (
-          <Text style={styles.progressDate}>
-            {formatDateTime(date)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-
-  const RequirementItem = ({ requirement, index }) => (
-    <View style={styles.requirementItem}>
-      <View style={styles.requirementBullet}>
-        <Ionicons name="ellipse" size={8} color="#10B981" />
-      </View>
-      <Text style={styles.requirementText}>{requirement}</Text>
-    </View>
-  );
-
-  const OfferStatusBadge = ({ status }) => {
-    const getStatusConfig = (status) => {
-      const configs = {
-        'pending': { bg: '#FEF3C7', text: '#92400E', label: 'Pending Review', icon: 'time-outline' },
-        'accepted': { bg: '#D1FAE5', text: '#065F46', label: 'Accepted', icon: 'checkmark-circle' },
-        'declined': { bg: '#FEE2E2', text: '#991B1B', label: 'Declined', icon: 'close-circle-outline' },
-      };
-      
-      return configs[status?.toLowerCase()] || { 
-        bg: '#F3F4F6', 
-        text: '#6B7280', 
-        label: status || 'Unknown',
-        icon: 'help-circle-outline'
-      };
-    };
-
-    const config = getStatusConfig(status);
-
-    return (
-      <View style={[styles.offerStatusBadge, { backgroundColor: config.bg }]}>
-        <Ionicons name={config.icon} size={14} color={config.text} />
-        <Text style={[styles.offerStatusText, { color: config.text }]}>
-          {config.label}
-        </Text>
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.container1}>
-        <StatusBar barStyle="light-content" backgroundColor="#1A1F3B" />
-        <Header title={"Service Request"} showBackButton={true} />
-        
+      <Header title={request.type} showBackButton />
+
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Hero Section */}
+        <View style={styles.heroCard}>
+          <Text style={styles.title}>{request.type}</Text>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor(request.status) }]} />
+            <Text style={styles.statusText}>{request.status.replace('-', ' ')}</Text>
+            {isAssignedToUser && <Text style={styles.assignedBadge}>• Assigned to You</Text>}
+            {hasUserOffered && !isAssignedToUser && (
+              <Text style={isOfferAccepted ? styles.acceptedBadge : styles.pendingBadge}>
+                • Offer {isOfferAccepted ? 'Accepted' : 'Pending'}
+              </Text>
+            )}
+            <Text style={styles.metaText}>• Posted {formatDate(request.createdAt)}</Text>
+          </View>
+        </View>
+
         {/* Offer Status Banner */}
         {hasUserOffered && !isAssignedToUser && (
-          <View style={[
-            styles.offerStatusCard,
-            isOfferAccepted && styles.offerStatusCardAccepted,
-            userOffer.status === 'declined' && styles.offerStatusCardDeclined
-          ]}>
-            <View style={styles.offerStatusHeader}>
-              <Ionicons 
-                name={isOfferAccepted ? "checkmark-circle" : "time"} 
-                size={24} 
-                color={isOfferAccepted ? "#10B981" : "#F59E0B"} 
-              />
-              <Text style={styles.offerStatusTitle}>
+          <View style={[styles.offerBanner, isOfferAccepted && styles.offerAcceptedBanner]}>
+            <Ionicons
+              name={isOfferAccepted ? "checkmark-circle" : "time-outline"}
+              size={28}
+              color={isOfferAccepted ? "#10B981" : "#F59E0B"}
+            />
+            <View style={styles.bannerText}>
+              <Text style={styles.bannerTitle}>
                 {isOfferAccepted ? 'Offer Accepted!' : 'Offer Submitted'}
               </Text>
+              <Text style={styles.bannerMessage}>
+                {isOfferAccepted
+                  ? 'You can now begin work on this service.'
+                  : 'Waiting for client response.'}
+              </Text>
             </View>
-            <Text style={styles.offerStatusMessage}>
-              {isOfferAccepted 
-                ? 'The client has accepted your offer. You can now start working on this service request.'
-                : 'Your offer is under review by the client. You will be notified when they make a decision.'
-              }
-            </Text>
             {isOfferPending && (
-              <TouchableOpacity 
-                style={styles.editOfferButton}
-                onPress={() => handleEditOffer(userOffer)}
-              >
-                <Ionicons name="create-outline" size={16} color="#6366F1" />
-                <Text style={styles.editOfferText}>Edit Offer</Text>
+              <TouchableOpacity style={styles.editBtn} onPress={() => handleEditOffer(userOffer)}>
+                <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
-        <ScrollView 
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Enhanced Header Section */}
-          <View style={styles.heroCard}>
-            <LinearGradient
-              colors={['#1A1F3B', '#2D1B69']}
-              style={styles.heroGradient}
-            >
-              <View style={styles.heroHeader}>
-                <View style={styles.heroTitleContainer}>
-                  <Text style={styles.heroTitle} numberOfLines={2}>{request.type}</Text>
-                  <View style={styles.heroMeta}>
-                    <View style={styles.heroMetaItem}>
-                      <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(request.status) }]} />
-                      <Text style={styles.heroMetaText}>Status: {request.status}</Text>
-                    </View>
-                    <View style={styles.heroMetaItem}>
-                      <Ionicons name="cash-outline" size={14} color="#E0E7FF" />
-                      <Text style={styles.heroMetaText}>
-                        {request.budget ? `₵${request.budget}` : 'Flexible Budget'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                
-                {/* Assignment Status Badge */}
-                {isAssignedToUser ? (
-                  <View style={styles.assignmentStatusBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.assignmentStatusText}>Assigned</Text>
-                  </View>
-                ) : hasUserOffered ? (
-                  <OfferStatusBadge status={userOffer.status} />
-                ) : (
-                  <View style={styles.assignmentStatusBadge}>
-                    <Ionicons name="add-circle-outline" size={16} color="#E0E7FF" />
-                    <Text style={styles.assignmentStatusText}>Available</Text>
-                  </View>
-                )}
-              </View>
+        {/* Funding Notice */}
+        <ServiceRequestFundingNoticeCard serviceRequest={request} isAssignedToUser={isAssignedToUser} />
 
-              {/* Quick Stats */}
-              <View style={styles.quickStats}>
-                <View style={styles.quickStat}>
-                  <Ionicons name="calendar-outline" size={14} color="#E0E7FF" />
-                  <Text style={styles.quickStatText}>
-                    {request.preferredDate 
-                      ? `Preferred ${formatDate(request.preferredDate)}`
-                      : 'Flexible timing'
-                    }
-                  </Text>
-                </View>
-                <View style={styles.quickStat}>
-                  <Ionicons name="speedometer-outline" size={14} color="#E0E7FF" />
-                  <Text style={[
-                    styles.quickStatText,
-                    { color: getUrgencyColor(request.urgency) }
-                  ]}>
-                    {request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1)}
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
+        {/* Quick Info Grid - Fixed Overlap */}
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Ionicons name="cash-outline" size={28} color="#10B981" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Budget</Text>
+              <Text style={styles.infoValue}>
+                {request.budget ? `₵${request.budget}` : 'Flexible'}
+              </Text>
+            </View>
           </View>
 
-           <ServiceRequestFundingNoticeCard 
-           serviceRequest={request} 
-          isAssignedToUser={isAssignedToUser}
-        /> 
+          <View style={styles.infoItem}>
+            <Ionicons name="calendar-outline" size={28} color="#F59E0B" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Preferred Date</Text>
+              <Text style={styles.infoValue}>
+                {request.preferredDate ? formatDate(request.preferredDate) : 'Flexible'}
+              </Text>
+            </View>
+          </View>
 
-          {/* Enhanced Completion Status */}
-          {isAssignedToUser && (
-            <View style={styles.completionCard}>
-              <Text style={styles.completionTitle}>Completion Progress</Text>
-              <View style={styles.progressContainer}>
-                <ProgressStep
-                  completed={request.markedDoneByTasker}
-                  current={!request.markedDoneByTasker && !request.markedDoneByEmployer}
-                  label="You marked as done"
-                  date={request.taskerDoneAt}
-                />
-                <View style={styles.progressLine} />
-                <ProgressStep
-                  completed={request.markedDoneByEmployer}
-                  current={request.markedDoneByTasker && !request.markedDoneByEmployer}
-                  label="Client marked as done"
-                  date={request.employerDoneAt}
-                />
-              </View>
+          <View style={styles.infoItem}>
+            <Ionicons name="location-outline" size={28} color="#6366F1" />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Location</Text>
+              <Text style={styles.infoValue}>{formatFullAddress(request.address)}</Text>
+            </View>
+          </View>
 
-              {request.markedDoneByTasker && request.markedDoneByEmployer && (
-                <View style={styles.mutualCompletion}>
-                  <Ionicons name="checkmark-done" size={20} color="#10B981" />
-                  <Text style={styles.mutualCompletionText}>
-                    Service mutually completed!
-                  </Text>
+          <View style={styles.infoItem}>
+            <Ionicons name="speedometer-outline" size={28} color={getUrgencyColor(request.urgency)} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Urgency</Text>
+              <Text style={styles.infoValue}>
+                {request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1) || 'Standard'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Horizontal Scrollable Tabs - Prevents Overlap */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScrollContainer}>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
+              onPress={() => setActiveTab('overview')}
+            >
+              <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>Overview</Text>
+            </TouchableOpacity>
+
+            {isAssignedToUser && (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'client' && styles.activeTab]}
+                onPress={() => setActiveTab('client')}
+              >
+                <Text style={[styles.tabText, activeTab === 'client' && styles.activeTabText]}>Client</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'requirements' && styles.activeTab]}
+              onPress={() => setActiveTab('requirements')}
+            >
+              <Text style={[styles.tabText, activeTab === 'requirements' && styles.activeTabText]}>Requirements</Text>
+            </TouchableOpacity>
+
+            {hasUserOffered && (
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'offer' && styles.activeTab]}
+                onPress={() => setActiveTab('offer')}
+              >
+                <Text style={[styles.tabText, activeTab === 'offer' && styles.activeTabText]}>Your Offer</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Tab Content */}
+        <View style={styles.tabContent}>
+          {activeTab === 'overview' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.description}>{request.description}</Text>
+              <MediaDisplay media={request.media} />
+            </View>
+          )}
+
+          {activeTab === 'client' && isAssignedToUser && request.client && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Client Information</Text>
+              <View style={styles.clientRow}>
+                <View style={styles.avatar}>
+                  {request.client.profileImage ? (
+                    <Image source={{ uri: request.client.profileImage }} style={styles.avatarImg} />
+                  ) : (
+                    <Text style={styles.avatarInitial}>{request.client.name?.[0]?.toUpperCase() || 'C'}</Text>
+                  )}
                 </View>
+                <View style={styles.clientInfo}>
+                  <Text style={styles.clientName}>{request.client.name}</Text>
+                  <Text style={styles.clientName}>{request.client.phone}</Text>
+                  <Text style={styles.clientMeta}>★ {request.client.rating?.toFixed(1) || 'New'}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {activeTab === 'requirements' && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Requirements</Text>
+              {(request.requirements || []).length > 0 ? (
+                request.requirements.map((req, i) => (
+                  <View key={i} style={styles.reqItem}>
+                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    <Text style={styles.reqText}>{req}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.placeholderText}>No specific requirements listed.</Text>
               )}
             </View>
           )}
 
-          {/* Enhanced Tab Navigation */}
-          <View style={styles.tabContainer}>
-            <TabButton
-              title="Overview"
-              icon="document-text-outline"
-              isActive={activeTab === 'overview'}
-              onPress={() => setActiveTab('overview')}
-            />
-            {isAssignedToUser && (
-              <TabButton
-                title="Client"
-                icon="person-outline"
-                isActive={activeTab === 'client'}
-                onPress={() => setActiveTab('client')}
-              />
-            )}
-            <TabButton
-              title="Requirements"
-              icon="checkmark-done-outline"
-              isActive={activeTab === 'requirements'}
-              onPress={() => setActiveTab('requirements')}
-              badge={request.requirements?.length || null}
-            />
-            {hasUserOffered && (
-              <TabButton
-                title="Your Offer"
-                icon="pricetag-outline"
-                isActive={activeTab === 'offer'}
-                onPress={() => setActiveTab('offer')}
-              />
-            )}
-          </View>
-
-          {/* Tab Content */}
-          <View style={styles.tabContent}>
-            {activeTab === 'overview' && (
-              <>
-                {/* Enhanced Request Overview */}
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="information-circle" size={22} color="#6366F1" />
-                    <Text style={styles.sectionTitle}>Service Description</Text>
-                  </View>
-                  <Text style={styles.taskDescription}>{request.description}</Text>
-
-                  {/* Media Display */}
-                  <MediaDisplay media={request.media} />
-                  
-                  {/* Key Information Grid */}
-                  <View style={styles.infoGrid}>
-                    <InfoCard
-                      icon="cash-outline"
-                      title="Budget"
-                      value={request.budget ? `₵${request.budget}` : 'Flexible'}
-                      color="#10B981"
-                      subtitle={request.finalCost ? `Final: ₵${request.finalCost}` : 'Client budget'}
-                    />
-                    {request.preferredDate && (
-                      <InfoCard
-                        icon="calendar-outline"
-                        title="Preferred Date"
-                        value={formatDate(request.preferredDate)}
-                        color="#F59E0B"
-                        subtitle={request.preferredTime || 'Any time'}
-                      />
-                    )}
-                    <InfoCard
-                      icon="location-outline"
-                      title="Location"
-                      value={formatFullAddress(request.address)}
-                      color="#6366F1"
-                      subtitle={request.address?.suburb || 'Location details'}
-                    />
-                    <InfoCard
-                      icon="speedometer-outline"
-                      title="Urgency"
-                      value={request.urgency?.charAt(0).toUpperCase() + request.urgency?.slice(1)}
-                      color={getUrgencyColor(request.urgency)}
-                      subtitle="Service priority"
-                    />
-                  </View>
-
-                  {/* Enhanced Timeline */}
-                  <View style={styles.sectionCard}>
-                    <View style={styles.sectionHeader}>
-                      <Ionicons name="time-outline" size={22} color="#6366F1" />
-                      <Text style={styles.sectionTitle}>Timeline</Text>
-                    </View>
-                    <View style={styles.timeline}>
-                      <View style={styles.timelineItem}>
-                        <View style={styles.timelineDot} />
-                        <View style={styles.timelineContent}>
-                          <Text style={styles.timelineLabel}>Request Created</Text>
-                          <Text style={styles.timelineDate}>{formatDateTime(request.createdAt)}</Text>
-                        </View>
-                      </View>
-                      <View style={styles.timelineConnector} />
-                      {request.preferredDate && (
-                        <>
-                          <View style={styles.timelineItem}>
-                            <View style={styles.timelineDot} />
-                            <View style={styles.timelineContent}>
-                              <Text style={styles.timelineLabel}>Preferred Date</Text>
-                              <Text style={styles.timelineDate}>{formatDateTime(request.preferredDate)}</Text>
-                            </View>
-                          </View>
-                          <View style={styles.timelineConnector} />
-                        </>
-                      )}
-                      <View style={styles.timelineItem}>
-                        <View style={styles.timelineDot} />
-                        <View style={styles.timelineContent}>
-                          <Text style={styles.timelineLabel}>Last Updated</Text>
-                          <Text style={styles.timelineDate}>{formatDateTime(request.updatedAt)}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </>
-            )}
-
-            {activeTab === 'client' && isAssignedToUser && request.client && (
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="person" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>Client Profile</Text>
-                </View>
-
-                <View style={styles.clientCard}>
-                  <View style={styles.clientHeader}>
-                    <View style={styles.clientAvatar}>
-                      {request.client.profileImage ? (
-                        <Image
-                          source={{ uri: request.client.profileImage }}
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <Text style={styles.avatarText}>
-                          {request.client.name?.charAt(0)?.toUpperCase() || 'C'}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.clientInfo}>
-                      <Text style={styles.clientName}>{request.client.name}</Text>
-                      {request.client.isVerified && (
-                        <View style={styles.verifiedBadge}>
-                          <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                          <Text style={styles.verifiedText}>Verified</Text>
-                        </View>
-                      )}
-                      <Text style={styles.clientBio}>
-                        {request.client.Bio || "No bio available"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Contact Information */}
-                  <View style={styles.contactSection}>
-                    <View style={styles.contactItem}>
-                      <Ionicons name="mail" size={20} color="#6366F1" />
-                      <View>
-                        <Text style={styles.contactLabel}>Email</Text>
-                        <Text style={styles.contactValue}>{request.client.email}</Text>
-                      </View>
-                    </View>
-                    {request.client.phone && (
-                      <View style={styles.contactItem}>
-                        <Ionicons name="call" size={20} color="#6366F1" />
-                        <View>
-                          <Text style={styles.contactLabel}>Phone</Text>
-                          <Text style={styles.contactValue}>{request.client.phone}</Text>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Enhanced Client Stats */}
-                  <View style={styles.clientStats}>
-                    <View style={styles.ratingStatsCard}>
-                      <View style={styles.ratingMain}>
-                        <View style={styles.ratingStars}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Ionicons
-                              key={star}
-                              name={star <= Math.floor(request.client.rating || 0) ? "star" : "star-outline"}
-                              size={16}
-                              color="#F59E0B"
-                            />
-                          ))}
-                        </View>
-                        <Text style={styles.ratingValue}>
-                          {request.client.rating?.toFixed(1) || '0.0'}
-                        </Text>
-                      </View>
-                      <Text style={styles.reviewsCount}>
-                        {request.client.numberOfRatings || 0} reviews
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {activeTab === 'requirements' && (
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="checkmark-done" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>Service Requirements</Text>
-                </View>
-
-                {/* Requirements Section */}
-                <View style={styles.requirementsSection}>
-                  <Text style={styles.subsectionTitle}>Specific Requirements</Text>
-                  <View style={styles.requirementsList}>
-                    {request.requirements && request.requirements.length > 0 ? (
-                      request.requirements.map((requirement, index) => (
-                        <RequirementItem 
-                          key={index} 
-                          requirement={requirement} 
-                          index={index} 
-                        />
-                      ))
-                    ) : (
-                      <Text style={styles.noRequirementsText}>
-                        No specific requirements listed. Please contact the client for details.
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Service Type Information */}
-                <View style={styles.serviceTypeSection}>
-                  <Text style={styles.subsectionTitle}>Service Type</Text>
-                  <View style={styles.serviceTypeCard}>
-                    <Ionicons name="build-outline" size={20} color="#6366F1" />
-                    <Text style={styles.serviceTypeText}>{request.type}</Text>
-                  </View>
-                </View>
-
-                {/* Funding Status */}
-                {request.funded !== undefined && (
-                  <View style={styles.fundingSection}>
-                    <Ionicons 
-                      name={request.funded ? "checkmark-circle" : "time-outline"} 
-                      size={20} 
-                      color={request.funded ? "#10B981" : "#F59E0B"} 
-                    />
-                    <View style={styles.fundingContent}>
-                      <Text style={styles.fundingTitle}>
-                        {request.funded ? 'Payment Secured' : 'Payment Pending'}
-                      </Text>
-                      <Text style={styles.fundingText}>
-                        {request.funded 
-                          ? 'Client has secured payment for this service.'
-                          : 'Payment will be processed once the client accepts an offer.'
-                        }
-                      </Text>
-                    </View>
-                  </View>
+          {activeTab === 'offer' && hasUserOffered && (
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Your Offer</Text>
+              <View style={styles.offerCard}>
+                <Text style={styles.offerLabel}>Amount</Text>
+                <Text style={styles.offerAmount}>₵{userOffer.amount}</Text>
+                {userOffer.message && (
+                  <>
+                    <Text style={styles.offerLabel}>Message</Text>
+                    <Text style={styles.offerMessage}>"{userOffer.message}"</Text>
+                  </>
+                )}
+                {isOfferPending && (
+                  <TouchableOpacity style={styles.editLargeBtn} onPress={() => handleEditOffer(userOffer)}>
+                    <Ionicons name="create-outline" size={18} color="#6366F1" />
+                    <Text style={styles.editLargeText}>Edit Offer</Text>
+                  </TouchableOpacity>
                 )}
               </View>
-            )}
-
-            {activeTab === 'offer' && hasUserOffered && (
-              <View style={styles.sectionCard}>
-                <View style={styles.sectionHeader}>
-                  <Ionicons name="pricetag" size={22} color="#6366F1" />
-                  <Text style={styles.sectionTitle}>Your Offer</Text>
-                </View>
-
-                <View style={styles.offerDetailsCard}>
-                  <View style={styles.offerAmountSection}>
-                    <Text style={styles.offerAmountLabel}>Your Offer Amount</Text>
-                    <Text style={styles.offerAmount}>₵{userOffer.amount}</Text>
-                  </View>
-
-                  {userOffer.message && (
-                    <View style={styles.offerMessageSection}>
-                      <Text style={styles.offerMessageLabel}>Your Message</Text>
-                      <Text style={styles.offerMessageText}>"{userOffer.message}"</Text>
-                    </View>
-                  )}
-
-                  <View style={styles.offerMeta}>
-                    <View style={styles.offerMetaItem}>
-                      <Ionicons name="time-outline" size={16} color="#64748B" />
-                      <Text style={styles.offerMetaText}>
-                        Submitted {formatDateTime(userOffer.createdAt)}
-                      </Text>
-                    </View>
-                    {userOffer.updatedAt && userOffer.updatedAt !== userOffer.createdAt && (
-                      <View style={styles.offerMetaItem}>
-                        <Ionicons name="create-outline" size={16} color="#64748B" />
-                        <Text style={styles.offerMetaText}>
-                          Updated {formatDateTime(userOffer.updatedAt)}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {isOfferPending && (
-                    <TouchableOpacity 
-                      style={styles.editOfferButtonLarge}
-                      onPress={() => handleEditOffer(userOffer)}
-                    >
-                      <Ionicons name="create-outline" size={18} color="#6366F1" />
-                      <Text style={styles.editOfferTextLarge}>Edit Offer</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Enhanced Safety Guidelines */}
-          <View style={styles.safetyCard}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="shield-checkmark" size={22} color="#6366F1" />
-              <Text style={styles.sectionTitle}>Safety Guidelines</Text>
             </View>
-            
-            <View style={styles.safetyList}>
-              <View style={[styles.safetyItem, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
-                <Ionicons name="warning" size={16} color="#EF4444" />
-                <Text style={[styles.safetyText, { color: '#EF4444' }]}>
-                  Never share personal financial information
-                </Text>
-              </View>
-              <View style={[styles.safetyItem, { backgroundColor: '#EFF6FF', borderColor: '#DBEAFE' }]}>
-                <Ionicons name="location" size={16} color="#3B82F6" />
-                <Text style={[styles.safetyText, { color: '#3B82F6' }]}>
-                  Meet in public places for onsite work
-                </Text>
-              </View>
-              <View style={[styles.safetyItem, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                <Ionicons name="chatbubble" size={16} color="#10B981" />
-                <Text style={[styles.safetyText, { color: '#10B981' }]}>
-                  Keep all communication on the platform
-                </Text>
-              </View>
+          )}
+        </View>
+
+        {/* Safety Guidelines */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Safety Guidelines</Text>
+          <View style={styles.safetyGrid}>
+            <View style={styles.safetyItemRed}>
+              <Ionicons name="warning" size={24} color="#DC2626" />
+              <Text style={styles.safetyText}>Never share personal financial info</Text>
             </View>
-          </View>
-        </ScrollView>
-
-    
-<View style={styles.fabContainer}>
-  {/* Backdrop */}
-  {fabExpanded && (
-    <TouchableWithoutFeedback onPress={toggleFAB}>
-      <View style={styles.fabBackdrop} />
-    </TouchableWithoutFeedback>
-  )}
-
-  {/* Action Buttons with Staggered Animation - ADD CONDITION */}
-  {fabExpanded && (
-    <Animated.View 
-      style={[
-        styles.fabActionButtons,
-        {
-          opacity: fabAnimation,
-          transform: [{
-            translateY: fabAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [80, 0]
-            })
-          }]
-        }
-      ]}
-    >
-      {canSubmitWork && (
-      <Animated.View style={{
-      transform: [{
-      translateY: fabAnimation.interpolate({
-      inputRange: [0, 1],
-      outputRange: [20, 0]
-      })
-      }],
-      opacity: fabAnimation
-        }}>
-        <TouchableOpacity 
-        style={[styles.fabActionButton, styles.fabSubmit]}
-        onPress={() => {
-        toggleFAB();
-        setShowWorkModal(true);
-        }}
-        >
-        <Ionicons name="cloud-upload" size={20} color="#FFFFFF" />
-        <Text style={styles.fabActionText}>Submit Work</Text>
-        </TouchableOpacity>
-        </Animated.View>
-        )}
-      {isAssignedToUser && (
-        <>
-
-          <Animated.View style={{
-            transform: [{
-            translateY: fabAnimation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [15, 0]
-            })
-            }],
-            opacity: fabAnimation
-            }}>
-           <TouchableOpacity 
-            style={[styles.fabActionButton, styles.fabSubmissions]}
-            onPress={() => {
-             toggleFAB();
-              navigate('Submissions', { taskId: request._id, taskTitle: request.title });
-               }}
-              >
-              <Ionicons name="document-text" size={20} color="#FFFFFF" />
-              <Text style={styles.fabActionText}>Submissions</Text>
-              </TouchableOpacity>
-              </Animated.View>
-         
-          <Animated.View style={{
-            transform: [{
-              translateY: fabAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0]
-              })
-            }],
-            opacity: fabAnimation
-          }}>
-            
-          </Animated.View>
-
-          <Animated.View style={{
-            transform: [{
-              translateY: fabAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [15, 0]
-              })
-            }],
-            opacity: fabAnimation
-          }}>
-            <TouchableOpacity 
-              style={[styles.fabActionButton, styles.fabReport]}
-              onPress={() => {
-                toggleFAB();
-                handleReportPress();
-              }}
-            >
-              <Ionicons name="flag" size={20} color="#FFFFFF" />
-              <Text style={styles.fabActionText}>Report Issue</Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Mark as Done Button */}
-          {hasTaskerMarkedDone ? (
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [10, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <View style={[styles.fabActionButton, styles.fabCompleteDisabled]}>
-                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.fabActionText}> Marked Done</Text>
-              </View>
-            </Animated.View>
-          ) : canMarkAsDone ? (
-            <Animated.View style={{
-              transform: [{
-                translateY: fabAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [5, 0]
-                })
-              }],
-              opacity: fabAnimation
-            }}>
-              <TouchableOpacity 
-                style={[styles.fabActionButton, styles.fabComplete]}
-                onPress={() => {
-                  toggleFAB();
-                  handleMarkAsDone();
-                }}
-              >
-                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                <Text style={styles.fabActionText}>Mark Complete</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          ) : null}
-        </>
-      )}
-
-      {/* Offer Submission Buttons */}
-      {canSubmitOffer && (
-        <Animated.View style={{
-          transform: [{
-            translateY: fabAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [20, 0]
-            })
-          }],
-          opacity: fabAnimation
-        }}>
-          <TouchableOpacity 
-            style={[styles.fabActionButton, styles.fabOffer]}
-            onPress={() => {
-              toggleFAB();
-              setShowOfferModal(true);
-            }}
-          >
-            <Ionicons name="pricetag" size={20} color="#FFFFFF" />
-            <Text style={styles.fabActionText}>Submit Offer</Text>
-          </TouchableOpacity>
-
-        </Animated.View>
-      )}
-
-      {canEditOffer && (
-        <Animated.View style={{
-          transform: [{
-            translateY: fabAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [15, 0]
-            })
-          }],
-          opacity: fabAnimation
-        }}>
-          <TouchableOpacity 
-            style={[styles.fabActionButton, styles.fabEditOffer]}
-            onPress={() => {
-              toggleFAB();
-              handleEditOffer(userOffer);
-            }}
-          >
-            <Ionicons name="create" size={20} color="#FFFFFF" />
-            <Text style={styles.fabActionText}>Edit Offer</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-       <TouchableOpacity 
-        style={[styles.fabActionButton, styles.fabMessage]}
-        onPress={() => {
-        toggleFAB();
-        handleMessageClient();
-        }}
-        >
-        <Ionicons name="chatbubble" size={20} color="#FFFFFF" />
-        <Text style={styles.fabActionText}>Message Client</Text>
-        </TouchableOpacity>
-
-      {/* Enhanced Hint Cards */}
-      {!isAssignedToUser && !hasUserOffered && request?.status !== 'Pending' && (
-        <View style={styles.fabHintCard}>
-          <Ionicons name="time" size={20} color="#F59E0B" />
-          <View style={styles.hintTextContainer}>
-            <Text style={styles.hintTitle}>Not Available</Text>
-            <Text style={styles.hintDescription}>
-              This service request is no longer accepting offers
-            </Text>
+            <View style={styles.safetyItemBlue}>
+              <Ionicons name="location" size={24} color="#2563EB" />
+              <Text style={styles.safetyText}>Meet in public for onsite work</Text>
+            </View>
+            <View style={styles.safetyItemGreen}>
+              <Ionicons name="chatbubble" size={24} color="#059669" />
+              <Text style={styles.safetyText}>Keep communication on platform</Text>
+            </View>
           </View>
         </View>
-      )}
-    </Animated.View>
-  )}
+      </ScrollView>
 
-  {/* Enhanced Main FAB */}
-  <TouchableOpacity 
-    style={[
-      styles.mainFAB,
-      fabExpanded && styles.mainFABExpanded
-    ]}
-    onPress={toggleFAB}
-    activeOpacity={0.8}
-  >
-    <Animated.View style={{
-      transform: [{
-        rotate: fabAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['0deg', '45deg']
-        })
-      }]
-    }}>
-      <Ionicons 
-        name={fabExpanded ? "close" : "ellipsis-horizontal"} 
-        size={24} 
-        color="#FFFFFF" 
-      />
-    </Animated.View>
-  </TouchableOpacity>
-</View>
+      {/* Bottom Action Bar */}
+      <View style={styles.bottomBar}>
+        <View style={styles.primaryActions}>
+          {canSubmitOffer && (
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => setShowOfferModal(true)}>
+              <Ionicons name="pricetag" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Submit Offer</Text>
+            </TouchableOpacity>
+          )}
+          {canMessageClient && (
+            <TouchableOpacity style={[styles.primaryBtn, styles.messageBtn]} onPress={handleMessageClient}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Message Client</Text>
+            </TouchableOpacity>
+          )}
+          {canMarkAsDone && (
+            <TouchableOpacity style={[styles.primaryBtn, styles.completeBtn]} onPress={handleMarkAsDone}>
+              <Ionicons name="checkmark-done" size={20} color="#FFF" />
+              <Text style={styles.primaryBtnText}>Mark Complete</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Offer Submission Modal */}
-        <Modal
-          visible={showOfferModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => {
-            setShowOfferModal(false);
-            setEditingOffer(null);
-            setOfferAmount('');
-            setOfferMessage('');
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {editingOffer ? 'Edit Your Offer' : 'Submit Offer'}
-                </Text>
-                <TouchableOpacity 
-                  onPress={() => {
-                    setShowOfferModal(false);
-                    setEditingOffer(null);
-                    setOfferAmount('');
-                    setOfferMessage('');
-                  }}
-                >
-                  <Ionicons name="close" size={24} color="#6B7280" />
-                </TouchableOpacity>
+        <View style={styles.secondaryActions}>
+          {canSubmitWork && (
+            <TouchableOpacity style={styles.secItem} onPress={() => setShowWorkModal(true)}>
+              <Ionicons name="cloud-upload" size={24} color="#6366F1" />
+              <Text style={styles.secLabel}>Submit Work</Text>
+            </TouchableOpacity>
+          )}
+          {canViewSubmissions && (
+            <TouchableOpacity style={styles.secItem} onPress={() => navigate('Submissions', { taskId: request._id })}>
+              <Ionicons name="document-attach-outline" size={24} color="#6366F1" />
+              <Text style={styles.secLabel}>Submissions</Text>
+            </TouchableOpacity>
+          )}
+          {isAssignedToUser && (
+            <TouchableOpacity style={styles.secItem} onPress={() => setShowReportModal(true)}>
+              <Ionicons name="flag-outline" size={24} color="#EF4444" />
+              <Text style={[styles.secLabel, { color: '#EF4444' }]}>Report</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Offer Modal */}
+      <Modal visible={showOfferModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{editingOffer ? 'Edit Offer' : 'Submit Offer'}</Text>
+              <TouchableOpacity onPress={() => {
+                setShowOfferModal(false);
+                setEditingOffer(null);
+                setOfferAmount('');
+                setOfferMessage('');
+              }}>
+                <Ionicons name="close" size={28} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Offer Amount (₵)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={offerAmount}
+                  onChangeText={setOfferAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 500"
+                />
+                {request.budget && <Text style={styles.hint}>Client budget: ₵{request.budget}</Text>}
               </View>
-
-              <ScrollView style={styles.modalBody}>
-                <View style={styles.offerInputGroup}>
-                  <Text style={styles.inputLabel}>Offer Amount (₵)</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    placeholder="Enter your offer amount"
-                    value={offerAmount}
-                    onChangeText={setOfferAmount}
-                    keyboardType="decimal-pad"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  {request.budget && (
-                    <Text style={styles.budgetHint}>
-                      Client budget: ₵{request.budget}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.offerInputGroup}>
-                  <Text style={styles.inputLabel}>Message to Client (Optional)</Text>
-                  <TextInput
-                    style={styles.messageInput}
-                    placeholder="Briefly describe why you're a good fit for this service..."
-                    value={offerMessage}
-                    onChangeText={setOfferMessage}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                </View>
-
-                <View style={styles.offerTips}>
-                  <Text style={styles.offerTipsTitle}>Tips for a great offer:</Text>
-                  <View style={styles.tipItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.tipText}>Be competitive with your pricing</Text>
-                  </View>
-                  <View style={styles.tipItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.tipText}>Highlight your relevant experience</Text>
-                  </View>
-                  <View style={styles.tipItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                    <Text style={styles.tipText}>Be clear about your availability</Text>
-                  </View>
-                </View>
-              </ScrollView>
-
-              <View style={styles.modalFooter}>
-                <TouchableOpacity 
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    setShowOfferModal(false);
-                    setEditingOffer(null);
-                    setOfferAmount('');
-                    setOfferMessage('');
-                  }}
-                >
-                  <Text style={styles.secondaryButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.primaryButton,
-                    (!offerAmount || parseFloat(offerAmount) <= 0) && styles.primaryButtonDisabled
-                  ]}
-                  onPress={handleSubmitOffer}
-                  disabled={!offerAmount || parseFloat(offerAmount) <= 0}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {editingOffer ? 'Update Offer' : 'Submit Offer'}
-                  </Text>
-                </TouchableOpacity>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Message (Optional)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={offerMessage}
+                  onChangeText={setOfferMessage}
+                  multiline
+                  placeholder="Why you're the best fit..."
+                />
               </View>
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowOfferModal(false)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitBtn, (!offerAmount || parseFloat(offerAmount) <= 0) && styles.disabledBtn]}
+                onPress={handleSubmitOffer}
+                disabled={!offerAmount || parseFloat(offerAmount) <= 0}
+              >
+                <Text style={styles.submitText}>{editingOffer ? 'Update' : 'Submit'} Offer</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </View>
+      </Modal>
 
-        <ReportForm
-          isVisible={showReportModal}
-          onClose={() => setShowReportModal(false)}
-          task={request}
-          onReportSubmitted={handleReportSubmitted}
-        />
-
-        <WorkSubmissionModal
+      <WorkSubmissionModal
         isVisible={showWorkModal}
         onClose={() => setShowWorkModal(false)}
         taskId={request._id}
         task={request}
-        type='serviceRequest'
-        onSubmissionSuccess={() => {
-        loadRequestDetails();
-        }}
-        />
+        type="serviceRequest"
+        onSubmissionSuccess={loadRequestDetails}
+      />
 
-        <RatingModal
-          visible={ratingModalVisible}
-          onClose={() => setRatingModalVisible(false)}
-          userId={request.client?._id}
-          userName={request.client?.name}
-          userRole='client'
-        />
-      </View>
+      <ReportForm
+        isVisible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        task={request}
+        onReportSubmitted={() => Alert.alert('Success', 'Report submitted')}
+      />
+
+      <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        userId={request.client?._id}
+        userName={request.client?.name}
+        userRole="client"
+      />
     </SafeAreaView>
   );
 };
+
+const getStatusColor = (status) => {
+  const map = {
+    pending: '#F97316',
+    quoted: '#8B5CF6',
+    booked: '#3B82F6',
+    'in-progress': '#F59E0B',
+    review: '#8B5CF6',
+    completed: '#10B981',
+    closed: '#6B7280',
+    canceled: '#EF4444',
+  };
+  return map[status?.toLowerCase()] || '#6B7280';
+};
+
+const getUrgencyColor = (urgency) => {
+  const map = { flexible: '#10B981', urgent: '#EF4444', scheduled: '#3B82F6' };
+  return map[urgency] || '#6B7280';
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  scrollContent: { paddingBottom: 160 },
+
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    margin: 16,
+    padding: 24,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  title: { fontSize: 26, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
+  statusText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
+  assignedBadge: { fontSize: 14, color: '#10B981', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: '600' },
+  acceptedBadge: { fontSize: 14, color: '#10B981', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: '600' },
+  pendingBadge: { fontSize: 14, color: '#F59E0B', backgroundColor: '#FFFBEB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, fontWeight: '600' },
+  metaText: { fontSize: 14, color: '#64748B' },
+
+  offerBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 20,
+    gap: 16,
+    borderWidth: 2,
+    borderColor: '#FCD34D',
+  },
+  offerAcceptedBanner: { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+  bannerText: { flex: 1 },
+  bannerTitle: { fontSize: 18, fontWeight: '800', color: '#92400E', marginBottom: 4 },
+  bannerMessage: { fontSize: 14, color: '#92400E' },
+  editBtn: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#6366F1', borderRadius: 12 },
+  editBtnText: { color: '#FFF', fontWeight: '600' },
+
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 12,
+    marginBottom: 24,
+  },
+  infoItem: {
+    width: (width - 56) / 2,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  infoContent: { flex: 1 },
+  infoLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoValue: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 4 },
+
+  tabScrollContainer: { marginBottom: 8 },
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12 },
+  tab: { paddingHorizontal: 16, paddingBottom: 12 },
+  activeTab: { borderBottomWidth: 3, borderBottomColor: '#6366F1' },
+  tabText: { fontSize: 16, fontWeight: '600', color: '#64748B' },
+  activeTabText: { color: '#6366F1', fontWeight: '700' },
+
+  tabContent: { paddingHorizontal: 16 },
+  sectionCard: { backgroundColor: '#FFFFFF', marginBottom: 24, padding: 24, borderRadius: 24, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B', marginBottom: 16 },
+  description: { fontSize: 15.5, color: '#475569', lineHeight: 24, marginBottom: 20 },
+
+  clientRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  avatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#6366F1', justifyContent: 'center', alignItems: 'center' },
+  avatarImg: { width: 72, height: 72, borderRadius: 36 },
+  avatarInitial: { color: '#FFF', fontSize: 28, fontWeight: '700' },
+  clientInfo: { flex: 1 },
+  clientName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  clientMeta: { fontSize: 14, color: '#64748B', marginTop: 4 },
+
+  reqItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  reqText: { flex: 1, fontSize: 15, color: '#475569', lineHeight: 22 },
+  placeholderText: { fontSize: 15, color: '#94A3B8', fontStyle: 'italic' },
+
+  offerCard: { backgroundColor: '#F8FAFC', padding: 20, borderRadius: 16 },
+  offerLabel: { fontSize: 14, color: '#64748B', fontWeight: '600', marginBottom: 6 },
+  offerAmount: { fontSize: 24, fontWeight: '900', color: '#10B981', marginBottom: 16 },
+  offerMessage: { fontSize: 15, color: '#475569', fontStyle: 'italic', marginBottom: 20 },
+  editLargeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  editLargeText: { fontSize: 16, color: '#6366F1', fontWeight: '600' },
+
+  safetyGrid: { gap: 16 },
+  safetyItemRed: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyItemBlue: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyItemGreen: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', borderWidth: 2, padding: 20, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 16 },
+  safetyText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1E293B' },
+
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    borderTopWidth: 2,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  primaryActions: { gap: 12, marginBottom: 24 },
+  primaryBtn: { flexDirection: 'row', backgroundColor: '#6366F1', paddingVertical: 18, borderRadius: 18, justifyContent: 'center', alignItems: 'center', gap: 12, shadowColor: '#6366F1', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 },
+  messageBtn: { backgroundColor: '#3B82F6', shadowColor: '#3B82F6' },
+  completeBtn: { backgroundColor: '#F59E0B', shadowColor: '#F59E0B' },
+  primaryBtnText: { color: '#FFF', fontSize: 17, fontWeight: '800' },
+
+  secondaryActions: { flexDirection: 'row', justifyContent: 'space-around' },
+  secItem: { alignItems: 'center', gap: 8 },
+  secLabel: { fontSize: 13, color: '#475569', fontWeight: '600' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderColor: '#E2E8F0' },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
+  inputGroup: { paddingHorizontal: 24, marginBottom: 20 },
+  inputLabel: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 8 },
+  input: { borderWidth: 2, borderColor: '#E2E8F0', borderRadius: 16, padding: 16, fontSize: 16 },
+  textArea: { height: 120, textAlignVertical: 'top' },
+  hint: { fontSize: 14, color: '#64748B', marginTop: 8 },
+  modalFooter: { flexDirection: 'row', padding: 24, gap: 12 },
+  cancelBtn: { flex: 1, paddingVertical: 16, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center' },
+  cancelText: { fontSize: 16, fontWeight: '600', color: '#64748B' },
+  submitBtn: { flex: 1, paddingVertical: 16, borderRadius: 16, backgroundColor: '#6366F1', alignItems: 'center' },
+  disabledBtn: { backgroundColor: '#9CA3AF' },
+  submitText: { fontSize: 16, fontWeight: '800', color: '#FFF' },
+
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyTitle: { fontSize: 24, fontWeight: '800', color: '#1E293B', marginTop: 20 },
+  emptySubtitle: { fontSize: 16, color: '#64748B', textAlign: 'center', marginVertical: 12 },
+  backBtn: { backgroundColor: '#6366F1', paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16, marginTop: 20 },
+  backBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+});
 
 export default ServiceRequestDetailScreen;

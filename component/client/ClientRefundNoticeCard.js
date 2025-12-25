@@ -165,7 +165,7 @@ const ClientRefundNoticeCard = ({ task, isTaskOwner }) => {
 const styles = StyleSheet.create({
    container: {
     position: 'absolute',
-    top: 560,
+    top: 360,
     left: 16,
     zIndex: 100,
   },
