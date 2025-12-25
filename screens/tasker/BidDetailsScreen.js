@@ -5,6 +5,8 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
+  Keyboard,
   StyleSheet,
   Image,
   ActivityIndicator,
@@ -632,22 +634,31 @@ const BidDetailsScreen = ({ route, navigation }) => {
         )}
       </View>
 
-      {/* Edit Bid Modal - Modern Bottom Sheet */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEditModal(false)}
+      
+
+{/* Edit Bid Modal - Centered Hanging Modal */}
+<Modal
+  visible={showEditModal}
+  animationType="fade"
+  transparent={true}
+  onRequestClose={() => setShowEditModal(false)}
+>
+  <TouchableWithoutFeedback onPress={() => setShowEditModal(false)}>
+    <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1, width: '100%', justifyContent: 'center' }}
       >
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.modalContainer}
-          >
-            <View style={styles.modalContent}>
+        <TouchableWithoutFeedback onPress={() => {}}>
+          <View style={styles.modalContent}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Your Bid</Text>
-                <TouchableOpacity 
+                <View style={styles.modalTitleContainer}>
+                  <Ionicons name="create-outline" size={24} color="#6366F1" />
+                  <Text style={styles.modalTitle}>Edit Your Bid</Text>
+                </View>
+                <TouchableOpacity
                   onPress={() => setShowEditModal(false)}
                   style={styles.modalCloseButton}
                 >
@@ -655,7 +666,14 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody}>
+              {/* Scrollable Body */}
+              <ScrollView
+                style={styles.modalBody}
+                contentContainerStyle={styles.modalBodyContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                {/* Amount Input */}
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Bid Amount (₵) *</Text>
                   <View style={styles.amountInputContainer}>
@@ -663,36 +681,52 @@ const BidDetailsScreen = ({ route, navigation }) => {
                     <TextInput
                       style={styles.amountInput}
                       value={editingBid.amount}
-                      onChangeText={(text) => setEditingBid(prev => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
+                      onChangeText={(text) =>
+                        setEditingBid((prev) => ({
+                          ...prev,
+                          amount: text.replace(/[^0-9.]/g, ''),
+                        }))
+                      }
                       placeholder="0.00"
-                      keyboardType="numeric"
+                      keyboardType="decimal-pad"
+                      placeholderTextColor="#9CA3AF"
+                      returnKeyType="next"
                       editable={!updating}
                     />
                   </View>
+                  {bid.task?.budget && (
+                    <Text style={styles.hintText}>
+                      Client budget: ₵{bid.task.budget}
+                    </Text>
+                  )}
                 </View>
 
+                {/* Timeline Input */}
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Timeline </Text>
-                  <View style={styles.timelineInputContainer}>
-                    <TextInput
-                      style={styles.timelineInput}
-                      value={editingBid.timeline}
-                      onChangeText={(text) => setEditingBid(prev => ({ ...prev, timeline: text }))}
-                      placeholder="e.g., 3 hours"
-                     
-                      editable={!updating}
-                    />
-                    
-                  </View>
+                  <Text style={styles.formLabel}>Timeline *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={editingBid.timeline}
+                    onChangeText={(text) =>
+                      setEditingBid((prev) => ({ ...prev, timeline: text }))
+                    }
+                    placeholder="e.g., 3 hours, 2 days, 1 week"
+                    placeholderTextColor="#9CA3AF"
+                    editable={!updating}
+                  />
                 </View>
 
+                {/* Message Input */}
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Message to Client (Optional)</Text>
                   <TextInput
                     style={styles.messageInput}
                     value={editingBid.message}
-                    onChangeText={(text) => setEditingBid(prev => ({ ...prev, message: text }))}
+                    onChangeText={(text) =>
+                      setEditingBid((prev) => ({ ...prev, message: text }))
+                    }
                     placeholder="Add any additional information for the client..."
+                    placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
@@ -701,18 +735,25 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 </View>
               </ScrollView>
 
-              <View style={styles.modalActions}>
-                <TouchableOpacity 
+              {/* Modal Footer - Fixed at Bottom */}
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={() => setShowEditModal(false)}
                   disabled={updating}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.updateButton}
+                <TouchableOpacity
+                  style={[
+                    styles.updateButton,
+                    (!editingBid.amount || !editingBid.timeline) &&
+                      styles.disabledButton,
+                  ]}
                   onPress={handleEditBid}
-                  disabled={updating}
+                  disabled={
+                    updating || !editingBid.amount || !editingBid.timeline
+                  }
                 >
                   {updating ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -721,10 +762,13 @@ const BidDetailsScreen = ({ route, navigation }) => {
                   )}
                 </TouchableOpacity>
               </View>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+            </SafeAreaView>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </View>
+  </TouchableWithoutFeedback>
+</Modal>
     </SafeAreaView>
   );
 };
@@ -1332,151 +1376,138 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    zIndex: 9999,
-  },
-  modalContainer: {
-     maxHeight: '95%',
-     zIndex: 10000,
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalBody: {
-    maxHeight: 400,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-  },
-  formGroup: {
-    marginBottom: 24,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 8,
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  amountPrefix: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#4B5563',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#F3F4F6',
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  timelineInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  timelineInput: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  timelineSuffix: {
-    fontSize: 14,
-    color: '#6B7280',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#F3F4F6',
-  },
-  messageInput: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1F2937',
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  updateButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6366F1',
-  },
-  updateButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+modalContent: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  width: '100%',
+  maxWidth: 420,
+  height: '85%',              // Better than maxHeight for consistency
+  maxHeight: Dimensions.get('window').height * 0.9,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  elevation: 10,
+},
+modalHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F1F5F9',
+},
+modalBody: {
+  flex: 1,
+},
+modalBodyContent: {
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  paddingBottom: 20,
+  flexGrow: 1,
+},
+modalFooter: {
+  flexDirection: 'row',
+  paddingHorizontal: 20,
+  paddingVertical: 16,
+  borderTopWidth: 1,
+  borderTopColor: '#F1F5F9',
+  gap: 12,
+  backgroundColor: '#FFFFFF',
+},
+// Add these input styles if not already present
+amountInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  marginTop: 8,
+  backgroundColor: '#FAFAFA',
+},
+amountPrefix: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#1F2937',
+  marginRight: 4,
+},
+amountInput: {
+  flex: 1,
+  fontSize: 18,
+  paddingVertical: 12,
+  color: '#1F2937',
+},
+textInput: {
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  marginTop: 8,
+  fontSize: 16,
+  backgroundColor: '#FAFAFA',
+},
+messageInput: {
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingTop: 12,
+  marginTop: 8,
+  fontSize: 16,
+  backgroundColor: '#FAFAFA',
+  minHeight: 100,
+},
+formGroup: {
+  marginBottom: 20,
+},
+formLabel: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#374151',
+  marginBottom: 4,
+},
+hintText: {
+  fontSize: 13,
+  color: '#6B7280',
+  marginTop: 6,
+},
+cancelButton: {
+  flex: 1,
+  paddingVertical: 14,
+  borderRadius: 12,
+  backgroundColor: '#F3F4F6',
+  alignItems: 'center',
+},
+cancelButtonText: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#374151',
+},
+updateButton: {
+  flex: 1,
+  paddingVertical: 14,
+  borderRadius: 12,
+  backgroundColor: '#6366F1',
+  alignItems: 'center',
+},
+updateButtonText: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#FFFFFF',
+},
+disabledButton: {
+  backgroundColor: '#9CA3AF',
+},
 });
 
 export default BidDetailsScreen;
