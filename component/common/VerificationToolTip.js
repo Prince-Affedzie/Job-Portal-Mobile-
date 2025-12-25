@@ -13,7 +13,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
-const VERIFICATION_FORM_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform';
+const VERIFICATION_FORM_URL = 'https://forms.gle/iF4MZ6RiBcUseJmR9';
 
 const VerificationTooltip = ({ 
   placement = 'right', // 'right', 'left'

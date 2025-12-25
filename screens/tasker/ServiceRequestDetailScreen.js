@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  StatusBar,
   Platform,
   Image,
   Alert,
@@ -464,7 +465,7 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
    
 
 {/* Offer Modal */}
-{/* Offer Modal - Updated Responsive Version */}
+{/* Offer Modal - Responsive Version */}
 <Modal
   visible={showOfferModal}
   animationType="fade"
@@ -475,125 +476,165 @@ const ServiceRequestDetailScreen = ({ route, navigation }) => {
     setOfferAmount('');
     setOfferMessage('');
   }}
+  statusBarTranslucent={true}
 >
-  <TouchableWithoutFeedback 
-    onPress={() => {
-      setShowOfferModal(false);
-      setEditingOffer(null);
-      setOfferAmount('');
-      setOfferMessage('');
-    }}
-  >
-    <View style={styles.modalOverlay}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1, width: '100%', justifyContent: 'center' }}
-      >
-        <TouchableWithoutFeedback onPress={() => {}}>
-          <View style={styles.modalContent}>
-            <SafeAreaView style={{ flex: 1 }}>
-              {/* Header */}
-              <View style={styles.modalHeader}>
-                <View style={styles.modalTitleContainer}>
-                  <Ionicons name="pricetag-outline" size={24} color="#6366F1" />
-                  <Text style={styles.modalTitle}>
-                    {editingOffer ? 'Edit Your Offer' : 'Submit Offer'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowOfferModal(false);
-                    setEditingOffer(null);
-                    setOfferAmount('');
-                    setOfferMessage('');
-                  }}
-                  style={styles.modalCloseButton}
-                >
-                  <Ionicons name="close" size={24} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Scrollable Body */}
-              <ScrollView
-                style={styles.modalBody}
-                contentContainerStyle={styles.modalBodyContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {/* Amount Input */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Offer Amount (₵) *</Text>
-                  <View style={styles.amountInputContainer}>
-                    <Text style={styles.amountPrefix}>₵</Text>
-                    <TextInput
-                      style={styles.amountInput}
-                      value={offerAmount}
-                      onChangeText={(text) => setOfferAmount(text.replace(/[^0-9.]/g, ''))}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
-                      placeholderTextColor="#9CA3AF"
-                      returnKeyType="next"
-                    />
-                  </View>
-                  {request.budget && (
-                    <Text style={styles.hintText}>
-                      Client budget: ₵{request.budget}
-                    </Text>
-                  )}
-                </View>
-
-                {/* Message Input */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Message to Client (Optional)</Text>
-                  <TextInput
-                    style={styles.messageInput}
-                    value={offerMessage}
-                    onChangeText={setOfferMessage}
-                    placeholder="Explain why you're the best fit..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={5}
-                    textAlignVertical="top"
-                    maxLength={500}
-                  />
-                  <Text style={styles.charCount}>
-                    {offerMessage.length}/500
-                  </Text>
-                </View>
-              </ScrollView>
-
-              {/* Footer */}
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => {
-                    setShowOfferModal(false);
-                    setEditingOffer(null);
-                    setOfferAmount('');
-                    setOfferMessage('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.updateButton,
-                    (!offerAmount || parseFloat(offerAmount) <= 0) && styles.disabledButton
-                  ]}
-                  onPress={handleSubmitOffer}
-                  disabled={!offerAmount || parseFloat(offerAmount) <= 0}
-                >
-                  <Text style={styles.updateButtonText}>
-                    {editingOffer ? 'Update Offer' : 'Submit Offer'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
+  <SafeAreaView style={styles.modalContainer}>
+    <TouchableOpacity
+      style={styles.modalOverlay}
+      activeOpacity={1}
+      onPress={() => {
+        setShowOfferModal(false);
+        setEditingOffer(null);
+        setOfferAmount('');
+        setOfferMessage('');
+      }}
+    />
+    <KeyboardAvoidingView
+      style={styles.modalKeyboardContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.select({
+        ios: 0,
+        android: StatusBar.currentHeight ? StatusBar.currentHeight + scale(20) : scale(20),
+      })}
+    >
+      <View style={styles.modalContent}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalTitleContainer}>
+            <Ionicons name="pricetag-outline" size={scale(24)} color="#FFFFFF" />
+            <Text style={styles.modalTitle}>
+              {editingOffer ? 'Edit Your Offer' : 'Submit Offer'}
+            </Text>
           </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </View>
-  </TouchableWithoutFeedback>
+          <TouchableOpacity
+            onPress={() => {
+              setShowOfferModal(false);
+              setEditingOffer(null);
+              setOfferAmount('');
+              setOfferMessage('');
+            }}
+            style={styles.modalCloseButton}
+          >
+            <Ionicons name="close" size={scale(24)} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Scrollable Body */}
+        <ScrollView
+          style={styles.modalBody}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.modalBodyContent}
+        >
+          {/* Current Information */}
+          {request && (
+            <View style={styles.infoSection}>
+              <View style={styles.infoHeader}>
+                <Ionicons name="information-circle" size={scale(20)} color="#6366F1" />
+                <Text style={styles.infoTitle}>Service Request Info</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Service Type:</Text>
+                <Text style={styles.infoValue}>{request.type}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Client Budget:</Text>
+                <Text style={styles.infoValue}>
+                  {request.budget ? `₵${request.budget}` : 'Flexible'}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Current Status:</Text>
+                <Text style={styles.infoValue}>
+                  {request.status?.replace('-', ' ') || 'Pending'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Amount Input */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>
+              Offer Amount (₵) <Text style={styles.required}>*</Text>
+            </Text>
+            <Text style={styles.sectionSubtitle}>
+              Enter your proposed amount for this service
+            </Text>
+            <View style={styles.inputContainer}>
+              <View style={styles.amountInputWrapper}>
+                <Text style={styles.currencySymbol}>₵</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  value={offerAmount}
+                  onChangeText={(text) => setOfferAmount(text.replace(/[^0-9.]/g, ''))}
+                  placeholder="0.00"
+                  keyboardType="decimal-pad"
+                  placeholderTextColor="#9CA3AF"
+                  returnKeyType="next"
+                  autoFocus={!editingOffer}
+                />
+              </View>
+              <Text style={styles.helperText}>
+                Competitive offers are more likely to be accepted
+              </Text>
+            </View>
+          </View>
+
+          {/* Message Input */}
+          <View style={styles.formSection}>
+            <Text style={styles.sectionTitle}>Message to Client (Optional)</Text>
+            <Text style={styles.sectionSubtitle}>
+              Explain why you're the best fit for this service
+            </Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.messageInput}
+                value={offerMessage}
+                onChangeText={setOfferMessage}
+                placeholder="Write a compelling message to the client..."
+                placeholderTextColor="#9CA3AF"
+                multiline={true}
+                numberOfLines={5}
+                textAlignVertical="top"
+                maxLength={500}
+              />
+              <View style={styles.charCounter}>
+                <Text style={styles.hintText}>Optional - Max 500 characters</Text>
+                <Text style={styles.charCount}>{offerMessage.length}/500</Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.modalFooter}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => {
+              setShowOfferModal(false);
+              setEditingOffer(null);
+              setOfferAmount('');
+              setOfferMessage('');
+            }}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              (!offerAmount || parseFloat(offerAmount) <= 0) && styles.buttonDisabled,
+            ]}
+            onPress={handleSubmitOffer}
+            disabled={!offerAmount || parseFloat(offerAmount) <= 0}
+          >
+            <Text style={styles.submitButtonText}>
+              {editingOffer ? 'Update Offer' : 'Submit Offer'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
 </Modal>
       <WorkSubmissionModal
         isVisible={showWorkModal}
@@ -772,156 +813,253 @@ const styles = StyleSheet.create({
   secItem: { alignItems: 'center', gap: 8 },
   secLabel: { fontSize: 13, color: '#475569', fontWeight: '600' },
 
-    modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-   modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(16),
-    width: '100%',
-  },
+    // Modal Styles
+modalContainer: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
 
-  modalContent: {
-   backgroundColor: '#FFFFFF',
-    borderRadius: scale(16),
-    width: Math.min(width * 0.9, scale(500)),
-    maxHeight: height * 0.95,
-    minHeight: scale(550),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-  },
+modalOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+},
 
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalBody: {
-    flex: 1,
-  },
-  modalBodyContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-  },
+modalKeyboardContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: scale(16),
+  width: '100%',
+},
 
-  // Form Styles
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  amountInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginTop: 8,
-    backgroundColor: '#FAFAFA',
-  },
-  amountPrefix: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginRight: 4,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 18,
-    paddingVertical: 14,
-    color: '#1F2937',
-  },
-  messageInput: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    marginTop: 8,
-    fontSize: 16,
-    backgroundColor: '#FAFAFA',
-    minHeight: 120,
-  },
-  hintText: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 6,
-  },
-  charCount: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textAlign: 'right',
-    marginTop: 6,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  updateButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-  },
-  updateButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  disabledButton: {
-    backgroundColor: '#9CA3AF',
-  },
+modalContent: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: scale(16),
+  width: Math.min(width * 0.9, scale(500)),
+  maxHeight: height * 0.85,
+  minHeight: scale(500),
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+  elevation: 10,
+},
+
+modalHeader: {
+  backgroundColor: '#6366F1',
+  borderTopLeftRadius: scale(16),
+  borderTopRightRadius: scale(16),
+  paddingHorizontal: scale(20),
+  paddingVertical: scale(16),
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+
+modalTitleContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: scale(8),
+},
+
+modalTitle: {
+  fontSize: scale(20),
+  fontWeight: '700',
+  color: '#FFFFFF',
+},
+
+modalCloseButton: {
+  padding: scale(4),
+},
+
+modalBody: {
+  flex: 1,
+},
+
+modalBodyContent: {
+  paddingHorizontal: scale(20),
+  paddingVertical: scale(20),
+},
+
+modalFooter: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  padding: scale(20),
+  borderTopWidth: 1,
+  borderTopColor: '#F1F5F9',
+  gap: scale(12),
+},
+
+// Info Section
+infoSection: {
+  backgroundColor: '#F8FAFC',
+  borderRadius: scale(12),
+  padding: scale(16),
+  marginBottom: scale(20),
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+},
+
+infoHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: scale(12),
+  gap: scale(8),
+},
+
+infoTitle: {
+  fontSize: scale(16),
+  fontWeight: '600',
+  color: '#1F2937',
+},
+
+infoRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingVertical: scale(8),
+  borderBottomWidth: 1,
+  borderBottomColor: '#F1F5F9',
+},
+
+infoLabel: {
+  fontSize: scale(14),
+  color: '#6B7280',
+},
+
+infoValue: {
+  fontSize: scale(14),
+  fontWeight: '600',
+  color: '#1F2937',
+},
+
+// Form Sections
+formSection: {
+  marginBottom: scale(24),
+},
+
+sectionTitle: {
+  fontSize: scale(16),
+  fontWeight: '600',
+  color: '#111827',
+  marginBottom: scale(4),
+},
+
+sectionSubtitle: {
+  fontSize: scale(14),
+  color: '#6B7280',
+  marginBottom: scale(12),
+},
+
+required: {
+  color: '#EF4444',
+},
+
+inputContainer: {
+  marginBottom: scale(8),
+},
+
+amountInputWrapper: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 2,
+  borderColor: '#E5E7EB',
+  borderRadius: scale(12),
+  backgroundColor: '#FFFFFF',
+  overflow: 'hidden',
+},
+
+currencySymbol: {
+  fontSize: scale(18),
+  fontWeight: '600',
+  color: '#6366F1',
+  paddingHorizontal: scale(16),
+  paddingVertical: scale(14),
+  backgroundColor: '#F8FAFC',
+},
+
+amountInput: {
+  flex: 1,
+  fontSize: scale(18),
+  fontWeight: '600',
+  color: '#1F2937',
+  paddingHorizontal: scale(16),
+  paddingVertical: scale(14),
+},
+
+messageInput: {
+  borderWidth: 2,
+  borderColor: '#E5E7EB',
+  borderRadius: scale(12),
+  paddingHorizontal: scale(16),
+  paddingVertical: scale(12),
+  fontSize: scale(16),
+  backgroundColor: '#FFFFFF',
+  minHeight: scale(120),
+  textAlignVertical: 'top',
+  color: '#111827',
+},
+helperText: {
+  fontSize: scale(13),
+  color: '#6B7280',
+  marginTop: scale(6),
+},
+
+charCounter: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: scale(8),
+},
+
+
+
+charCount: {
+  color: '#6B7280',
+  fontSize: scale(14),
+},
+
+
+// Button Styles
+cancelButton: {
+  flex: 1,
+  backgroundColor: '#FFFFFF',
+  borderWidth: 2,
+  borderColor: '#E5E7EB',
+  paddingVertical: scale(16),
+  borderRadius: scale(12),
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+cancelButtonText: {
+  color: '#374151',
+  fontSize: scale(16),
+  fontWeight: '600',
+},
+
+submitButton: {
+  flex: 1,
+  backgroundColor: '#6366F1',
+  paddingVertical: scale(16),
+  borderRadius: scale(12),
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+
+submitButtonText: {
+  color: '#FFFFFF',
+  fontSize: scale(16),
+  fontWeight: '600',
+},
+
+buttonDisabled: {
+  opacity: 0.6,
+},
 
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 24, fontWeight: '800', color: '#1E293B', marginTop: 20 },

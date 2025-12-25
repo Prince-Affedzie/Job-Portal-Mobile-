@@ -11,7 +11,7 @@ import {
 import { AuthContext } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const VERIFICATION_FORM_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform';
+const VERIFICATION_FORM_URL = 'https://forms.gle/iF4MZ6RiBcUseJmR9';
 
 const VerificationBanner = ({ 
   showCloseButton = true,
