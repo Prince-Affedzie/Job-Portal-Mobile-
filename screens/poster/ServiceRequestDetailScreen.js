@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  title: { fontSize: 26, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
+  title: { fontSize: 21, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
   statusDot: { width: 12, height: 12, borderRadius: 6 },
   statusText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
   },
   infoContent: { flex: 1 },
   infoLabel: { fontSize: 12, color: '#64748B', fontWeight: '700', textTransform: 'uppercase' },
-  infoValue: { fontSize: 18, fontWeight: '600', color: '#1E293B', marginTop: 6 },
+  infoValue: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 6 },
 
   tabScrollContainer: { marginBottom: 8 },
   tabContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12 },

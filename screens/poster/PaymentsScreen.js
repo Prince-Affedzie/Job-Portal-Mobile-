@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ActivityIndicator,
   RefreshControl,
   Dimensions,
   StatusBar,
   Alert,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
@@ -23,14 +23,49 @@ import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width, height } = Dimensions.get('window');
 
-// Simple status config
+// Enhanced status config
 const getStatusConfig = (status) => {
   const configs = {
-    'released': { color: '#10B981', icon: 'checkmark-circle', label: 'Paid', bgColor: '#F0FDF4' },
-    'in_escrow': { color: '#F59E0B', icon: 'lock-closed', label: 'In Escrow', bgColor: '#FFFBEB' },
-    'pending': { color: '#6366F1', icon: 'time', label: 'Processing', bgColor: '#EEF2FF' },
-    'refunded': { color: '#8B5CF6', icon: 'arrow-back', label: 'Refunded', bgColor: '#FAF5FF' },
-    'failed': { color: '#EF4444', icon: 'close-circle', label: 'Failed', bgColor: '#FEF2F2' }
+    'released': { 
+      color: '#10B981', 
+      icon: 'checkmark-circle', 
+      label: 'Paid', 
+      bgColor: '#F0FDF4',
+      lightColor: '#D1FAE5',
+      textColor: '#065F46'
+    },
+    'in_escrow': { 
+      color: '#F59E0B', 
+      icon: 'lock-closed', 
+      label: 'In Escrow', 
+      bgColor: '#FFFBEB',
+      lightColor: '#FEF3C7',
+      textColor: '#92400E'
+    },
+    'pending': { 
+      color: '#6366F1', 
+      icon: 'time', 
+      label: 'Processing', 
+      bgColor: '#EEF2FF',
+      lightColor: '#E0E7FF',
+      textColor: '#3730A3'
+    },
+    'refunded': { 
+      color: '#8B5CF6', 
+      icon: 'arrow-back', 
+      label: 'Refunded', 
+      bgColor: '#FAF5FF',
+      lightColor: '#EDE9FE',
+      textColor: '#5B21B6'
+    },
+    'failed': { 
+      color: '#EF4444', 
+      icon: 'close-circle', 
+      label: 'Failed', 
+      bgColor: '#FEF2F2',
+      lightColor: '#FECACA',
+      textColor: '#7F1D1D'
+    }
   };
   return configs[status] || configs.pending;
 };
@@ -40,15 +75,14 @@ const PaymentsScreen = ({ navigation }) => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState('all'); // Changed from 'month' to 'all'
+  const [timeRange, setTimeRange] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [referenceModalVisible, setReferenceModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
 
-  // Simple task title resolver
+  // Enhanced task title resolver
   const getTaskTitle = (payment) => {
-    // Handle null taskId
     if (!payment.taskId) {
       return payment.reference ? `Payment ${payment.reference.substring(0, 8)}...` : 'Direct Payment';
     }
@@ -59,15 +93,48 @@ const PaymentsScreen = ({ navigation }) => {
       return task.title;
     }
     
+    if (task.type) {
+      return task.type;
+    }
+    
     if (task.description) {
-      const words = task.description.split(' ').slice(0, 5).join(' ');
-      return words + (task.description.split(' ').length > 5 ? '...' : '');
+      const words = task.description.split(' ').slice(0, 4).join(' ');
+      return words + (task.description.split(' ').length > 4 ? '...' : '');
     }
     
     return payment.reference ? `Payment ${payment.reference.substring(0, 8)}...` : 'Task Payment';
   };
 
-  // Simple reference display
+  // Get task type or category
+  const getTaskType = (payment) => {
+    if (!payment.taskId) return 'Payment';
+    
+    const task = payment.taskId;
+    return task.type || task.category || 'Service';
+  };
+
+  // Get tasker name
+  const getTaskerName = (payment) => {
+    if (payment.taskId?.assignedTasker?.name) {
+      return payment.taskId.assignedTasker.name;
+    }
+    if (payment.beneficiary?.name) {
+      return payment.beneficiary.name;
+    }
+    return 'Tasker';
+  };
+
+  // Get tasker image
+  const getTaskerImage = (payment) => {
+    if (payment.taskId?.assignedTasker?.profileImage) {
+      return payment.taskId.assignedTasker.profileImage;
+    }
+    if (payment.beneficiary?.profileImage) {
+      return payment.beneficiary.profileImage;
+    }
+    return null;
+  };
+
   const getPaymentReference = (payment) => {
     return payment.reference || payment.transactionRef || payment._id || 'N/A';
   };
@@ -77,7 +144,6 @@ const PaymentsScreen = ({ navigation }) => {
     setReferenceModalVisible(true);
   };
 
-  // Simple filtering
   const filterPaymentsByTimeRange = (payments, range) => {
     const now = moment();
     switch (range) {
@@ -103,7 +169,6 @@ const PaymentsScreen = ({ navigation }) => {
     return payments.filter(payment => payment.status === status);
   };
 
-  // Simple payment statistics
   const paymentStats = useMemo(() => {
     const timeFiltered = filterPaymentsByTimeRange(payments, timeRange);
     const statusFiltered = filterPaymentsByStatus(timeFiltered, statusFilter);
@@ -115,6 +180,9 @@ const PaymentsScreen = ({ navigation }) => {
     const escrowAmount = timeFiltered
       .filter(p => p.status === 'in_escrow')
       .reduce((sum, payment) => sum + payment.amount, 0);
+    const refundedAmount = timeFiltered
+      .filter(p => p.status === 'refunded')
+      .reduce((sum, payment) => sum + payment.amount, 0);
     
     const totalTasks = timeFiltered.length;
     const completedTasks = timeFiltered.filter(p => p.status === 'released').length;
@@ -123,6 +191,7 @@ const PaymentsScreen = ({ navigation }) => {
       totalSpent,
       releasedAmount,
       escrowAmount,
+      refundedAmount,
       totalTasks,
       completedTasks,
       filteredPayments: statusFiltered,
@@ -134,7 +203,6 @@ const PaymentsScreen = ({ navigation }) => {
     try {
       const response = await getClientPayments(); 
       if(response.status === 200){
-        
         setPayments(response.data || []);
       } else {
         setPayments([]);
@@ -158,64 +226,114 @@ const PaymentsScreen = ({ navigation }) => {
     fetchPayments();
   };
 
-  const PaymentItem = ({ payment, index }) => {
+  // Card Component for Payment
+  const PaymentCard = ({ payment, index }) => {
     const statusConfig = getStatusConfig(payment.status);
     const taskTitle = getTaskTitle(payment);
+    const taskType = getTaskType(payment);
+    const taskerName = getTaskerName(payment);
+    const taskerImage = getTaskerImage(payment);
     const paymentReference = getPaymentReference(payment);
+    const isRefund = payment.status === 'refunded';
+    const isFailed = payment.status === 'failed';
 
     return (
-      <View style={styles.paymentItem}>
-        <TouchableOpacity onPress={() => showReferenceModal(payment)} style={styles.paymentLeft}>
-          <View style={[styles.paymentIcon, { backgroundColor: statusConfig.bgColor }]}>
-            <Ionicons name={statusConfig.icon} size={20} color={statusConfig.color} />
-          </View>
-          
-          <View style={styles.paymentInfo}>
-            <Text style={styles.paymentTask} numberOfLines={2}>
-              {taskTitle}
-            </Text>
-            
-            <View style={styles.paymentMeta}>
-              <Text style={styles.paymentDate}>
-                {moment(payment.createdAt).format('MMM D, YYYY • h:mm A')}
+      <View style={styles.paymentCard}>
+        {/* Card Header */}
+        <View style={styles.cardHeader}>
+          <View style={styles.cardHeaderLeft}>
+            <View style={[styles.statusIndicator, { backgroundColor: statusConfig.lightColor }]}>
+              <Ionicons name={statusConfig.icon} size={16} color={statusConfig.color} />
+            </View>
+            <View>
+              <Text style={styles.taskType}>{taskType}</Text>
+              <Text style={[styles.statusLabel, { color: statusConfig.textColor }]}>
+                {statusConfig.label}
               </Text>
             </View>
-            
-            <View style={styles.paymentDetails}>
-              <Text style={styles.paymentMethod}>
-                {payment.paymentMethod === 'momo' ? 'Mobile Money' : 
-                 payment.paymentMethod === 'mobile_money' ? 'Mobile Money' : 
-                 payment.paymentMethod || 'N/A'}
-              </Text>
-              
-              <TouchableOpacity 
-                style={styles.referenceContainer}
-                onPress={() => showReferenceModal(payment)}
-              >
-                <Ionicons name="document-text" size={12} color="#6B7280" />
-                <Text style={styles.transactionRef}>
-                  Ref: {paymentReference.substring(0, 12)}...
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
-        </TouchableOpacity>
-        
-        <View style={styles.paymentRight}>
-          <Text style={[
-            styles.amountText,
-            payment.status === 'refunded' && styles.amountRefunded,
-            payment.status === 'failed' && styles.amountFailed
-          ]}>
-            {payment.status === 'refunded' ? '+' : '-'}₵{payment.amount.toLocaleString()}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-            <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
-            <Text style={[styles.statusText, { color: statusConfig.color }]}>
-              {statusConfig.label}
+          <View style={styles.cardHeaderRight}>
+            <Text style={[
+              styles.amount,
+              isRefund && styles.amountRefund,
+              isFailed && styles.amountFailed
+            ]}>
+              {isRefund ? '+' : isFailed ? '-' : '-'}₵{payment.amount.toLocaleString()}
             </Text>
           </View>
         </View>
+
+        {/* Card Body */}
+        <View style={styles.cardBody}>
+          <Text style={styles.taskTitle} numberOfLines={2}>
+            {taskTitle}
+          </Text>
+          
+          {/* Tasker Info */}
+          <View style={styles.taskerContainer}>
+            {taskerImage ? (
+              <Image source={{ uri: taskerImage }} style={styles.taskerAvatar} />
+            ) : (
+              <View style={styles.taskerAvatarFallback}>
+                <Text style={styles.taskerInitial}>{taskerName[0]?.toUpperCase()}</Text>
+              </View>
+            )}
+            <View style={styles.taskerInfo}>
+              <Text style={styles.taskerNameText}>{taskerName}</Text>
+              <Text style={styles.taskerRole}>Tasker</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Card Footer */}
+        <View style={styles.cardFooter}>
+          <View style={styles.footerLeft}>
+            <View style={styles.dateContainer}>
+              <Ionicons name="calendar-outline" size={12} color="#6B7280" />
+              <Text style={styles.dateText}>
+                {moment(payment.createdAt).format('MMM D, YYYY')}
+              </Text>
+            </View>
+            <View style={styles.methodContainer}>
+              <Ionicons 
+                name={payment.paymentMethod === 'momo' ? 'phone-portrait' : 'card'} 
+                size={12} 
+                color="#6B7280" 
+              />
+              <Text style={styles.methodText}>
+                {payment.paymentMethod === 'momo' ? 'Mobile Money' : 
+                 payment.paymentMethod === 'card' ? 'Card' : 
+                 payment.paymentMethod || 'Payment'}
+              </Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.referenceButton}
+            onPress={() => showReferenceModal(payment)}
+          >
+            <Ionicons name="document-text" size={14} color="#6366F1" />
+            <Text style={styles.referenceButtonText}>Details</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Progress Bar for In Escrow */}
+        {payment.status === 'in_escrow' && (
+          <View style={styles.escrowProgress}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: '60%' }]} />
+            </View>
+            <Text style={styles.progressText}>Payment held securely in escrow</Text>
+          </View>
+        )}
+
+        {/* Refund Badge */}
+        {payment.status === 'refunded' && (
+          <View style={styles.refundBadge}>
+            <Ionicons name="refresh" size={12} color="#8B5CF6" />
+            <Text style={styles.refundText}>Refunded to your account</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -234,7 +352,6 @@ const PaymentsScreen = ({ navigation }) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Payment Details</Text>
               <TouchableOpacity
@@ -245,59 +362,72 @@ const PaymentsScreen = ({ navigation }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Body */}
             <ScrollView style={styles.modalBody}>
-              <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Reference ID:</Text>
-                <Text style={styles.referenceValue}>
-                  {getPaymentReference(selectedPayment)}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Task:</Text>
-                <Text style={styles.referenceValue}>
-                  {getTaskTitle(selectedPayment)}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Amount:</Text>
-                <Text style={[styles.referenceValue, styles.amountHighlight]}>
-                  ₵{selectedPayment.amount.toLocaleString()}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Date:</Text>
-                <Text style={styles.referenceValue}>
-                  {moment(selectedPayment.createdAt).format('MMMM D, YYYY [at] h:mm A')}
-                </Text>
-              </View>
-
-              <View style={styles.detailRow}>
-                <Text style={styles.referenceLabel}>Status:</Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-                  <Ionicons name={statusConfig.icon} size={12} color={statusConfig.color} />
-                  <Text style={[styles.statusText, { color: statusConfig.color }]}>
+              <View style={styles.detailCard}>
+                <View style={[styles.detailHeader, { backgroundColor: statusConfig.lightColor }]}>
+                  <Ionicons name={statusConfig.icon} size={24} color={statusConfig.color} />
+                  <Text style={[styles.detailStatus, { color: statusConfig.textColor }]}>
                     {statusConfig.label}
                   </Text>
                 </View>
-              </View>
+                
+                <View style={styles.detailContent}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Reference ID</Text>
+                    <Text style={styles.detailValue}>
+                      {getPaymentReference(selectedPayment)}
+                    </Text>
+                  </View>
 
-              {selectedPayment.paymentMethod && (
-                <View style={styles.detailRow}>
-                  <Text style={styles.referenceLabel}>Payment Method:</Text>
-                  <Text style={styles.referenceValue}>
-                    {selectedPayment.paymentMethod === 'momo' ? 'Mobile Money' : 
-                     selectedPayment.paymentMethod === 'mobile_money' ? 'Mobile Money' : 
-                     selectedPayment.paymentMethod}
-                  </Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Task Title</Text>
+                    <Text style={styles.detailValue}>
+                      {getTaskTitle(selectedPayment)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Tasker</Text>
+                    <Text style={styles.detailValue}>
+                      {getTaskerName(selectedPayment)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Amount</Text>
+                    <Text style={[styles.detailValue, styles.detailAmount]}>
+                      ₵{selectedPayment.amount.toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date</Text>
+                    <Text style={styles.detailValue}>
+                      {moment(selectedPayment.createdAt).format('MMMM D, YYYY [at] h:mm A')}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Payment Method</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedPayment.paymentMethod === 'momo' ? 'Mobile Money' : 
+                       selectedPayment.paymentMethod === 'card' ? 'Credit/Debit Card' : 
+                       selectedPayment.paymentMethod || 'Not specified'}
+                    </Text>
+                  </View>
+
+                  {selectedPayment.updatedAt && selectedPayment.updatedAt !== selectedPayment.createdAt && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Last Updated</Text>
+                      <Text style={styles.detailValue}>
+                        {moment(selectedPayment.updatedAt).format('MMMM D, YYYY [at] h:mm A')}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              )}
+              </View>
             </ScrollView>
 
-            {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.closeModalButton}
@@ -313,39 +443,44 @@ const PaymentsScreen = ({ navigation }) => {
   };
 
   const TimeRangeFilter = () => (
-    <View style={styles.timeFilter}>
-      {[
-        { key: 'week', label: 'Week', icon: 'calendar-outline' },
-        { key: 'month', label: 'Month', icon: 'calendar' },
-        { key: 'year', label: 'Year', icon: 'business-outline' },
-        { key: 'all', label: 'All Time', icon: 'time-outline' }
-      ].map((range) => (
-        <TouchableOpacity
-          key={range.key}
-          style={[
-            styles.timeFilterButton,
-            timeRange === range.key && styles.timeFilterButtonActive
-          ]}
-          onPress={() => setTimeRange(range.key)}
-        >
-          <Ionicons 
-            name={range.icon} 
-            size={14} 
-            color={timeRange === range.key ? '#FFFFFF' : '#6366F1'} 
-          />
-          <Text style={[
-            styles.timeFilterText,
-            timeRange === range.key && styles.timeFilterTextActive
-          ]}>
-            {range.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      style={styles.timeFilterScroll}
+    >
+      <View style={styles.timeFilter}>
+        {[
+          { key: 'week', label: 'Week', icon: 'calendar-outline' },
+          { key: 'month', label: 'Month', icon: 'calendar' },
+          { key: 'year', label: 'Year', icon: 'business-outline' },
+          { key: 'all', label: 'All Time', icon: 'time-outline' }
+        ].map((range) => (
+          <TouchableOpacity
+            key={range.key}
+            style={[
+              styles.timeFilterButton,
+              timeRange === range.key && styles.timeFilterButtonActive
+            ]}
+            onPress={() => setTimeRange(range.key)}
+          >
+            <Ionicons 
+              name={range.icon} 
+              size={16} 
+              color={timeRange === range.key ? '#FFFFFF' : '#6366F1'} 
+            />
+            <Text style={[
+              styles.timeFilterText,
+              timeRange === range.key && styles.timeFilterTextActive
+            ]}>
+              {range.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
   );
 
   const StatusFilter = () => {
-    // Calculate counts for each status
     const statusCounts = {
       all: paymentStats.allPayments.length,
       released: paymentStats.allPayments.filter(p => p.status === 'released').length,
@@ -359,43 +494,50 @@ const PaymentsScreen = ({ navigation }) => {
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
-        style={styles.statusFilter}
+        style={styles.statusFilterScroll}
       >
-        {[
-          { key: 'all', label: 'All Payments' },
-          { key: 'released', label: 'Paid' },
-          { key: 'in_escrow', label: 'Escrow' },
-          { key: 'pending', label: 'Processing' },
-          { key: 'refunded', label: 'Refunded' },
-          { key: 'failed', label: 'Failed' },
-        ].map((status) => (
-          <TouchableOpacity
-            key={status.key}
-            style={[
-              styles.statusFilterButton,
-              statusFilter === status.key && styles.statusFilterButtonActive
-            ]}
-            onPress={() => setStatusFilter(status.key)}
-          >
-            <Text style={[
-              styles.statusFilterText,
-              statusFilter === status.key && styles.statusFilterTextActive
-            ]}>
-              {status.label}
-            </Text>
-            <View style={[
-              styles.statusCountBadge,
-              statusFilter === status.key && styles.statusCountBadgeActive
-            ]}>
+        <View style={styles.statusFilter}>
+          {[
+            { key: 'all', label: 'All Payments', icon: 'layers' },
+            { key: 'released', label: 'Paid', icon: 'checkmark-circle' },
+            { key: 'in_escrow', label: 'Escrow', icon: 'lock-closed' },
+            { key: 'pending', label: 'Processing', icon: 'time' },
+            { key: 'refunded', label: 'Refunded', icon: 'refresh' },
+            { key: 'failed', label: 'Failed', icon: 'close-circle' },
+          ].map((status) => (
+            <TouchableOpacity
+              key={status.key}
+              style={[
+                styles.statusFilterButton,
+                statusFilter === status.key && styles.statusFilterButtonActive
+              ]}
+              onPress={() => setStatusFilter(status.key)}
+            >
+              <Ionicons 
+                name={status.icon} 
+                size={14} 
+                color={statusFilter === status.key ? '#FFFFFF' : '#6B7280'} 
+              />
               <Text style={[
-                styles.statusCountText,
-                statusFilter === status.key && styles.statusCountTextActive
+                styles.statusFilterText,
+                statusFilter === status.key && styles.statusFilterTextActive
               ]}>
-                {statusCounts[status.key] || 0}
+                {status.label}
               </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={[
+                styles.statusCountBadge,
+                statusFilter === status.key && styles.statusCountBadgeActive
+              ]}>
+                <Text style={[
+                  styles.statusCountText,
+                  statusFilter === status.key && styles.statusCountTextActive
+                ]}>
+                  {statusCounts[status.key] || 0}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
     );
   };
@@ -432,70 +574,83 @@ const PaymentsScreen = ({ navigation }) => {
             tintColor="#6366F1"
           />
         }
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* Spending Overview */}
-        <View style={styles.spendingHeader}>
-          <View style={styles.spendingOverview}>
-            <Text style={styles.spendingLabel}>Total Spent</Text>
-            <Text style={styles.spendingAmount}>
-              ₵{paymentStats.totalSpent.toLocaleString()}
-            </Text>
-            
-            <View style={styles.spendingBreakdown}>
-              <View style={styles.spendingItem}>
-                <View style={[styles.spendingDot, { backgroundColor: '#10B981' }]} />
-                <Text style={styles.spendingText}>
-                  Paid Out: ₵{paymentStats.releasedAmount.toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.spendingItem}>
-                <View style={[styles.spendingDot, { backgroundColor: '#F59E0B' }]} />
-                <Text style={styles.spendingText}>
-                  In Escrow: ₵{paymentStats.escrowAmount.toLocaleString()}
-                </Text>
-              </View>
+        {/* Stats Overview Cards */}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#EEF2FF' }]}>
+              <Ionicons name="cash" size={24} color="#6366F1" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statLabel}>Total Spent</Text>
+              <Text style={styles.statValue}>
+                ₵{paymentStats.totalSpent.toLocaleString()}
+              </Text>
             </View>
           </View>
-          
-          <View style={styles.spendingVisual}>
-            <Ionicons name="card" size={48} color="#FFFFFF" opacity={0.8} />
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#F0FDF4' }]}>
+              <Ionicons name="checkmark-done" size={24} color="#10B981" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statLabel}>Paid Out</Text>
+              <Text style={styles.statValue}>
+                ₵{paymentStats.releasedAmount.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#FFFBEB' }]}>
+              <Ionicons name="lock-closed" size={24} color="#F59E0B" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statLabel}>In Escrow</Text>
+              <Text style={styles.statValue}>
+                ₵{paymentStats.escrowAmount.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#FAF5FF' }]}>
+              <Ionicons name="refresh" size={24} color="#8B5CF6" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statLabel}>Refunded</Text>
+              <Text style={styles.statValue}>
+                ₵{paymentStats.refundedAmount.toLocaleString()}
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* Time Filter */}
-        <TimeRangeFilter />
+        {/* Filters */}
+        <View style={styles.filterSection}>
+          <Text style={styles.filterTitle}>Time Range</Text>
+          <TimeRangeFilter />
+        </View>
 
-        {/* Status Filter */}
-        <StatusFilter />
-
-        {/* Stats Summary */}
-        <View style={styles.statsSummary}>
-          <View style={styles.statItem}>
-            <Ionicons name="briefcase" size={24} color="#6366F1" />
-            <View style={styles.statItemContent}>
-              <Text style={styles.statItemLabel}>Total Tasks</Text>
-              <Text style={styles.statItemValue}>{paymentStats.totalTasks}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Ionicons name="checkmark-done" size={24} color="#10B981" />
-            <View style={styles.statItemContent}>
-              <Text style={styles.statItemLabel}>Completed</Text>
-              <Text style={styles.statItemValue}>{paymentStats.completedTasks}</Text>
-            </View>
-          </View>
+        <View style={styles.filterSection}>
+          <Text style={styles.filterTitle}>Payment Status</Text>
+          <StatusFilter />
         </View>
 
         {/* Payment History */}
-        <View style={styles.section}>
+        <View style={styles.paymentsSection}>
           <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="receipt" size={20} color="#6366F1" />
-              <Text style={styles.sectionTitle}>
-                Payment History ({paymentStats.filteredPayments.length})
-              </Text>
+            <View style={styles.sectionHeaderLeft}>
+              <Ionicons name="receipt" size={22} color="#6366F1" />
+              <View>
+                <Text style={styles.sectionTitle}>Payment History</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {paymentStats.filteredPayments.length} payments found
+                </Text>
+              </View>
             </View>
+            
             {paymentStats.filteredPayments.length > 10 && (
               <TouchableOpacity 
                 style={styles.toggleButton}
@@ -514,26 +669,29 @@ const PaymentsScreen = ({ navigation }) => {
           </View>
 
           {displayedPayments.length > 0 ? (
-            <View style={styles.paymentsList}>
+            <View style={styles.paymentsGrid}>
               {displayedPayments.map((payment, index) => (
-                <PaymentItem key={payment._id || index} payment={payment} index={index} />
+                <PaymentCard key={payment._id || index} payment={payment} index={index} />
               ))}
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="card-outline" size={64} color="#D1D5DB" />
+              <View style={styles.emptyIcon}>
+                <Ionicons name="card-outline" size={64} color="#D1D5DB" />
+              </View>
               <Text style={styles.emptyStateTitle}>No Payments Found</Text>
               <Text style={styles.emptyStateText}>
                 {timeRange !== 'all' || statusFilter !== 'all'
                   ? 'No payments match your current filters'
-                  : 'Your payment history will appear here when you make payments'
+                  : 'Your payment history will appear here'
                 }
               </Text>
               <TouchableOpacity 
                 style={styles.createTaskButton}
                 onPress={() => navigation.navigate('CreateTask')}
               >
-                <Text style={styles.createTaskText}>Create Your First Task</Text>
+                <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.createTaskText}>Create a Task</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -554,102 +712,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  spendingHeader: {
-    padding: 24,
-    paddingTop: 32,
-    borderRadius: 22,
-    marginHorizontal: 12,
-    backgroundColor: '#6366F1',
-    marginBottom: 8,
+  scrollContent: {
+    paddingBottom: 40,
   },
-  spendingOverview: {
-    flex: 1,
+  
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
   },
-  spendingLabel: {
-    fontSize: 14,
-    color: '#E5E7EB',
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  spendingAmount: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 16,
-  },
-  spendingBreakdown: {
-    gap: 8,
-  },
-  spendingItem: {
+  statCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    flex: 1,
+    minWidth: width / 2 - 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  spendingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  spendingText: {
+  statInfo: {
+    flex: 1,
+  },
+  statLabel: {
     fontSize: 12,
-    color: '#E5E7EB',
+    color: '#6B7280',
     fontWeight: '500',
+    marginBottom: 4,
   },
-  spendingVisual: {
-    padding: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+
+  // Filter Section
+  filterSection: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  filterTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  timeFilterScroll: {
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
   },
   timeFilter: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    borderRadius: 20,
-    marginBottom: 8,
+    gap: 8,
   },
   timeFilterButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
     gap: 6,
+    minWidth: 90,
   },
   timeFilterButtonActive: {
     backgroundColor: '#6366F1',
   },
   timeFilterText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
   },
   timeFilterTextActive: {
     color: '#FFFFFF',
   },
+
+  statusFilterScroll: {
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
   statusFilter: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingHorizontal: 4,
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
   },
   statusFilterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: 12,
     backgroundColor: '#F3F4F6',
-    marginHorizontal: 4,
-    gap: 8,
+    gap: 6,
   },
   statusFilterButtonActive: {
     backgroundColor: '#6366F1',
   },
   statusFilterText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
   },
@@ -660,7 +837,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 8,
     minWidth: 20,
   },
   statusCountBadgeActive: {
@@ -675,185 +852,267 @@ const styles = StyleSheet.create({
   statusCountTextActive: {
     color: '#6366F1',
   },
-  statsSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+
+  // Payments Section
+  paymentsSection: {
     paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 16,
-    flex: 1,
-    marginHorizontal: 8,
-    gap: 12,
-  },
-  statItemContent: {
-    flex: 1,
-  },
-  statItemLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  statItemValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1F2937',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
+    marginTop: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    marginBottom: 16,
   },
-  sectionTitleRow: {
+  sectionHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
-    marginLeft: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   toggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     backgroundColor: '#EEF2FF',
-    borderRadius: 12,
+    borderRadius: 10,
     gap: 4,
   },
   toggleButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#6366F1',
   },
-  paymentsList: {
-    padding: 4,
+
+  // Payment Cards Grid
+  paymentsGrid: {
+    gap: 16,
   },
-  paymentItem: {
+  paymentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  cardHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  paymentLeft: {
+  cardHeaderLeft: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    marginRight: 12,
+    alignItems: 'center',
+    gap: 10,
   },
-  paymentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  statusIndicator: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  paymentInfo: {
-    flex: 1,
-  },
-  paymentTask: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  paymentMeta: {
-    marginBottom: 2,
-  },
-  paymentDate: {
+  taskType: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  paymentDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 2,
   },
-  paymentMethod: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    fontWeight: '500',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  referenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  transactionRef: {
-    fontSize: 10,
-    color: '#6B7280',
-  },
-  paymentRight: {
-    alignItems: 'flex-end',
-    minWidth: 90,
-  },
-  amountText: {
-    fontSize: 16,
+  cardHeaderRight: {},
+  amount: {
+    fontSize: 22,
     fontWeight: '800',
     color: '#EF4444',
-    marginBottom: 6,
-    textAlign: 'right',
   },
-  amountRefunded: {
+  amountRefund: {
     color: '#10B981',
   },
   amountFailed: {
     color: '#6B7280',
     textDecorationLine: 'line-through',
   },
-  statusBadge: {
+
+  cardBody: {
+    marginBottom: 16,
+  },
+  taskTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  taskerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    gap: 12,
+  },
+  taskerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  taskerAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  taskerInitial: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  taskerInfo: {
+    flex: 1,
+  },
+  taskerNameText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  taskerRole: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  dateText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
+  methodContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  methodText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  referenceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    gap: 6,
+  },
+  referenceButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6366F1',
+  },
+
+  // Special Elements
+  escrowProgress: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#F59E0B',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  refundBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  refundText: {
+    fontSize: 12,
+    color: '#8B5CF6',
+    fontWeight: '500',
+  },
+
+  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: 40,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    marginTop: 8,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#6B7280',
-    marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
@@ -862,21 +1121,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
+    maxWidth: 300,
   },
   createTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#6366F1',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
+    gap: 8,
   },
   createTaskText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
+
   bottomPadding: {
     height: 30,
   },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -912,26 +1178,49 @@ const styles = StyleSheet.create({
     maxHeight: height * 0.5,
     padding: 20,
   },
+  detailCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    gap: 10,
+  },
+  detailStatus: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  detailContent: {
+    padding: 20,
+  },
   detailRow: {
     marginBottom: 16,
   },
-  referenceLabel: {
-    fontSize: 14,
+  detailLabel: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#6B7280',
     marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  referenceValue: {
+  detailValue: {
     fontSize: 15,
     color: '#1F2937',
     fontWeight: '500',
     backgroundColor: '#F9FAFB',
-    padding: 14,
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  amountHighlight: {
+  detailAmount: {
     fontSize: 18,
     fontWeight: '800',
     color: '#EF4444',

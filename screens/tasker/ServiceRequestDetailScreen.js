@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  title: { fontSize: 26, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
+  title: { fontSize: 21, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
   statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
   statusDot: { width: 12, height: 12, borderRadius: 6 },
   statusText: { fontSize: 16, fontWeight: '700', color: '#1E293B' },

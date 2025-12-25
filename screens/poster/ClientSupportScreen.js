@@ -186,19 +186,19 @@ const quickActions = [
   };
 
   const handleContactSupport = () => {
-    const email = "clients@novaedgeapp.com";
+    const email = "workaflow726@gmail.com";
     Linking.openURL(`mailto:${email}?subject=Client Support Request&body=Hello, I need help with...`);
   };
 
   const handleCallSupport = () => {
     Alert.alert(
       "Client Support",
-      "Call our dedicated client support team at +23359782841",
+      "Call our dedicated client support team at +233505671577",
       [
         { text: "Cancel", style: "cancel" },
         { 
           text: "Call", 
-          onPress: () => Linking.openURL('tel:+23359782841'),
+          onPress: () => Linking.openURL('tel:+2233505671577'),
           style: "default"
         }
       ]
