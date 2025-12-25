@@ -31,7 +31,10 @@ import LoadingIndicator from '../../component/common/LoadingIndicator';
 import RatingModal from '../../component/common/RatingModal';
 import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
 
-const { width } = Dimensions.get('window');
+const { width,height } = Dimensions.get('window');
+const guidelineBaseWidth = 375;
+const scale = (size) => (width / guidelineBaseWidth) * size;
+
 
 const ServiceRequestDetailScreen = ({ route, navigation }) => {
   const { requestId } = route.params;
@@ -776,19 +779,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+   modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: scale(16),
     width: '100%',
-    maxWidth: 420,
-    height: '85%',
-    maxHeight: Dimensions.get('window').height * 0.9,
+  },
+
+  modalContent: {
+   backgroundColor: '#FFFFFF',
+    borderRadius: scale(16),
+    width: Math.min(width * 0.9, scale(500)),
+    maxHeight: height * 0.95,
+    minHeight: scale(550),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
   },
+
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',

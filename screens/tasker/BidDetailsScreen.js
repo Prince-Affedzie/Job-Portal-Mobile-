@@ -29,7 +29,9 @@ import { navigate } from '../../services/navigationService';
 import { getBidDetails, withdrawBid, updateBid } from '../../api/bidApi';
 import { startOrGetChatRoom } from '../../api/chatApi';
 
-const { width } = Dimensions.get('window');
+const { width,height } = Dimensions.get('window');
+const guidelineBaseWidth = 375;
+const scale = (size) => (width / guidelineBaseWidth) * size;
 
 const BidDetailsScreen = ({ route, navigation }) => {
   const { bidId, taskId } = route.params;
@@ -636,23 +638,23 @@ const BidDetailsScreen = ({ route, navigation }) => {
 
       
 
-{/* Edit Bid Modal - Centered Hanging Modal */}
+{/* Edit Bid Modal - FINAL FIXED VERSION */}
 <Modal
   visible={showEditModal}
-  animationType="fade"
+  animationType="slide"
   transparent={true}
   onRequestClose={() => setShowEditModal(false)}
 >
-  <TouchableWithoutFeedback onPress={() => setShowEditModal(false)}>
-    <View style={styles.modalOverlay}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1, width: '100%', justifyContent: 'center' }}
-      >
-        <TouchableWithoutFeedback onPress={() => {}}>
-          <View style={styles.modalContent}>
-            <SafeAreaView style={{ flex: 1 }}>
-              {/* Modal Header */}
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalOverlay}
+  >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.modalOverlay}>
+        <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              {/* Header - Fixed */}
               <View style={styles.modalHeader}>
                 <View style={styles.modalTitleContainer}>
                   <Ionicons name="create-outline" size={24} color="#6366F1" />
@@ -661,6 +663,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   onPress={() => setShowEditModal(false)}
                   style={styles.modalCloseButton}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons name="close" size={24} color="#64748B" />
                 </TouchableOpacity>
@@ -672,6 +675,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 contentContainerStyle={styles.modalBodyContent}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                bounces={false}
               >
                 {/* Amount Input */}
                 <View style={styles.formGroup}>
@@ -682,7 +686,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
                       style={styles.amountInput}
                       value={editingBid.amount}
                       onChangeText={(text) =>
-                        setEditingBid((prev) => ({
+                        setEditingBid(prev => ({
                           ...prev,
                           amount: text.replace(/[^0-9.]/g, ''),
                         }))
@@ -708,10 +712,11 @@ const BidDetailsScreen = ({ route, navigation }) => {
                     style={styles.textInput}
                     value={editingBid.timeline}
                     onChangeText={(text) =>
-                      setEditingBid((prev) => ({ ...prev, timeline: text }))
+                      setEditingBid(prev => ({ ...prev, timeline: text }))
                     }
                     placeholder="e.g., 3 hours, 2 days, 1 week"
                     placeholderTextColor="#9CA3AF"
+                    returnKeyType="next"
                     editable={!updating}
                   />
                 </View>
@@ -723,9 +728,9 @@ const BidDetailsScreen = ({ route, navigation }) => {
                     style={styles.messageInput}
                     value={editingBid.message}
                     onChangeText={(text) =>
-                      setEditingBid((prev) => ({ ...prev, message: text }))
+                      setEditingBid(prev => ({ ...prev, message: text }))
                     }
-                    placeholder="Add any additional information for the client..."
+                    placeholder="Add any additional information..."
                     placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={4}
@@ -735,7 +740,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 </View>
               </ScrollView>
 
-              {/* Modal Footer - Fixed at Bottom */}
+              {/* Fixed Footer */}
               <View style={styles.modalFooter}>
                 <TouchableOpacity
                   style={styles.cancelButton}
@@ -747,13 +752,10 @@ const BidDetailsScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={[
                     styles.updateButton,
-                    (!editingBid.amount || !editingBid.timeline) &&
-                      styles.disabledButton,
+                    (!editingBid.amount || !editingBid.timeline || updating) && styles.disabledButton,
                   ]}
                   onPress={handleEditBid}
-                  disabled={
-                    updating || !editingBid.amount || !editingBid.timeline
-                  }
+                  disabled={updating || !editingBid.amount || !editingBid.timeline}
                 >
                   {updating ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -762,12 +764,12 @@ const BidDetailsScreen = ({ route, navigation }) => {
                   )}
                 </TouchableOpacity>
               </View>
-            </SafeAreaView>
+            </View>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </View>
-  </TouchableWithoutFeedback>
+      </View>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
 </Modal>
     </SafeAreaView>
   );
@@ -1377,137 +1379,192 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingHorizontal: 20,
-},
-modalContent: {
-  backgroundColor: '#FFFFFF',
-  borderRadius: 16,
-  width: '100%',
-  maxWidth: 420,
-  height: '85%',              // Better than maxHeight for consistency
-  maxHeight: Dimensions.get('window').height * 0.9,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.25,
-  shadowRadius: 10,
-  elevation: 10,
-},
-modalHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingHorizontal: 20,
-  paddingVertical: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: '#F1F5F9',
-},
-modalBody: {
-  flex: 1,
-},
-modalBodyContent: {
-  paddingHorizontal: 20,
-  paddingVertical: 16,
-  paddingBottom: 20,
-  flexGrow: 1,
-},
-modalFooter: {
-  flexDirection: 'row',
-  paddingHorizontal: 20,
-  paddingVertical: 16,
-  borderTopWidth: 1,
-  borderTopColor: '#F1F5F9',
-  gap: 12,
-  backgroundColor: '#FFFFFF',
-},
-// Add these input styles if not already present
-amountInputContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#E2E8F0',
-  borderRadius: 12,
-  paddingHorizontal: 12,
-  marginTop: 8,
-  backgroundColor: '#FAFAFA',
-},
-amountPrefix: {
-  fontSize: 18,
-  fontWeight: '600',
-  color: '#1F2937',
-  marginRight: 4,
-},
-amountInput: {
-  flex: 1,
-  fontSize: 18,
-  paddingVertical: 12,
-  color: '#1F2937',
-},
-textInput: {
-  borderWidth: 1,
-  borderColor: '#E2E8F0',
-  borderRadius: 12,
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  marginTop: 8,
-  fontSize: 16,
-  backgroundColor: '#FAFAFA',
-},
-messageInput: {
-  borderWidth: 1,
-  borderColor: '#E2E8F0',
-  borderRadius: 12,
-  paddingHorizontal: 12,
-  paddingTop: 12,
-  marginTop: 8,
-  fontSize: 16,
-  backgroundColor: '#FAFAFA',
-  minHeight: 100,
-},
-formGroup: {
-  marginBottom: 20,
-},
-formLabel: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#374151',
-  marginBottom: 4,
-},
-hintText: {
-  fontSize: 13,
-  color: '#6B7280',
-  marginTop: 6,
-},
-cancelButton: {
-  flex: 1,
-  paddingVertical: 14,
-  borderRadius: 12,
-  backgroundColor: '#F3F4F6',
-  alignItems: 'center',
-},
-cancelButtonText: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#374151',
-},
-updateButton: {
-  flex: 1,
-  paddingVertical: 14,
-  borderRadius: 12,
-  backgroundColor: '#6366F1',
-  alignItems: 'center',
-},
-updateButtonText: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-disabledButton: {
-  backgroundColor: '#9CA3AF',
-},
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: scale(16),
+    width: '100%',
+    borderRadius: scale(16),
+  },
+
+  modalContent: {
+   backgroundColor: '#FFFFFF',
+    borderRadius: scale(16),
+    width: Math.min(width * 0.9, scale(500)),
+    maxHeight: height * 0.95,
+    minHeight: scale(550),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+
+  modalCloseButton: {
+    padding: 8,
+    marginRight: -8,
+  },
+
+  modalBody: {
+    flex: 1,
+  },
+
+  modalBodyContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+  },
+
+  // Form Styles
+  formGroup: {
+    marginBottom: 20,
+  },
+
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    height: 52,
+  },
+
+  amountPrefix: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6366F1',
+    marginRight: 8,
+  },
+
+  amountInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    padding: 0,
+  },
+
+  textInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    height: 52,
+  },
+
+  messageInput: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    minHeight: 120,
+    maxHeight: 160,
+  },
+
+  hintText: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 6,
+  },
+
+  // Button Styles
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+
+  updateButton: {
+    flex: 1,
+    backgroundColor: '#6366F1',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  updateButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+
+  disabledButton: {
+    backgroundColor: '#CBD5E1',
+    opacity: 0.6,
+  },
+
 });
 
 export default BidDetailsScreen;
