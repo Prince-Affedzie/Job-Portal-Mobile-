@@ -28,208 +28,362 @@ const TaskerSelectionCard = ({ tasker, isSelected, onToggleSelect, onViewProfile
       : `${(meters / 1000).toFixed(1)}km`;
   };
 
-  return (
-    <TouchableOpacity 
-      style={[
-        styles.taskerCard,
-        isSelected && styles.selectedTaskerCard
-      ]}
-      onPress={() => onToggleSelect(tasker)}
-      activeOpacity={0.7}
-    >
-      {/* Selection Checkbox */}
-      <View style={styles.selectionContainer}>
-        <View style={[
-          styles.checkbox,
-          isSelected && styles.checkboxSelected
-        ]}>
-          {isSelected && <Ionicons name="checkmark" size={16} color="#FFF" />}
-        </View>
-      </View>
+  const calculateCompletionRate = (tasks) => {
+    if (!tasks || tasks.total === 0) return 0;
+    return Math.round((tasks.completed / tasks.total) * 100);
+  };
 
-      {/* Tasker Info */}
-      <View style={styles.taskerInfo}>
-        <View style={styles.taskerHeader}>
-          <Image
-            source={{ uri: tasker.profileImage || 'https://via.placeholder.com/70' }}
-            style={styles.taskerImage}
-          />
-          <View style={styles.taskerDetails}>
-            <Text style={styles.taskerName} numberOfLines={1}>
-              {tasker.name}
-            </Text>
-            <Text style={styles.taskerSkill} numberOfLines={1}>
-              Available
-            </Text>
-            
-            {/* Location Information */}
-            <View style={styles.locationContainer}>
-              <Ionicons name="location-outline" size={12} color="#8E8E93" />
-              <Text style={styles.locationText} numberOfLines={1}>
-                {formatTaskerLocation(tasker.location) || 'Location not specified'}
-              </Text>
+  return (
+    <View style={[
+      styles.cardContainer,
+      isSelected && styles.selectedCardContainer
+    ]}>
+      <TouchableOpacity 
+        style={styles.cardTouchable}
+        onPress={() => onToggleSelect(tasker)}
+        activeOpacity={0.9}
+      >
+        {/* Main Content Container */}
+        <View style={styles.mainContent}>
+          {/* Selection Indicator */}
+          <View style={styles.selectionIndicator}>
+            <View style={[
+              styles.checkbox,
+              isSelected && styles.checkboxSelected
+            ]}>
+              {isSelected && (
+                <Ionicons 
+                  name="checkmark-sharp" 
+                  size={14} 
+                  color="#FFFFFF" 
+                />
+              )}
+            </View>
+          </View>
+
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
+            {/* Avatar with Status */}
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ 
+                  uri: tasker.profileImage || 'https://via.placeholder.com/70'
+                }}
+                style={styles.avatar}
+              />
+              {tasker.isOnline && (
+                <View style={styles.onlineIndicator} />
+              )}
+            </View>
+
+            {/* Tasker Details */}
+            <View style={styles.detailsContainer}>
+              {/* Name and Rating Row */}
+              <View style={styles.nameRatingRow}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {tasker.name}
+                </Text>
+                <View style={styles.ratingBadge}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.ratingValue}>
+                    {tasker.rating?.toFixed(1) || 'New'}
+                  </Text>
+                  {tasker.numberOfRatings > 0 && (
+                    <Text style={styles.ratingCount}>
+                      ({tasker.numberOfRatings})
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Skills/Tags */}
+              <View style={styles.tagsContainer}>
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>
+                    Available
+                  </Text>
+                </View>
+                {tasker.tasks && (
+                  <View style={[styles.tag, styles.completionTag]}>
+                    <Ionicons name="checkmark-circle" size={10} color="#10B981" />
+                    <Text style={styles.completionText}>
+                      {calculateCompletionRate(tasker.tasks)}% completion
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Location Info */}
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={14} color="#6366F1" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {formatTaskerLocation(tasker.location) || 'Location not specified'}
+                </Text>
+              </View>
+
+              {/* Stats Row */}
+              <View style={styles.statsRow}>
+                {/* Distance */}
+                <View style={styles.statItem}>
+                  <Ionicons name="navigate-outline" size={14} color="#8B5CF6" />
+                  <Text style={styles.statText}>
+                    {formatDistance(tasker.distance)}
+                  </Text>
+                </View>
+
+                {/* Separator */}
+                <View style={styles.statSeparator} />
+
+                {/* Experience */}
+                {tasker.experience && (
+                  <View style={styles.statItem}>
+                    <Ionicons name="briefcase-outline" size={14} color="#F59E0B" />
+                    <Text style={styles.statText}>
+                      {tasker.experience}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         </View>
-        
-        <View style={styles.taskerMeta}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#F59E0B" />
-            <Text style={styles.ratingText}>
-              {tasker.rating?.toFixed(1) || 'New'}
-            </Text>
-            {tasker.numberOfRatings > 0 && (
-              <Text style={styles.reviewCount}>
-                ({tasker.numberOfRatings})
-              </Text>
-            )}
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.distanceContainer}>
-            <Ionicons name="navigate-outline" size={13} color="#8E8E93" />
-            <Text style={styles.distanceText}>
-              {formatDistance(tasker.distance)}
-            </Text>
-          </View>
-        </View>
-      </View>
 
-      {/* Individual Action Button */}
-      <TouchableOpacity 
-        style={styles.viewProfileButton}
-        onPress={(e) => {
-          e.stopPropagation(); // Prevent card selection
-          onViewProfile(tasker);
-        }}
-      >
-        <Text style={styles.viewProfileText}>View</Text>
+        {/* Action Button - Separate from selection area */}
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onViewProfile(tasker);
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="eye-outline" size={16} color="#6366F1" />
+          <Text style={styles.actionButtonText}>
+            View
+          </Text>
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  taskerCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
+  // Card Container
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F2F2F7',
+    shadowRadius: 10,
+    elevation: 3,
+    borderWidth: 1.5,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+    marginHorizontal:12,
+  },
+  selectedCardContainer: {
+    borderColor: '#6366F1',
+    backgroundColor: '#F8FAFF',
+    shadowColor: '#6366F1',
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+  },
+
+  // Touchable Area
+  cardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
   },
-  selectedTaskerCard: {
-    borderColor: '#007AFF',
-    backgroundColor: '#F0F8FF',
+
+  // Main Content
+  mainContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  selectionContainer: {
+
+  // Selection Indicator
+  selectionIndicator: {
     marginRight: 12,
+    marginTop: 4,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#C7C7CC',
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   checkboxSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
   },
-  taskerInfo: {
+
+  // Profile Section
+  profileSection: {
     flex: 1,
-  },
-  taskerHeader: {
     flexDirection: 'row',
-    marginBottom: 8,
   },
-  taskerImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#E2E8F0',
+
+  // Avatar
+  avatarContainer: {
+    position: 'relative',
     marginRight: 12,
   },
-  taskerDetails: {
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E2E8F0',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+
+  // Details Container
+  detailsContainer: {
     flex: 1,
-    justifyContent: 'center',
   },
-  taskerName: {
+
+  // Name and Rating
+  nameRatingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  name: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+    marginRight: 8,
   },
-  taskerSkill: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 4,
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  ratingValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  ratingCount: {
+    fontSize: 11,
+    color: '#B45309',
     fontWeight: '500',
   },
-  locationContainer: {
+
+  // Tags
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  tag: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#3730A3',
+  },
+  completionTag: {
+    backgroundColor: '#F0FDF4',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  completionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+
+  // Location
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
   },
   locationText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    fontWeight: '400',
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    flex: 1,
   },
-  taskerMeta: {
+
+  // Stats Row
+  statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  ratingContainer: {
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  ratingText: {
-    fontSize: 13,
-    color: '#000',
-    fontWeight: '600',
-  },
-  reviewCount: {
+  statText: {
     fontSize: 12,
-    color: '#8E8E93',
-    marginLeft: 2,
+    color: '#6B7280',
+    fontWeight: '500',
   },
-  divider: {
+  statSeparator: {
     width: 1,
     height: 12,
-    backgroundColor: '#C7C7CC',
+    backgroundColor: '#E5E7EB',
     marginHorizontal: 10,
   },
-  distanceContainer: {
+
+  // Action Button
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  distanceText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    fontWeight: '400',
-  },
-  viewProfileButton: {
+    backgroundColor: '#F8FAFC',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 6,
-    marginLeft: 8,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginLeft: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 6,
   },
-  viewProfileText: {
-    fontSize: 12,
-    color: '#000',
-    fontWeight: '500',
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6366F1',
   },
 });
 
