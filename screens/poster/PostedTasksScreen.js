@@ -353,10 +353,10 @@ export default function AllTasksScreen() {
         </LinearGradient>
       </View>
 
-        {/* Statistics Overview */}
+        {/* Statistics Overview 
         <View style={styles.statsSection}>
           <StatsOverview stats={stats} />
-        </View>
+        </View>*/}
 
         {/* Filters Section */}
         {showFilters && (
