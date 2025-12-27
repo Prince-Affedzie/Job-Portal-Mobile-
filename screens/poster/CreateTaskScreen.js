@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext, useRef,useCallback } from 'react';
 import {
   View,
   Text,
@@ -49,11 +49,13 @@ const subcategories = {
 };
 
 // Enhanced InputField Component (unchanged)
+// Enhanced InputField Component - FIXED VERSION
 const InputField = React.memo(({ 
   label, value, onChange, placeholder, error, multiline = false, 
   numberOfLines = 1, required = false, icon = null, keyboardType = 'default', ...props 
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+   const inputRef = useRef(null);
   
   return (
     <View style={styles.inputContainer}>
@@ -62,7 +64,10 @@ const InputField = React.memo(({
           {label} {required && <Text style={styles.required}>*</Text>}
         </Text>
       </View>
-      <View style={[
+      <TouchableOpacity 
+       activeOpacity={1}
+       onPress={() => inputRef.current?.focus()}
+      style={[
         styles.inputWrapper,
         isFocused && styles.inputFocused,
         error && styles.inputError,
@@ -88,7 +93,7 @@ const InputField = React.memo(({
           returnKeyType={multiline ? 'default' : 'next'}
           {...props}
         />
-      </View>
+      </TouchableOpacity>
       {error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="warning" size={scale(14)} color="#EF4444" />
@@ -96,13 +101,12 @@ const InputField = React.memo(({
         </View>
       ) : (
         <Text style={styles.helperText}>
-          {multiline ? `Characters: ${value.length}/500` : '\u00A0'}
+          {multiline ? `Characters: ${value.length}/1000` : '\u00A0'}
         </Text>
       )}
     </View>
   );
 });
-
 // Enhanced Chip Component (unchanged)
 const Chip = ({ text, onRemove, variant = 'skill' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -207,6 +211,27 @@ const EnhancedPicker = ({ label, selectedValue, onValueChange, items, enabled = 
   </View>
 );
 
+const MediaPreview = ({ media, index, onRemove }) => (
+  <View style={styles.mediaPreview}>
+    {media.type === 'image' ? (
+      <Image source={{ uri: media.uri || media.url }} style={styles.mediaImage} />
+    ) : (
+      <View style={styles.videoPlaceholder}>
+        <Ionicons name="videocam" size={scale(24)} color="#6366F1" />
+        <Text style={styles.videoText}>Video</Text>
+      </View>
+    )}
+    <TouchableOpacity 
+      style={styles.removeMediaButton}
+      onPress={() => onRemove(index)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Ionicons name="close-circle" size={scale(20)} color="#EF4444" />
+    </TouchableOpacity>
+  </View>
+);
+
+
 const CreateTaskScreen = ({ navigation }) => {
   const { addTask, loading } = useContext(PosterContext);
   const { user } = useContext(AuthContext);
@@ -232,6 +257,40 @@ const CreateTaskScreen = ({ navigation }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
+
+
+  const handleTitleChange = useCallback((text) => {
+  setTask(prev => ({ ...prev, title: text }));
+}, []);
+
+const handleDescriptionChange = useCallback((text) => {
+  setTask(prev => ({ ...prev, description: text }));
+}, []);
+
+const handleBudgetChange = useCallback((text) => {
+  setTask(prev => ({ ...prev, budget: text.replace(/[^0-9.]/g, '') }));
+}, []);
+
+const handleRegionChange = useCallback((text) => {
+  setTask(prev => ({
+    ...prev,
+    address: { ...prev.address, region: text }
+  }));
+}, []);
+
+const handleCityChange = useCallback((text) => {
+  setTask(prev => ({
+    ...prev,
+    address: { ...prev.address, city: text }
+  }));
+}, []);
+
+const handleSuburbChange = useCallback((text) => {
+  setTask(prev => ({
+    ...prev,
+    address: { ...prev.address, suburb: text }
+  }));
+}, []);
 
   // === MEDIA HANDLING: Local storage only ===
   const pickImage = async () => {
@@ -330,28 +389,6 @@ const CreateTaskScreen = ({ navigation }) => {
       media: prev.media.filter((_, i) => i !== index)
     }));
   };
-
-  // === MEDIA PREVIEW: Handles both local URI and uploaded URL ===
-  const MediaPreview = ({ media, index }) => (
-    <View style={styles.mediaPreview}>
-      {media.type === 'image' ? (
-        <Image source={{ uri: media.uri || media.url }} style={styles.mediaImage} />
-      ) : (
-        <View style={styles.videoPlaceholder}>
-          <Ionicons name="videocam" size={scale(24)} color="#6366F1" />
-          <Text style={styles.videoText}>Video</Text>
-        </View>
-      )}
-      <TouchableOpacity 
-        style={styles.removeMediaButton}
-        onPress={() => removeMedia(index)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="close-circle" size={scale(20)} color="#EF4444" />
-      </TouchableOpacity>
-    </View>
-  );
-
   // === FORM VALIDATION (unchanged) ===
   const validateForm = () => {
     const newErrors = {};
@@ -503,13 +540,16 @@ const CreateTaskScreen = ({ navigation }) => {
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
+        removeClippedSubviews={false}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+         scrollEventThrottle={16}
       >
         {/* Task Details */}
         <FormSection title="Task Details" icon="document-text-outline" description="Tell us what you need help with">
-          <InputField label="Task Title" value={task.title} onChange={text => setTask(prev => ({ ...prev, title: text }))}
-            placeholder="e.g., Website Design, Home Cleaning" error={errors.title}  />
-          <InputField label="Description" value={task.description} onChange={text => setTask(prev => ({ ...prev, description: text }))}
+          <InputField label="Task Title" value={task.title} onChange={handleTitleChange}
+            placeholder="e.g., Website Design, Home Cleaning" error={errors.title} required  />
+          <InputField label="Description" value={task.description} onChange={handleDescriptionChange}
             placeholder="Describe what needs to be done..." error={errors.description} multiline numberOfLines={4} required  />
           <View style={styles.row}>
             <View style={{ flex: 1, marginRight: scale(8) }}>
@@ -560,7 +600,7 @@ const CreateTaskScreen = ({ navigation }) => {
           {task.media.length > 0 && (
             <View style={styles.mediaPreviews}>
               {task.media.map((media, index) => (
-                <MediaPreview key={media.tempId || index} media={media} index={index} />
+                <MediaPreview key={media.tempId || index} media={media} index={index} onRemove={removeMedia} />
               ))}
             </View>
           )}
@@ -642,7 +682,7 @@ const CreateTaskScreen = ({ navigation }) => {
             <InputField
               label="Amount (GHS)"
               value={task.budget}
-              onChange={(text) => setTask(prev => ({ ...prev, budget: text.replace(/[^0-9.]/g, '') }))}
+              onChange={handleBudgetChange}
               placeholder="0.00"
               keyboardType="decimal-pad"
               error={errors.budget}
@@ -743,10 +783,7 @@ const CreateTaskScreen = ({ navigation }) => {
                     <InputField
                       label="Region"
                       value={task.address.region}
-                      onChange={(text) => setTask(prev => ({
-                        ...prev,
-                        address: { ...prev.address, region: text }
-                      }))}
+                      onChange={handleRegionChange }
                       placeholder="Greater Accra"
                       icon="navigate-outline"
                     />
@@ -755,10 +792,7 @@ const CreateTaskScreen = ({ navigation }) => {
                     <InputField
                       label="City"
                       value={task.address.city}
-                      onChange={(text) => setTask(prev => ({
-                        ...prev,
-                        address: { ...prev.address, city: text }
-                      }))}
+                      onChange={handleCityChange}
                       placeholder="Accra"
                       icon="business-outline"
                     />
@@ -767,10 +801,7 @@ const CreateTaskScreen = ({ navigation }) => {
                 <InputField
                   label="Suburb/Street"
                   value={task.address.suburb}
-                  onChange={(text) => setTask(prev => ({
-                    ...prev,
-                    address: { ...prev.address, suburb: text }
-                  }))}
+                  onChange={handleSuburbChange}
                   placeholder="e.g., East Legon"
                   icon="home-outline"
                 />
