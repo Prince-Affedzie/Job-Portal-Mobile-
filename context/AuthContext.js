@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginUser, fetchUser, logoutUser,signUp,modifyProfile } from "../api/authApi";
+import { loginUser, fetchUser, logoutUser,signUp,modifyProfile,deleteAccount } from "../api/authApi";
 import { navigate } from '../services/navigationService';
 
 
@@ -106,6 +106,22 @@ const login = async (credentials) => {
     await AsyncStorage.removeItem("authToken");
   };
 
+  const removeAccount = async () => {
+    try {
+      const res = await deleteAccount();
+      if(res.status===200){
+        setUser(null);
+        setToken(null);
+       await AsyncStorage.removeItem("authToken"); 
+       navigate("AuthStack")
+        
+      }
+    } catch {}
+    setUser(null);
+    setToken(null);
+    await AsyncStorage.removeItem("authToken");
+  };
+
   const updateProfile = async(data)=>{
     try{
       const response = await modifyProfile(data)
@@ -118,7 +134,7 @@ const login = async (credentials) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token,register, login, logout,  updateProfile, loading, setUser }}>
+    <AuthContext.Provider value={{ user, token,register, login, logout,removeAccount, updateProfile, loading, setUser }}>
       {children}
     </AuthContext.Provider>
   );

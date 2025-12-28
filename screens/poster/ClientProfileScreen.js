@@ -57,7 +57,7 @@ const ClientProfileScreen = ({ navigation }) => {
   const [editingSections, setEditingSections] = useState({});
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const { user, logout, updateProfile, setUser } = useContext(AuthContext);
+  const { user, logout, updateProfile, setUser ,removeAccount} = useContext(AuthContext);
   const { postedTasks, payments } = useContext(PosterContext);
   const [profileData, setProfileData] = useState({});
   const [originalProfileImage, setOriginalProfileImage] = useState('');
@@ -303,7 +303,20 @@ const ClientProfileScreen = ({ navigation }) => {
     );
   };
 
-  // Helper functions
+
+  const handleDeleteAccount = () => {
+      Alert.alert(
+        'Delete Account',
+        'Are you sure you want to delete your account?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', onPress: removeAccount, style: 'destructive' }
+        ]
+      );
+    };
+  
+
+  
   const formatMemberSince = () => {
     try {
       return new Date(profileData.memberSince).toLocaleDateString('en-US', {
@@ -803,6 +816,10 @@ const ClientProfileScreen = ({ navigation }) => {
             <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color={THEME.danger} />
               <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleDeleteAccount}>
+              <Ionicons name="trash-outline" size={20} color={THEME.danger} />
+                <Text style={[styles.settingText, styles.logoutText]}>Delete Account</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -72,7 +72,7 @@ const TaskerProfileScreen = ({ navigation }) => {
   const [originalData, setOriginalData] = useState({});
   const [loading, setLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const { user, logout, updateProfile,setUser } = useContext(AuthContext);
+  const { user, logout, updateProfile,setUser,removeAccount } = useContext(AuthContext);
   const [newSkill, setNewSkill] = useState('');
   const [showExperienceModal, setShowExperienceModal] = useState(false);
   const [editingExperience, setEditingExperience] = useState(null);
@@ -666,6 +666,18 @@ const TaskerProfileScreen = ({ navigation }) => {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Log Out', onPress: logout, style: 'destructive' }
+      ]
+    );
+  };
+
+
+   const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete your account?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', onPress: removeAccount, style: 'destructive' }
       ]
     );
   };
@@ -1440,6 +1452,11 @@ const TaskerProfileScreen = ({ navigation }) => {
             <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={20} color={THEME.danger} />
               <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleDeleteAccount}>
+              <Ionicons name="trash-outline" size={20} color={THEME.danger} />
+              <Text style={[styles.settingText, styles.logoutText]}>Delete Account</Text>
             </TouchableOpacity>
           </View>
         </View>

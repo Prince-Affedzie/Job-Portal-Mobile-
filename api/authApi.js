@@ -5,6 +5,7 @@ export const signUp = (data) => API.post("/api/user/signup", data);
 export const loginUser = (data) => API.post("/api/user/login", data);
 export const logoutUser = () => API.post("/api/user/logout");
 export const switchAccount = ()=>API.put("/api/user/switch/account")
+export const deleteAccount = ()=>API.delete("/api/user/delete/account")
 
 export const sendOtp = (data)=>API.post("/api/send-otp",data)
 export const verifyOtp = (data)=>API.post("/api/verify-reset-otp",data)
