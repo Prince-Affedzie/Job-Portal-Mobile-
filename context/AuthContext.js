@@ -60,9 +60,10 @@ const login = async (credentials) => {
       await AsyncStorage.setItem('authToken', res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
+      res.data.user?.role === "job_seeker"?navigate('TaskerStack'):navigate('PosterStack')
       return {
         status: res.status,
-        data: res.data,
+        user: res.data.user,
         success: true,
       };
     }
@@ -95,15 +96,8 @@ const login = async (credentials) => {
       if(res.status===200){
         setUser(null);
         setToken(null);
-       await AsyncStorage.removeItem("authToken");
-      
-      
-      if (navigationRef.isReady()) {
-      navigationRef.reset({
-        index: 0,
-        routes: [{ name: 'AuthStack' }],
-      });
-    }
+       await AsyncStorage.removeItem("authToken"); 
+       navigate("AuthStack")
         
       }
     } catch {}

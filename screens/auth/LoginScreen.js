@@ -198,14 +198,14 @@ const Login = ({ navigation }) => {
       if (response.success) {
         setStatus('success');
         setStatusMessage('Login successful!');
+        response.user?.role === "job_seeker"?navigate('TaskerStack'):navigate('PosterStack')
         setAlert({
           visible: true,
           title: 'Success',
           message: 'Login successful!',
         });
-        setTimeout(() => {
-          // Navigation logic here
-        }, 1000);
+        
+        
       } else {
         throw response; 
       }

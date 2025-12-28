@@ -15,6 +15,7 @@ import TaskDetailsScreen from "../screens/tasker/TaskDetails";
 import SplashScreen from "../screens/SplashScreen";
 import  ChatWindowScreen from "../screens/Messaging/ChatWindowScreen"
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
+import LoginScreen from "../screens/auth/LoginScreen";
 
 
 import TaskerOnboardingStack from './TaskerOnboardingStack'
@@ -67,6 +68,7 @@ export default function RootNavigator() {
         )}
 
         {/* Shared/global routes */}
+         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="TaskerOnboarding" component={TaskerOnboardingStack} />
         <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
         <Stack.Screen 
