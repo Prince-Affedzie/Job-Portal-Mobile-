@@ -49,9 +49,14 @@ const TaskerOnboardingStack = () => {
       screenOptions={{
         headerShown: true,
         header: (props) => <OnboardingHeader {...props} />,
-        gestureEnabled: true,
+        //gestureEnabled: true,
       }}
     >
+      <Stack.Screen 
+        name="Skills" 
+        component={SkillsScreen}
+        options={{ title: 'Skills' }}
+      />
       <Stack.Screen 
         name="BasicInfo" 
         component={BasicInfoScreen}
@@ -61,12 +66,7 @@ const TaskerOnboardingStack = () => {
         name="Location" 
         component={LocationScreen}
         options={{ title: 'Location' }}
-      />
-      <Stack.Screen 
-        name="Skills" 
-        component={SkillsScreen}
-        options={{ title: 'Skills' }}
-      />
+      />   
       <Stack.Screen 
         name="ProfileImage" 
         component={ProfileImageScreen}

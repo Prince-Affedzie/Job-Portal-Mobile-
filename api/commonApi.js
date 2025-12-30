@@ -18,3 +18,6 @@ export const getPreviewUrl =(fileKey,selectedSubmission)=> API.get(`/api/get_pre
 
 
 export const sendPushToken = (data)=>API.post('/api/user/push-token',data)
+
+
+export const getAllServices =()=>API.get('/api/all-services')

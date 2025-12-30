@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet,Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTaskerOnboarding } from '../../context/TaskerOnboardingContext';
 import { colors, typography, shadows } from '../../styles/auth/TaskerOnboarding.styles';
-
 
 const OnboardingHeader = ({ navigation, route, back }) => {
   const { currentStep, totalSteps, goToPreviousStep } = useTaskerOnboarding();
@@ -17,15 +16,30 @@ const OnboardingHeader = ({ navigation, route, back }) => {
     }
   };
 
+  // UPDATED: New step order titles
   const getStepTitle = (step) => {
     const titles = {
-      1: 'Basic Info',
-      2: 'Location',
-      3: 'Skills',
-      4: 'Profile Photo',
-      5: 'Review'
+      1: 'Services & Skills',       // Changed from 'Basic Info'
+      2: 'Bio & Phone',             // Changed from 'Location'
+      3: 'Location',                // Changed from 'Skills'
+      4: 'Profile Photo',           // Same
+      5: 'ID Card',                 // NEW: Added ID Card as step 5
+      6: 'Review'                   // Review is now step 6
     };
     return titles[step] || `Step ${step}`;
+  };
+
+  // UPDATED: Get step description/subtitle
+  const getStepDescription = (step) => {
+    const descriptions = {
+      1: 'Select your services and skills',
+      2: 'Tell clients about yourself',
+      3: 'Set your service location',
+      4: 'Upload a profile photo',
+      5: 'Verify your identity',
+      6: 'Review your information'
+    };
+    return descriptions[step] || '';
   };
   
   return (
@@ -39,7 +53,10 @@ const OnboardingHeader = ({ navigation, route, back }) => {
 
       {/* Progress and Title */}
       <View style={styles.headerContent}>
-        <Text style={styles.stepTitle}>{getStepTitle(currentStep)}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.stepTitle}>{getStepTitle(currentStep)}</Text>
+          <Text style={styles.stepDescription}>{getStepDescription(currentStep)}</Text>
+        </View>
         
         {/* Progress Bar */}
         <View style={styles.progressContainer}>
@@ -52,7 +69,7 @@ const OnboardingHeader = ({ navigation, route, back }) => {
             />
           </View>
           <Text style={styles.progressText}>
-            {currentStep} of {totalSteps}
+            Step {currentStep} of {totalSteps}
           </Text>
         </View>
       </View>
@@ -68,7 +85,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingBottom: 20,
     backgroundColor: colors.background,
-    marginTop:20,
+    marginTop: 20,
   },
   backButton: {
     width: 40,
@@ -83,10 +100,21 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
   },
+  titleContainer: {
+    marginBottom: 16,
+  },
   stepTitle: {
     ...typography.h3,
-    marginBottom: 8,
+    marginBottom: 4,
     color: colors.textPrimary,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  stepDescription: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -109,7 +137,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '600',
     color: colors.textSecondary,
-    minWidth: 40,
+    minWidth: 60,
+    textAlign: 'right',
   },
 });
 

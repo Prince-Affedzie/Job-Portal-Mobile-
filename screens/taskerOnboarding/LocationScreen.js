@@ -130,7 +130,7 @@ const LocationScreen = () => {
 
     updateLocation(formData);
     if (goToNextStep()) {
-      navigation.navigate('Skills');
+      navigation.navigate('ProfileImage');
     }
   };
 

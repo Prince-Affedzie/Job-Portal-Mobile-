@@ -136,6 +136,37 @@ const BasicInfoScreen = () => {
               </Text>
             </View>
 
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Phone Number</Text>
+              <View style={[
+                styles.inputWrapper,
+                focusedField === 'phone' && styles.inputWrapperFocused,
+                !validation.phone.valid && errors.phone && styles.inputWrapperError,
+              ]}>
+                <TextInput
+                  ref={phoneInputRef}
+                  style={styles.textInput}
+                  placeholder="020 456 7897"
+                  placeholderTextColor="#8E8E93"
+                  value={formData.phone}
+                  onChangeText={(text) => handleChange('phone', text)}
+                  keyboardType="phone-pad"
+                  onFocus={() => setFocusedField('phone')}
+                  onBlur={() => setFocusedField(null)}
+                  onSubmitEditing={handleSubmit}
+                  editable={!isSubmitting}
+                  selectionColor="#007AFF"
+                  returnKeyType="done"
+                  accessibilityLabel="Phone number"
+                  accessibilityHint="Enter your phone number for client contact"
+                />
+              </View>
+              {!validation.phone.valid && errors.phone && (
+                <Text style={styles.errorText}>{validation.phone.message}</Text>
+              )}
+            </View>
+
             <View style={styles.inputContainer}>
               <View style={styles.labelContainer}>
                 <Text style={styles.label}>Professional Summary</Text>
@@ -171,35 +202,7 @@ const BasicInfoScreen = () => {
               )}
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Phone Number</Text>
-              <View style={[
-                styles.inputWrapper,
-                focusedField === 'phone' && styles.inputWrapperFocused,
-                !validation.phone.valid && errors.phone && styles.inputWrapperError,
-              ]}>
-                <TextInput
-                  ref={phoneInputRef}
-                  style={styles.textInput}
-                  placeholder="+233 20 456 7897"
-                  placeholderTextColor="#8E8E93"
-                  value={formData.phone}
-                  onChangeText={(text) => handleChange('phone', text)}
-                  keyboardType="phone-pad"
-                  onFocus={() => setFocusedField('phone')}
-                  onBlur={() => setFocusedField(null)}
-                  onSubmitEditing={handleSubmit}
-                  editable={!isSubmitting}
-                  selectionColor="#007AFF"
-                  returnKeyType="done"
-                  accessibilityLabel="Phone number"
-                  accessibilityHint="Enter your phone number for client contact"
-                />
-              </View>
-              {!validation.phone.valid && errors.phone && (
-                <Text style={styles.errorText}>{validation.phone.message}</Text>
-              )}
-            </View>
+            
           </Animated.View>
         </ScrollView>
 

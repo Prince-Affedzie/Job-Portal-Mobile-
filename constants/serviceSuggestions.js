@@ -1,5 +1,5 @@
 export const SERVICE_SUGGESTIONS = [
-  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services',
+  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services','Errands',
   'Graphic Design', 'Video Editing', 'Photo Editing', 'Digital Marketing',
   'Video Production', 'Interior Design',
   'Web Development', 'Animation', 'Motion Graphics',
@@ -7,7 +7,7 @@ export const SERVICE_SUGGESTIONS = [
   'Software Engineering', 'Mobile App Development', 'UI/UX Design',
   'SEO/SEM', 'Social Media Management', 'Data Analysis', 'AI/ML',
   'Cybersecurity', 'Network Administration', 'IT Support', 'Cloud Computing',
-  'Logo Design', 'Brand Identity', 'Interior Decor', 'Interior Design',
+  'Logo Design', 'Brand Identity', 'Interior Decor', 'Interior Design','Home & Office Furnishing',
   'Architectural Design', '3D Modeling', 'Animation', 'Motion Graphics',
   'Video Production', 'Photography', 'Illustration', 'Fashion Design',
   'Product Design', 'Creative Writing',

@@ -1,569 +1,754 @@
-// SkillsScreen.js - FIXED TOUCH HANDLING FOR SKILL SELECTION
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   Platform,
-  Alert,
-  Keyboard,
   ScrollView,
-  Dimensions,
-  LayoutAnimation,
-  UIManager,
+  Alert,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTaskerOnboarding } from '../../context/TaskerOnboardingContext';
+import { serviceSkills } from '../../constants/commonSkills';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-const { width, height } = Dimensions.get('window');
-
-const CATEGORIES = [
-  {
-    id: 'digital-tech',
-    title: 'Digital & Tech',
-    icon: 'laptop-outline',
-    color: '#1976D2',
-    bg: '#E3F2FD',
-    skills: [
-      'Software Engineering', 'Web Development', 'Mobile App Development',
-      'UI/UX Design', 'Graphic Design', 'Video Editing', 'Photo Editing',
-      'Digital Marketing', 'SEO/SEM', 'Social Media Management', 'Data Analysis',
-      'AI/ML', 'Cybersecurity', 'Network Administration', 'IT Support',
-      'Cloud Computing', 'Blockchain', 'Game Development'
-    ]
-  },
-  {
-    id: 'creative-design',
-    title: 'Creative & Design',
-    icon: 'brush-outline',
-    color: '#7B1FA2',
-    bg: '#F3E5F5',
-    skills: [
-      'Logo Design', 'Brand Identity', 'Interior Decor', 'Interior Design',
-      'Architectural Design', '3D Modeling', 'Animation', 'Motion Graphics',
-      'Video Production', 'Photography', 'Illustration', 'Fashion Design',
-      'Jewelry Design', 'Product Design', 'Industrial Design', 'Art Direction',
-      'Creative Writing'
-    ]
-  },
-  {
-    id: 'home-professional',
-    title: 'Home & Professional',
-    icon: 'home-outline',
-    color: '#388E3C',
-    bg: '#E8F5E9',
-    skills: [
-      'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting',
-      'Cleaning Services', 'Gardening', 'Landscaping', 'Moving & Packing',
-      'Home Appliance Repair', 'HVAC Installation', 'CCTV Installation',
-      'Home Security', 'Smart Home Setup', 'Home Renovation', 'Roofing',
-      'Masonry', 'Flooring Installation', 'Window Installation',
-      'Event Planning', 'Catering', 'Personal Training', 'Tutoring',
-      'Language Translation', 'Virtual Assistance', 'Accounting', 'Legal Services'
-    ]
-  }
-];
-
-const ALL_SKILLS = CATEGORIES.flatMap(category => category.skills).sort();
-
 const SkillsScreen = () => {
-  const { 
-    skills, 
-    updateSkills, 
-    goToNextStep, 
-    goToPreviousStep, 
-    errors, 
-    clearErrors 
+  const {
+    skills,
+    primaryService,
+    secondaryServices,
+    allServices,
+    servicesLoading,
+    servicesError,
+    updateSkills,
+    updateServices,
+    fetchAllServices,
+    goToNextStep,
+    goToPreviousStep,
+    clearErrors,
   } = useTaskerOnboarding();
-  
+
   const navigation = useNavigation();
-  const scrollViewRef = useRef(null);
 
+  const [selectedPrimary, setSelectedPrimary] = useState(primaryService);
+  const [selectedSecondary, setSelectedSecondary] = useState(secondaryServices || []);
   const [selectedSkills, setSelectedSkills] = useState(skills || []);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState(null);
+  
+  // Modal states
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showSkillModal, setShowSkillModal] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [skillSearch, setSkillSearch] = useState('');
 
-  // Filter skills based on search query
-  const filteredSkills = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    return ALL_SKILLS.filter(skill =>
-      skill.toLowerCase().includes(searchQuery.toLowerCase().trim())
-    ).slice(0, 8);
-  }, [searchQuery]);
-
-  const shouldShowAddOption = searchQuery.trim().length > 0 && 
-    !ALL_SKILLS.some(skill => 
-      skill.toLowerCase() === searchQuery.toLowerCase().trim()
-    );
-
-  // ================== SKILL HANDLERS ==================
-  const toggleSkill = (skill) => {
-    const newSkills = selectedSkills.includes(skill)
-      ? selectedSkills.filter(s => s !== skill)
-      : [...selectedSkills, skill];
-    
-    setSelectedSkills(newSkills);
-    if (!selectedSkills.includes(skill)) {
-      setSearchQuery('');
-      setShowSuggestions(false);
+  useEffect(() => {
+    if (allServices.length === 0 && !servicesLoading) {
+      fetchAllServices();
     }
-    Keyboard.dismiss();
+  }, []);
+
+  // Get skills for a specific service
+  const getSkillsForService = (service) => {
+    if (!service || !service.name) return [];
     
-    if (errors.skills) clearErrors();
+    // Try to find exact match
+    let exactMatchSkills = serviceSkills[service.name] || [];
+    
+    // If no exact match, try partial match
+    if (exactMatchSkills.length === 0) {
+      const serviceName = service.name.toLowerCase();
+      for (const [category, skillsList] of Object.entries(serviceSkills)) {
+        if (serviceName.includes(category.toLowerCase()) || 
+            category.toLowerCase().includes(serviceName)) {
+          return skillsList;
+        }
+      }
+    }
+    
+    return exactMatchSkills;
+  };
+
+  // Get recommended skills based on ALL selected services (primary + secondary)
+  const getRecommendedSkills = useMemo(() => {
+    const allServices = [selectedPrimary, ...selectedSecondary].filter(Boolean);
+    if (allServices.length === 0) return [];
+    
+    const allRecommendedSkills = new Set();
+    
+    // Get skills from each service
+    allServices.forEach(service => {
+      const serviceSkillsList = getSkillsForService(service);
+      serviceSkillsList.forEach(skill => allRecommendedSkills.add(skill));
+    });
+    
+    // Add general skills if we have any services
+    if (allRecommendedSkills.size === 0 && serviceSkills['General']) {
+      serviceSkills['General'].forEach(skill => allRecommendedSkills.add(skill));
+    }
+    
+    return Array.from(allRecommendedSkills);
+  }, [selectedPrimary, selectedSecondary]);
+
+  const filteredServices = allServices.filter(s =>
+    s.name.toLowerCase().includes(serviceSearch.toLowerCase())
+  );
+
+  // Get all available skills for searching
+  const getAllSkills = () => {
+    const allAvailableSkills = Object.values(serviceSkills).flat();
+    return Array.from(new Set(allAvailableSkills));
+  };
+
+  const filteredSkills = () => {
+    const searchTerm = skillSearch.toLowerCase();
+    
+    if (!searchTerm) {
+      // When no search term, show recommended skills first, then selected skills
+      const combinedSkills = [...getRecommendedSkills, ...selectedSkills];
+      return Array.from(new Set(combinedSkills));
+    }
+    
+    // When searching, filter all available skills
+    const allSkills = getAllSkills();
+    return allSkills.filter(skill => 
+      skill.toLowerCase().includes(searchTerm)
+    );
+  };
+
+  const selectPrimary = (service) => {
+    setSelectedPrimary(service);
+    setSelectedSecondary(prev => prev.filter(s => s.name !== service.name));
+    clearErrors();
+    setShowServiceModal(false);
+    setServiceSearch('');
+  };
+
+  const toggleSecondary = (service) => {
+    if (selectedPrimary?.name === service.name) return;
+    
+    const exists = selectedSecondary.some(s => s.name === service.name);
+    if (exists) {
+      setSelectedSecondary(prev => prev.filter(s => s.name !== service.name));
+    } else if (selectedSecondary.length < 3) {
+      setSelectedSecondary(prev => [...prev, service]);
+      setShowServiceModal(false);
+      setServiceSearch('');
+    } else {
+      Alert.alert('Limit Reached', 'You can select up to 3 additional services.');
+    }
+    clearErrors();
+  };
+
+  const toggleSkill = (skill) => {
+    if (selectedSkills.includes(skill)) {
+      setSelectedSkills(prev => prev.filter(s => s !== skill));
+    } else {
+      setSelectedSkills(prev => [...prev, skill]);
+    }
   };
 
   const addCustomSkill = () => {
-    const customSkill = searchQuery.trim();
-    if (!customSkill) return;
-
-    if (selectedSkills.some(skill => 
-      skill.toLowerCase() === customSkill.toLowerCase())) {
+    const skill = skillSearch.trim();
+    if (!skill || skill.length < 2) return;
+    if (selectedSkills.some(s => s.toLowerCase() === skill.toLowerCase())) {
       Alert.alert('Already Added', 'This skill is already in your list.');
       return;
     }
-
-    if (customSkill.length < 2) {
-      Alert.alert('Too Short', 'Skill must be at least 2 characters.');
-      return;
-    }
-
-    if (customSkill.length > 50) {
-      Alert.alert('Too Long', 'Skill must be less than 50 characters.');
-      return;
-    }
-
-    const newSkills = [...selectedSkills, customSkill];
-    setSelectedSkills(newSkills);
-    setSearchQuery('');
-    setShowSuggestions(false);
-    Keyboard.dismiss();
+    setSelectedSkills(prev => [...prev, skill]);
+    setSkillSearch('');
   };
 
-  const removeSkill = (skillToRemove) => {
-    setSelectedSkills(selectedSkills.filter(skill => skill !== skillToRemove));
-  };
-
-  const toggleCategory = (categoryId) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedCategory(expandedCategory === categoryId ? null : categoryId);
-  };
-
-  const handleSubmit = () => {
-    if (selectedSkills.length === 0) {
-      Alert.alert('Required', 'Please add at least one skill to continue.');
+  const handleContinue = () => {
+    if (!selectedPrimary) {
+      Alert.alert('Required', 'Please select a primary service to continue.');
       return;
     }
+    updateServices({ primaryService: selectedPrimary, secondaryServices: selectedSecondary });
     updateSkills(selectedSkills);
-    if (goToNextStep()) navigation.navigate('ProfileImage');
+    if (goToNextStep()) {
+      navigation.navigate('BasicInfo');
+    }
   };
 
-  const handleBack = () => {
-    updateSkills(selectedSkills);
-    goToPreviousStep();
-    navigation.goBack();
-  };
-
-  const handleSearchChange = (text) => {
-    setSearchQuery(text);
-    setShowSuggestions(text.trim().length > 0);
-  };
-
-  // ================== RENDER COMPONENTS ==================
-  const renderSkillChip = (skill) => (
-    <TouchableOpacity
-      key={`chip-${skill}`}
-      style={[
-        styles.skillChip,
-        selectedSkills.includes(skill) && styles.skillChipSelected
-      ]}
-      onPress={() => toggleSkill(skill)}
-      activeOpacity={0.7}
-      // These props prevent the ScrollView from capturing the tap
-      onStartShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => true}
-    >
-      <Text style={[
-        styles.skillChipText,
-        selectedSkills.includes(skill) && styles.skillChipTextSelected
-      ]} numberOfLines={1}>
-        {skill}
-      </Text>
-      {selectedSkills.includes(skill) && (
-        <Ionicons name="checkmark" size={16} color="#007AFF" style={styles.checkIcon} />
-      )}
-    </TouchableOpacity>
-  );
-
-  const renderSuggestionItem = (skill, index) => (
-    <TouchableOpacity
-      key={`suggestion-${skill}-${index}`}
-      style={styles.suggestionItem}
-      onPress={() => toggleSkill(skill)}
-      activeOpacity={0.7}
-    >
-      <Text style={[
-        styles.suggestionText,
-        selectedSkills.includes(skill) && styles.suggestionTextSelected
-      ]}>
-        {skill}
-      </Text>
-      <Ionicons 
-        name={selectedSkills.includes(skill) ? "checkmark-circle" : "add-circle-outline"} 
-        size={24} 
-        color={selectedSkills.includes(skill) ? "#007AFF" : "#65676B"} 
-      />
-    </TouchableOpacity>
-  );
-
-  const renderCategoryDropdown = (category) => {
-    const isExpanded = expandedCategory === category.id;
-
+  const renderServiceItem = ({ item }) => {
+    const isPrimary = selectedPrimary?.name === item.name;
+    const isSecondary = selectedSecondary.some(s => s.name === item.name);
+    
     return (
-      <View style={styles.categoryDropdown} key={category.id}>
-        <TouchableOpacity
-          style={[
-            styles.categoryHeader,
-            isExpanded && styles.categoryHeaderExpanded,
-          ]}
-          onPress={() => toggleCategory(category.id)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.categoryHeaderLeft}>
-            <View style={[styles.categoryIcon, { backgroundColor: category.bg }]}>
-              <Ionicons name={category.icon} size={20} color={category.color} />
-            </View>
-            <View style={styles.categoryInfo}>
-              <Text style={styles.categoryTitleText}>{category.title}</Text>
-              <Text style={styles.categorySkillCount}>
-                {category.skills.length} skills
-              </Text>
-            </View>
-          </View>
-          <Ionicons
-            name={isExpanded ? "chevron-up" : "chevron-down"}
-            size={20}
-            color="#8E8E93"
-          />
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View style={styles.expandedContent}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalSkillsContainer}
-              style={styles.horizontalScrollView}
-              scrollEnabled={true}
-              nestedScrollEnabled={true}
-              // CRITICAL: These props allow taps to work
-              keyboardShouldPersistTaps="handled"
-              // Don't capture taps - let child components handle them
-              onStartShouldSetResponder={() => false}
-              onMoveShouldSetResponder={() => false}
-            >
-              {category.skills.map((skill) => renderSkillChip(skill))}
-            </ScrollView>
-          </View>
-        )}
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.modalItem,
+          isPrimary && styles.modalItemSelected,
+          isSecondary && styles.modalItemSecondary,
+        ]}
+        onPress={() => {
+          if (!selectedPrimary) {
+            selectPrimary(item);
+          } else if (isPrimary) {
+            // Allow deselecting primary
+            setSelectedPrimary(null);
+          } else {
+            toggleSecondary(item);
+          }
+        }}
+      >
+        <View style={styles.modalItemContent}>
+          <Text style={[styles.modalItemText, (isPrimary || isSecondary) && styles.modalItemTextSelected]}>
+            {item.name}
+          </Text>
+          {item.description && (
+            <Text style={styles.modalItemDesc} numberOfLines={1}>
+              {item.description}
+            </Text>
+          )}
+        </View>
+        {isPrimary && <Ionicons name="star" size={20} color="#FF9500" />}
+        {isSecondary && <Ionicons name="checkmark-circle" size={20} color="#007AFF" />}
+      </TouchableOpacity>
     );
   };
 
-  // ================== MAIN SCREEN RENDER ==================
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* FIXED HEADER */}
-      <View style={styles.header}>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Skills & Expertise</Text>
-          <Text style={styles.subtitle}>
-            Showcase what you're great at
-          </Text>
-        </View>
-        <View style={styles.headerRight} />
-      </View>
-
-      {/* MAIN CONTENT */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-        keyboardShouldPersistTaps="handled"
-        bounces={true}
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
+  const renderSkillItem = ({ item }) => {
+    const isSelected = selectedSkills.includes(item);
+    const isRecommended = getRecommendedSkills.includes(item) && (selectedPrimary || selectedSecondary.length > 0);
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.modalItem,
+          isSelected && styles.modalItemSelected,
+          isRecommended && !isSelected && styles.recommendedSkill,
+        ]}
+        onPress={() => toggleSkill(item)}
       >
-        {/* SEARCH SECTION */}
-        <View style={styles.searchSection}>
-          <View style={[
-            styles.searchContainer,
-            showSuggestions && styles.searchContainerActive
+        <View style={styles.skillItemContent}>
+          <Text style={[
+            styles.modalItemText, 
+            isSelected && styles.modalItemTextSelected,
+            isRecommended && styles.recommendedSkillText
           ]}>
-            <Ionicons name="search" size={20} color="#8E8E93" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search or add custom skill..."
-              placeholderTextColor="#8E8E93"
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              returnKeyType="search"
-              autoCorrect={false}
-              clearButtonMode="while-editing"
-            />
-          </View>
-
-          {/* SUGGESTIONS */}
-          {showSuggestions && (
-            <View style={styles.suggestionsContainer}>
-              {filteredSkills.length > 0 ? (
-                <View style={styles.suggestionsList}>
-                  {filteredSkills.map((skill, index) =>
-                    renderSuggestionItem(skill, index)
-                  )}
-                </View>
-              ) : shouldShowAddOption ? (
-                <TouchableOpacity
-                  style={styles.addCustomSkill}
-                  onPress={addCustomSkill}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.addCustomText}>
-                    <Ionicons name="add-circle" size={18} color="#007AFF" /> 
-                    {' '}Add "{searchQuery.trim()}"
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.noResults}>
-                  <Ionicons name="search-outline" size={24} color="#C7C7CC" />
-                  <Text style={styles.noResultsText}>No matching skills found</Text>
-                </View>
-              )}
+            {item}
+          </Text>
+          {isRecommended && !isSelected && (
+            <View style={styles.recommendedBadge}>
+              <Ionicons name="sparkles" size={14} color="#FF9500" />
+              <Text style={styles.recommendedBadgeText}>Recommended</Text>
             </View>
           )}
         </View>
+        {isSelected && <Ionicons name="checkmark-circle" size={20} color="#007AFF" />}
+      </TouchableOpacity>
+    );
+  };
 
-        {/* SELECTED SKILLS */}
-        {selectedSkills.length > 0 && (
-          <View style={styles.selectedSection}>
-            <View style={styles.selectedHeader}>
-              <Text style={styles.sectionTitle}>Your Selected Skills</Text>
-              <Text style={styles.skillCount}>{selectedSkills.length} added</Text>
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Set Up Your Services</Text>
+          <Text style={styles.subtitle}>
+            Choose what you'll offer to clients on our platform
+          </Text>
+        </View>
+
+        {/* Recommended Skills Section (scrollable like before) */}
+        {(selectedPrimary || selectedSecondary.length > 0) && getRecommendedSkills.length > 0 && (
+          <View style={styles.recommendedSection}>
+            <View style={styles.recommendedHeader}>
+              <View style={styles.recommendedIcon}>
+                <Ionicons name="sparkles" size={18} color="#FF9500" />
+              </View>
+              <View style={styles.recommendedTextContainer}>
+                <Text style={styles.recommendedTitle}>Recommended Skills</Text>
+                <Text style={styles.recommendedSubtitle}>
+                  {selectedPrimary && selectedSecondary.length > 0 
+                    ? `Based on your ${selectedSecondary.length + 1} selected services`
+                    : selectedPrimary
+                    ? `Based on your primary service: ${selectedPrimary.name}`
+                    : 'Based on your services'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.selectedSkillsGrid}>
-              {selectedSkills.map(skill => (
-                <View key={`selected-${skill}`} style={styles.selectedSkillChip}>
-                  <Text style={styles.selectedSkillText} numberOfLines={1}>
-                    {skill}
-                  </Text>
-                  <TouchableOpacity 
-                    onPress={() => removeSkill(skill)}
-                    style={styles.removeButton}
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.recommendedSkillsScroll}
+              contentContainerStyle={styles.recommendedSkillsContent}
+            >
+              {getRecommendedSkills.slice(0, 10).map((skill, index) => {
+                const isSelected = selectedSkills.includes(skill);
+                return (
+                  <TouchableOpacity
+                    key={`recommended-${index}`}
+                    style={[
+                      styles.recommendedSkillChip,
+                      isSelected && styles.recommendedSkillChipSelected
+                    ]}
+                    onPress={() => toggleSkill(skill)}
                   >
-                    <Ionicons name="close" size={16} color="#8E8E93" />
+                    <Text style={[
+                      styles.recommendedSkillChipText,
+                      isSelected && styles.recommendedSkillChipTextSelected
+                    ]}>
+                      {skill}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={14} color="#007AFF" style={styles.checkIcon} />
+                    )}
                   </TouchableOpacity>
-                </View>
-              ))}
-            </View>
+                );
+              })}
+            </ScrollView>
+            
+            {getRecommendedSkills.length > 10 && (
+              <TouchableOpacity 
+                style={styles.viewMoreButton}
+                onPress={() => setShowSkillModal(true)}
+              >
+                <Text style={styles.viewMoreText}>View all {getRecommendedSkills.length} skills</Text>
+                <Ionicons name="chevron-forward" size={16} color="#007AFF" />
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
-        {/* CATEGORIES DROPDOWN */}
-        {!showSuggestions && (
-          <View style={styles.categoriesContainer}>
-            <View style={styles.categoriesHeader}>
-              <Text style={styles.categoriesTitle}>Browse Popular Categories</Text>
-              <Text style={styles.categoriesSubtitle}>
-                Tap on a category to view available skills
-              </Text>
+        {/* Primary Service Selector */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Primary Service *</Text>
+          <Text style={styles.cardSubtitle}>Your main offering</Text>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowServiceModal(true)}
+          >
+            <View style={styles.selectorContent}>
+              {selectedPrimary ? (
+                <>
+                  <Ionicons name="star" size={20} color="#FF9500" />
+                  <Text style={styles.selectorTextFilled}>{selectedPrimary.name}</Text>
+                </>
+              ) : (
+                <Text style={styles.selectorTextPlaceholder}>Select your primary service</Text>
+              )}
             </View>
-            
-            {/* CATEGORY DROPDOWNS */}
-            {CATEGORIES.map(category => renderCategoryDropdown(category))}
-            
-            {/* EXTRA SPACE FOR BETTER VISUAL APPEARANCE */}
-            <View style={styles.categoriesSpacer} />
+            <Ionicons name="chevron-down" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Additional Services Selector */}
+        <View style={styles.section}>
+          <Text style={styles.label}>
+            Additional Services ({selectedSecondary.length}/3)
+          </Text>
+          <Text style={styles.cardSubtitle}>Extra services you can offer</Text>
+          <TouchableOpacity
+            style={styles.selector}
+            onPress={() => setShowServiceModal(true)}
+          >
+            <View style={styles.selectorContent}>
+              {selectedSecondary.length > 0 ? (
+                <View style={styles.chipsRow}>
+                  {selectedSecondary.map(s => (
+                    <View key={s.name} style={styles.miniChip}>
+                      <Text style={styles.miniChipText}>{s.name}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.selectorTextPlaceholder}>Add additional services (optional)</Text>
+              )}
+            </View>
+            <Ionicons name="chevron-down" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Skills Selector */}
+        <View style={styles.section}>
+          <View style={styles.skillsHeader}>
+            <View>
+              <Text style={styles.label}>Skills</Text>
+              <Text style={styles.cardSubtitle}>Keywords for your profile</Text>
+            </View>
+            {selectedPrimary && (
+              <TouchableOpacity 
+                style={styles.addSkillsButton}
+                onPress={() => setShowSkillModal(true)}
+              >
+                <Ionicons name="add-circle" size={20} color="#007AFF" />
+                <Text style={styles.addSkillsText}>Add Skills</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        )}
+          
+          {selectedSkills.length > 0 ? (
+            <View style={styles.selectedSkillsContainer}>
+              <View style={styles.selectedSkillsHeader}>
+                <Text style={styles.selectedSkillsTitle}>
+                  Your Skills ({selectedSkills.length})
+                </Text>
+                <TouchableOpacity onPress={() => setSelectedSkills([])}>
+                  <Text style={styles.clearSkillsText}>Clear All</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.chipsRow}>
+                {selectedSkills.map(skill => (
+                  <View key={skill} style={styles.selectedSkillChip}>
+                    <Text style={styles.selectedSkillChipText}>{skill}</Text>
+                    <TouchableOpacity 
+                      style={styles.removeSkillButton}
+                      onPress={() => toggleSkill(skill)}
+                    >
+                      <Ionicons name="close" size={14} color="#007AFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.selector, !selectedPrimary && styles.selectorDisabled]}
+              onPress={() => {
+                if (selectedPrimary) {
+                  setShowSkillModal(true);
+                }
+              }}
+              disabled={!selectedPrimary}
+            >
+              <View style={styles.selectorContent}>
+                <Text style={[
+                  styles.selectorTextPlaceholder,
+                  !selectedPrimary && styles.selectorTextPlaceholderDisabled
+                ]}>
+                  {selectedPrimary ? 'Tap to add skills' : 'Select a primary service first'}
+                </Text>
+              </View>
+              {selectedPrimary && <Ionicons name="chevron-down" size={24} color="#666" />}
+            </TouchableOpacity>
+          )}
+          
+          {selectedPrimary && selectedSkills.length === 0 && (
+            <Text style={styles.skillsHint}>
+              Adding skills helps clients find you when searching for specific expertise
+            </Text>
+          )}
+        </View>
+        
+        {/* Spacer for footer */}
+        <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      {/* FIXED CONTINUE BUTTON */}
+      {/* Continue Button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[
-            styles.continueButton,
-            selectedSkills.length === 0 && styles.continueButtonDisabled
-          ]}
-          onPress={handleSubmit}
-          disabled={selectedSkills.length === 0}
-          activeOpacity={0.8}
+          style={[styles.continueBtn, !selectedPrimary && styles.disabledBtn]}
+          onPress={handleContinue}
+          disabled={!selectedPrimary}
         >
-          <View style={styles.continueButtonContent}>
-            <Text style={styles.continueButtonText}>
-              Continue to Next Step
-            </Text>
-            {selectedSkills.length > 0 && (
-              <View style={styles.skillCounter}>
-                <Text style={styles.skillCounterText}>{selectedSkills.length}</Text>
-              </View>
-            )}
-            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={styles.continueIcon} />
-          </View>
+          <Text style={styles.continueText}>Continue</Text>
+          <Ionicons name="arrow-forward" size={20} color="#FFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Services Modal */}
+      <Modal
+        visible={showServiceModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowServiceModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>Select Services</Text>
+              <Text style={styles.modalSubtitle}>
+                {!selectedPrimary 
+                  ? "Choose your primary service first" 
+                  : `Add up to 3 additional services (${selectedSecondary.length}/3 selected)`}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowServiceModal(false)}>
+              <Ionicons name="close" size={28} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color="#888" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search services..."
+              value={serviceSearch}
+              onChangeText={setServiceSearch}
+              autoFocus
+            />
+          </View>
+
+          {servicesLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color="#007AFF" />
+            </View>
+          ) : servicesError ? (
+            <View style={styles.center}>
+              <Text style={styles.errorText}>Failed to load services</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={fetchAllServices}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredServices}
+              renderItem={renderServiceItem}
+              keyExtractor={(item, index) => item.name + index}
+              contentContainerStyle={styles.modalList}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* Skills Modal */}
+      <Modal
+        visible={showSkillModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSkillModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top', 'bottom']}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>Add Skills</Text>
+              <Text style={styles.modalSubtitle}>
+                {(selectedPrimary || selectedSecondary.length > 0)
+                  ? `Skills for your ${selectedSecondary.length + (selectedPrimary ? 1 : 0)} selected services`
+                  : 'Add skills to describe your expertise'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowSkillModal(false)}>
+              <Ionicons name="close" size={28} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={20} color="#888" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search or add custom skill..."
+              value={skillSearch}
+              onChangeText={setSkillSearch}
+              autoFocus
+            />
+            {skillSearch.trim() && (
+              <TouchableOpacity onPress={addCustomSkill} style={styles.addBtn}>
+                <Ionicons name="add-circle" size={24} color="#007AFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Simple recommended section in modal (scrollable by FlatList) */}
+          {(selectedPrimary || selectedSecondary.length > 0) && getRecommendedSkills.length > 0 && !skillSearch.trim() && (
+            <View style={styles.modalRecommendedSection}>
+              <View style={styles.modalRecommendedHeader}>
+                <Ionicons name="sparkles" size={16} color="#FF9500" />
+                <Text style={styles.modalRecommendedTitle}>Recommended Skills</Text>
+              </View>
+              <Text style={styles.modalRecommendedText}>
+                Based on your selected services
+              </Text>
+            </View>
+          )}
+
+          <FlatList
+            data={filteredSkills()}
+            renderItem={renderSkillItem}
+            keyExtractor={(item, index) => item + index}
+            contentContainerStyle={styles.modalList}
+          />
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-// ================== STYLES ==================
 const styles = {
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F9FAFB' 
   },
-  // HEADER
-  header: {
+  content: { 
+    flex: 1, 
+    padding: 20 
+  },
+  header: { 
+    marginBottom: 24, 
+    alignItems: 'center' 
+  },
+  cardSubtitle: { 
+    fontSize: 14, 
+    color: '#8E8E93',
+    marginBottom: 8,
+  },
+  title: { 
+    fontSize: 28, 
+    fontWeight: '700', 
+    marginBottom: 8, 
+    textAlign: 'center' 
+  },
+  subtitle: { 
+    fontSize: 16, 
+    color: '#666', 
+    textAlign: 'center' 
+  },
+
+  // Recommended Skills Section (NOW SCROLLABLE)
+  recommendedSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E4E6EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  recommendedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    marginBottom: 16,
   },
-  headerCenter: {
-    flex: 1,
+  recommendedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFF4E5',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
-  headerRight: {
-    width: 40,
+  recommendedTextContainer: {
+    flex: 1,
   },
-  title: {
-    fontSize: 20,
+  recommendedTitle: {
+    fontSize: 18,
     fontWeight: '700',
     color: '#1C1E21',
     marginBottom: 4,
   },
-  subtitle: {
+  recommendedSubtitle: {
     fontSize: 14,
-    color: '#65676B',
+    color: '#8E8E93',
   },
-  // SCROLL VIEW
-  scrollView: {
-    flex: 1,
+  recommendedSkillsScroll: {
+    flexGrow: 0,
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 160,
+  recommendedSkillsContent: {
+    paddingRight: 20,
   },
-  // SEARCH SECTION
-  searchSection: {
-    marginBottom: 24,
-  },
-  searchContainer: {
+  recommendedSkillChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4E6EA',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#F2F8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#B3D4FC',
+    marginRight: 8,
+    marginBottom: 8,
   },
-  searchContainerActive: {
+  recommendedSkillChipSelected: {
+    backgroundColor: '#E6F0FA',
     borderColor: '#007AFF',
-    backgroundColor: '#FFFFFF',
   },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1C1E21',
-    paddingVertical: 0,
-  },
-  // SUGGESTIONS
-  suggestionsContainer: {
-    marginTop: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4E6EA',
-    overflow: 'hidden',
-  },
-  suggestionsList: {},
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: '#1C1E21',
-    flex: 1,
-  },
-  suggestionTextSelected: {
+  recommendedSkillChipText: {
+    fontSize: 14,
     color: '#007AFF',
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  recommendedSkillChipTextSelected: {
     fontWeight: '600',
   },
-  addCustomSkill: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+  checkIcon: {
+    marginLeft: 2,
   },
-  addCustomText: {
-    fontSize: 16,
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 4,
+  },
+  viewMoreText: {
+    fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
   },
-  noResults: {
-    alignItems: 'center',
-    paddingVertical: 24,
+
+  // Sections
+  section: { 
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  noResultsText: {
-    fontSize: 16,
-    color: '#8E8E93',
+  skillsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  addSkillsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addSkillsText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  label: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1C1E21' 
+  },
+  
+  // Selected Skills
+  selectedSkillsContainer: {
     marginTop: 8,
   },
-  // SELECTED SKILLS
-  selectedSection: {
-    marginBottom: 32,
-  },
-  selectedHeader: {
+  selectedSkillsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
+  selectedSkillsTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#1C1E21',
   },
-  skillCount: {
+  clearSkillsText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#FF3B30',
     fontWeight: '500',
-  },
-  selectedSkillsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
   },
   selectedSkillChip: {
     flexDirection: 'row',
@@ -571,218 +756,259 @@ const styles = {
     backgroundColor: '#E6F0FA',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#B3D4FC',
-    maxWidth: width * 0.85,
+    marginBottom: 8,
   },
-  selectedSkillText: {
+  selectedSkillChipText: {
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',
     marginRight: 6,
-    flexShrink: 1,
   },
-  removeButton: {
+  removeSkillButton: {
     padding: 2,
   },
-  // CATEGORIES DROPDOWN
-  categoriesContainer: {
-    marginBottom: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  categoriesHeader: {
-    marginBottom: 24,
-  },
-  categoriesTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1C1E21',
-    marginBottom: 8,
-  },
-  categoriesSubtitle: {
-    fontSize: 14,
-    color: '#65676B',
-    lineHeight: 20,
-  },
-  categoriesSpacer: {
-    height: 20,
-  },
-  categoryDropdown: {
-    marginBottom: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4E6EA',
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  categoryHeader: {
+  
+  // Selectors
+  selector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    backgroundColor: '#FFFFFF',
-  },
-  categoryHeaderExpanded: {
     backgroundColor: '#F8F9FA',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E4E6EA',
-  },
-  categoryHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  categoryIcon: {
-    width: 44,
-    height: 44,
+    padding: 16,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    borderWidth: 2,
+    borderColor: '#E4E6EA',
+    minHeight: 60,
   },
-  categoryInfo: {
-    flex: 1,
+  selectorDisabled: {
+    opacity: 0.6,
   },
-  categoryTitleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1E21',
-    marginBottom: 4,
+  selectorContent: { 
+    flex: 1, 
+    marginRight: 12 
   },
-  categorySkillCount: {
-    fontSize: 13,
+  selectorTextPlaceholder: { 
+    fontSize: 16, 
     color: '#8E8E93',
     fontWeight: '500',
   },
-  expandedContent: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
+  selectorTextPlaceholderDisabled: {
+    color: '#C7C7CC',
   },
-  horizontalScrollView: {
-    backgroundColor: '#FFFFFF',
-    maxHeight: 180,
+  selectorTextFilled: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#1C1E21', 
+    marginLeft: 8 
   },
-  horizontalSkillsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+  
+  // Skills Hint
+  skillsHint: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 12,
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  
+  // Chips Row
+  chipsRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: 8 
+  },
+  miniChip: {
+    backgroundColor: '#E6F0FA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  miniChipText: { 
+    fontSize: 14, 
+    color: '#007AFF', 
+    fontWeight: '500' 
+  },
+  
+  // Bottom Spacer
+  bottomSpacer: {
+    height: 40,
+  },
+  
+  // Footer
+  footer: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 20,
+    backgroundColor: '#FFF',
+    borderTopWidth: 1,
+    borderColor: '#EEE',
+  },
+  continueBtn: {
+    backgroundColor: '#007AFF',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
-    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 18,
+    borderRadius: 12,
   },
-  skillChip: {
+  disabledBtn: { 
+    backgroundColor: '#CCC' 
+  },
+  continueText: { 
+    color: '#FFF', 
+    fontSize: 18, 
+    fontWeight: '700', 
+    marginRight: 8 
+  },
+
+  // Modal Styles
+  modalContainer: { 
+    flex: 1, 
+    backgroundColor: '#FFF' 
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderColor: '#EEE',
+  },
+  modalTitle: { 
+    fontSize: 22, 
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  modalRecommendedSection: {
+    backgroundColor: '#F2F8FF',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  modalRecommendedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    gap: 8,
+    marginBottom: 8,
+  },
+  modalRecommendedTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1E21',
+  },
+  modalRecommendedText: {
+    fontSize: 14,
+    color: '#007AFF',
+    lineHeight: 20,
+  },
+  
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    margin: 20,
+    marginBottom: 0,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#E4E6EA',
+    borderRadius: 12,
+  },
+  searchInput: { 
+    flex: 1, 
+    marginLeft: 12, 
+    fontSize: 16 
+  },
+  addBtn: { 
+    marginLeft: 8 
+  },
+
+  modalList: { 
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
     marginBottom: 12,
-    minHeight: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
-  skillChipSelected: {
+  modalItemSelected: {
     backgroundColor: '#E6F0FA',
+    borderWidth: 2,
     borderColor: '#007AFF',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  skillChipText: {
-    fontSize: 15,
-    color: '#65676B',
-    fontWeight: '500',
-    marginRight: 8,
-    flexShrink: 1,
-    maxWidth: width * 0.7,
+  modalItemSecondary: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
-  skillChipTextSelected: {
-    color: '#007AFF',
-    fontWeight: '600',
+  recommendedSkill: {
+    backgroundColor: '#FFF4E5',
+    borderWidth: 1,
+    borderColor: '#FF9500',
   },
-  checkIcon: {
-    marginLeft: 2,
-    flexShrink: 0,
+  skillItemContent: {
+    flex: 1,
+    marginRight: 12,
   },
-  // FOOTER
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 10,
+  modalItemText: { 
+    fontSize: 17, 
+    fontWeight: '500', 
+    color: '#000' 
   },
-  continueButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 14,
-    bottom:18,
-    paddingVertical: 16,
+  modalItemTextSelected: { 
+    fontWeight: '700', 
+    color: '#007AFF' 
   },
-  continueButtonDisabled: {
-    backgroundColor: '#C7C7CC',
+  recommendedSkillText: {
+    color: '#FF9500',
   },
-  continueButtonContent: {
+  recommendedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 4,
+    gap: 4,
   },
-  continueButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginRight: 8,
+  recommendedBadgeText: {
+    fontSize: 12,
+    color: '#FF9500',
+    fontWeight: '500',
   },
-  skillCounter: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 8,
+  modalItemDesc: { 
+    fontSize: 14, 
+    color: '#666', 
+    marginTop: 4 
   },
-  skillCounterText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
+
+  center: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
   },
-  continueIcon: {
-    marginLeft: 4,
+  errorText: { 
+    fontSize: 16, 
+    color: '#FF3B30', 
+    marginBottom: 16 
+  },
+  retryBtn: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: { 
+    color: '#FFF', 
+    fontWeight: '600' 
   },
 };
 

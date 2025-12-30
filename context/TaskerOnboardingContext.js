@@ -2,17 +2,24 @@ import React, { createContext, useContext, useState, useReducer } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { completeProfile, fetchUser, uploadProfileImage, uploadIdCard } from '../api/authApi';
 import { sendFileToS3 } from '../api/commonApi';
+import { getAllServices } from '../api/commonApi';
 import { AuthContext } from './AuthContext';
 
 const TaskerOnboardingContext = createContext();
 
-// Initial state matching your web form structure
+// Initial state with NEW STEP ORDER (6 steps total)
 const initialState = {
-  // Step 1: Basic Info
+  // Step 1: Skills & Services (moved to first)
+  skills: [],
+  primaryService: null, 
+  secondaryServices: [], 
+  allServices: [], 
+  
+  // Step 2: Basic Info (moved to second)
   bio: '',
   phone: '',
   
-  // Step 2: Location
+  // Step 3: Location (moved to third)
   location: {
     region: '',
     city: '',
@@ -20,39 +27,47 @@ const initialState = {
     street: ''
   },
   
-  // Step 3: Skills
-  skills: [],
-  
-  // Step 4: Profile Image - FIXED: Consistent structure
+  // Step 4: Profile Image (moved to fourth)
   profileImage: {
     uri: '',
     type: '',
     name: ''
   },
   
-  // Step 5: ID Card
+  // Step 5: ID Card (moved to fifth)
   idCard: {
     uri: '',
     type: '',
     name: '',
-    front: '', // For front side of ID
-    back: ''  // For back side of ID (optional based on your requirements)
+    front: '',
+    back: ''
   },
   
-  // Onboarding progress
+  // Step 6: Review & Submit (remains as step 6)
+  // No additional state needed for review, it just displays collected data
+  
+  // Onboarding progress - 6 STEPS TOTAL
   currentStep: 1,
-  totalSteps: 6, // Updated from 5 to 6
+  totalSteps: 6, // Keep as 6 steps
+  
+  // State flags
   isSubmitting: false,
   
   // Validation errors
-  errors: {}
+  errors: {},
+  servicesLoading: false,
+  servicesError: null
 };
 
-// Action types
+// Action types (no changes needed)
 const ACTION_TYPES = {
   UPDATE_BASIC_INFO: 'UPDATE_BASIC_INFO',
   UPDATE_LOCATION: 'UPDATE_LOCATION',
   UPDATE_SKILLS: 'UPDATE_SKILLS',
+  UPDATE_SERVICES: 'UPDATE_SERVICES',
+  SET_ALL_SERVICES: 'SET_ALL_SERVICES',
+  SET_SERVICES_LOADING: 'SET_SERVICES_LOADING',
+  SET_SERVICES_ERROR: 'SET_SERVICES_ERROR',
   UPDATE_PROFILE_IMAGE: 'UPDATE_PROFILE_IMAGE',
   UPDATE_ID_CARD: 'UPDATE_ID_CARD',
   SET_CURRENT_STEP: 'SET_CURRENT_STEP',
@@ -63,7 +78,7 @@ const ACTION_TYPES = {
   LOAD_SAVED_PROGRESS: 'LOAD_SAVED_PROGRESS'
 };
 
-// Reducer function
+// Reducer function (no changes needed)
 const onboardingReducer = (state, action) => {
   switch (action.type) {
     case ACTION_TYPES.UPDATE_BASIC_INFO:
@@ -104,6 +119,43 @@ const onboardingReducer = (state, action) => {
         }
       };
 
+    case ACTION_TYPES.UPDATE_SERVICES:
+      return {
+        ...state,
+        primaryService: action.payload.primaryService !== undefined 
+          ? action.payload.primaryService 
+          : state.primaryService,
+        secondaryServices: action.payload.secondaryServices !== undefined 
+          ? action.payload.secondaryServices 
+          : state.secondaryServices,
+        errors: {
+          ...state.errors,
+          primaryService: null,
+          secondaryServices: null
+        }
+      };
+
+    case ACTION_TYPES.SET_ALL_SERVICES:
+      return {
+        ...state,
+        allServices: action.payload,
+        servicesLoading: false,
+        servicesError: null
+      };
+
+    case ACTION_TYPES.SET_SERVICES_LOADING:
+      return {
+        ...state,
+        servicesLoading: action.payload
+      };
+
+    case ACTION_TYPES.SET_SERVICES_ERROR:
+      return {
+        ...state,
+        servicesError: action.payload,
+        servicesLoading: false
+      };
+
     case ACTION_TYPES.UPDATE_PROFILE_IMAGE:
       return {
         ...state,
@@ -142,7 +194,7 @@ const onboardingReducer = (state, action) => {
     case ACTION_TYPES.SET_ERRORS:
       return {
         ...state,
-        errors: action.payload // Replace errors entirely, don't merge
+        errors: action.payload
       };
 
     case ACTION_TYPES.CLEAR_ERRORS:
@@ -173,15 +225,60 @@ const onboardingReducer = (state, action) => {
   }
 };
 
-// Storage keys
+// Storage keys (no changes)
 const STORAGE_KEYS = {
   ONBOARDING_DATA: '@tasker_onboarding_data',
-  ONBOARDING_STEP: '@tasker_onboarding_step'
+  ONBOARDING_STEP: '@tasker_onboarding_step',
+  SERVICES_CACHE: '@services_cache'
 };
 
 export const TaskerOnboardingProvider = ({ children }) => {
   const [state, dispatch] = useReducer(onboardingReducer, initialState);
   const { setUser } = useContext(AuthContext);
+
+  const fetchAllServices = async () => {
+    try {
+      const cached = await AsyncStorage.getItem(STORAGE_KEYS.SERVICES_CACHE);
+      if (cached) {
+        const parsedCache = JSON.parse(cached);
+        if (Date.now() - parsedCache.timestamp < 24 * 60 * 60 * 1000) {
+          dispatch({ type: ACTION_TYPES.SET_ALL_SERVICES, payload: parsedCache.data });
+          return parsedCache.data;
+        }
+      }
+
+      dispatch({ type: ACTION_TYPES.SET_SERVICES_LOADING, payload: true });
+      
+      const response = await getAllServices();
+      const services = response.data;
+      
+      await AsyncStorage.setItem(STORAGE_KEYS.SERVICES_CACHE, JSON.stringify({
+        data: services,
+        timestamp: Date.now()
+      }));
+      
+      dispatch({ type: ACTION_TYPES.SET_ALL_SERVICES, payload: services });
+      return services;
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      dispatch({ 
+        type: ACTION_TYPES.SET_SERVICES_ERROR, 
+        payload: error.message || 'Failed to fetch services' 
+      });
+      throw error;
+    }
+  };
+
+  const validateServices = () => {
+    const errors = {};
+    if (!state.primaryService) {
+      errors.primaryService = 'Please select a primary service';
+    }
+    if (state.secondaryServices.length > 3) {
+      errors.secondaryServices = 'You can only select up to 3 secondary services';
+    }
+    return errors;
+  };
 
   // Save progress to AsyncStorage
   const saveProgress = async (data) => {
@@ -231,18 +328,15 @@ export const TaskerOnboardingProvider = ({ children }) => {
   // Upload image to S3
   const uploadImageToS3 = async (imageData, isIdCard = false) => {
     try {
-      // Extract file info from imageData
       const filename = imageData.name || (isIdCard ? 'id-card.jpg' : 'profile.jpg');
       const type = imageData.type || 'image/jpeg';
       
-      // Create file object
       const file = {
         uri: imageData.uri,
         name: filename,
         type: type,
       };
 
-      // Get pre-signed URL from backend - use appropriate API based on file type
       const uploadFunction = isIdCard ? uploadIdCard : uploadProfileImage;
       const res = await uploadFunction({ 
         filename: file.name, 
@@ -259,7 +353,6 @@ export const TaskerOnboardingProvider = ({ children }) => {
         throw new Error('No upload URL in response');
       }
       
-      // Upload file to S3 using the pre-signed URL
       await sendFileToS3(fileUrl, file);
       
       return publicUrl;
@@ -270,7 +363,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
     }
   };
 
-  // Action creators
+  // Action creators (no changes)
   const updateBasicInfo = (basicInfo) => {
     dispatch({ type: ACTION_TYPES.UPDATE_BASIC_INFO, payload: basicInfo });
     saveProgress({ ...state, ...basicInfo, currentStep: state.currentStep });
@@ -286,8 +379,16 @@ export const TaskerOnboardingProvider = ({ children }) => {
     saveProgress({ ...state, skills, currentStep: state.currentStep });
   };
 
+  const updateServices = (servicesData) => {
+    dispatch({ type: ACTION_TYPES.UPDATE_SERVICES, payload: servicesData });
+    saveProgress({ 
+      ...state, 
+      ...servicesData, 
+      currentStep: state.currentStep 
+    });
+  };
+
   const updateProfileImage = (imageData) => {
-    // FIXED: Ensure consistent image data structure
     const processedImageData = {
       uri: imageData.uri,
       type: imageData.mime || imageData.type || 'image/jpeg',
@@ -344,12 +445,32 @@ export const TaskerOnboardingProvider = ({ children }) => {
     clearProgress();
   };
 
-  // Validation functions - FIXED VERSION
+  // UPDATED: Validation functions with NEW 6-STEP ORDER
   const validateStep = (step, currentState = state) => {
     const errors = {};
 
+    // NEW 6-STEP ORDER:
+    // Step 1: Skills & Services (was step 3)
+    // Step 2: Basic Info (was step 1)
+    // Step 3: Location (was step 2)
+    // Step 4: Profile Image (was step 4)
+    // Step 5: ID Card (was step 5)
+    // Step 6: Review & Submit (no validation needed)
+
     switch (step) {
-      case 1: // Basic Info
+      case 1: // NEW: Skills & Services (moved from step 3)
+        if (!currentState.skills || currentState.skills.length === 0) {
+          errors.skills = 'Please select at least one skill';
+        }
+        if (!currentState.primaryService) {
+          errors.primaryService = 'Please select a primary service';
+        }
+        if (currentState.secondaryServices.length > 3) {
+          errors.secondaryServices = 'You can only select up to 3 secondary services';
+        }
+        break;
+
+      case 2: // NEW: Basic Info (moved from step 1)
         if (!currentState.bio || !currentState.bio.trim()) {
           errors.bio = 'Professional summary is required';
         } else if (currentState.bio.trim().length < 10) {
@@ -365,7 +486,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
         }
         break;
 
-      case 2: // Location
+      case 3: // NEW: Location (moved from step 2)
         if (!currentState.location.region || !currentState.location.region.trim()) {
           errors.region = 'Region is required';
         }
@@ -374,13 +495,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
         }
         break;
 
-      case 3: // Skills
-        if (!currentState.skills || currentState.skills.length === 0) {
-          errors.skills = 'Please select at least one skill';
-        }
-        break;
-
-      case 4: // Profile Image (optional, so no validation needed)
+      case 4: // Profile Image (optional)
         // No validation required for optional profile image
         break;
 
@@ -390,6 +505,10 @@ export const TaskerOnboardingProvider = ({ children }) => {
         }
         break;
 
+      case 6: // Review & Submit
+        // No validation needed for review step
+        break;
+
       default:
         break;
     }
@@ -397,23 +516,10 @@ export const TaskerOnboardingProvider = ({ children }) => {
     return errors;
   };
 
-  // FIXED: Navigation helpers - proper error handling
+  // Navigation helpers (no changes needed)
   const goToNextStep = () => {
-    // Clear any existing errors first
     dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
     
-    // Validate current step with current state
-    //const validationErrors = validateStep(state.currentStep, state);
-    
-    // Check if there are any validation errors
-   /* if (Object.keys(validationErrors).length > 0) {
-      // Set errors and prevent navigation
-      dispatch({ type: ACTION_TYPES.SET_ERRORS, payload: validationErrors });
-      console.log('Validation failed for step', state.currentStep, ':', validationErrors);
-      return false;
-    }*/
-    
-    // No errors - proceed to next step
     const nextStep = state.currentStep + 1;
     if (nextStep <= state.totalSteps) {
       dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: nextStep });
@@ -427,7 +533,6 @@ export const TaskerOnboardingProvider = ({ children }) => {
 
   const goToPreviousStep = () => {
     if (state.currentStep > 1) {
-      // Clear errors when going back
       dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
       const prevStep = state.currentStep - 1;
       dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: prevStep });
@@ -439,7 +544,6 @@ export const TaskerOnboardingProvider = ({ children }) => {
 
   const goToStep = (step) => {
     if (step >= 1 && step <= state.totalSteps) {
-      // Clear errors when jumping to a step
       dispatch({ type: ACTION_TYPES.CLEAR_ERRORS });
       dispatch({ type: ACTION_TYPES.SET_CURRENT_STEP, payload: step });
       saveProgress({ ...state, currentStep: step, errors: {} });
@@ -448,7 +552,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
     return false;
   };
 
-  // UPDATED: submitOnboarding function with ID card upload
+  // submitOnboarding function (no changes needed)
   const submitOnboarding = async () => {
     try {
       setSubmitting(true);
@@ -488,6 +592,10 @@ export const TaskerOnboardingProvider = ({ children }) => {
       const requestData = {
         Bio: state.bio,
         phone: state.phone,
+        primaryService: state.primaryService?.name || state.primaryService, 
+        secondaryServices: state.secondaryServices.map(service => 
+          service.name || service 
+        ),
         location: {
           region: state.location.region,
           city: state.location.city,
@@ -507,12 +615,12 @@ export const TaskerOnboardingProvider = ({ children }) => {
         requestData.idCard = idCardUrl;
       }
       
-      // Log request data for debugging
       console.log('Request data being sent:', {
         bio: state.bio,
         phone: state.phone,
         location: state.location,
         skills: state.skills,
+        primaryService: state.primaryService,
         hasProfileImage: !!profileImageUrl,
         profileImageUrl: profileImageUrl,
         hasIdCard: !!idCardUrl,
@@ -532,7 +640,6 @@ export const TaskerOnboardingProvider = ({ children }) => {
       return response;
     } catch (error) {
       console.error('Onboarding submission error:', error);
-      // Log more detailed error information
       if (error.response) {
         console.error('Error response:', error.response.data);
         console.error('Error status:', error.response.status);
@@ -551,6 +658,8 @@ export const TaskerOnboardingProvider = ({ children }) => {
     updateBasicInfo,
     updateLocation,
     updateSkills,
+    updateServices,
+    fetchAllServices,
     updateProfileImage,
     updateIdCard,
     setCurrentStep,
@@ -562,6 +671,7 @@ export const TaskerOnboardingProvider = ({ children }) => {
     
     // Helpers
     validateStep,
+    validateServices,
     goToNextStep,
     goToPreviousStep,
     goToStep,
