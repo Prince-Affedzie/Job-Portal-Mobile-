@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Animated, 
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -37,6 +38,20 @@ import { filterServiceSuggestions } from '../../utils/searchUtils';
 import { useLocationSearch } from '../../hooks/useLocationSearch';
 
 const { height } = Dimensions.get('window');
+
+// Multiple avatar images from Unsplash (real, diverse people)
+const TASKER_AVATARS = [
+  'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132141/casual-young-african-man-smiling-isolated-white_pjfa64.jpg',
+  'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132132/african-teenage-girl-portrait-happy-smiling-face_iqapqm.jpg',
+  'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/attractive-plus-size-model-white-shirt-apparel_szenla.jpg',
+   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/blackprofile_lee5qh.jpg',
+  // For Unsplash ones (not Cloudinary), add ?fm=jpg or keep as-is
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
+  'https://images.unsplash.com/photo-1494790108755-2616b786d4d1?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
+  'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
+  'https://images.unsplash.com/photo-1507591064344-4c6ce005-128?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
+];
 
 const SearchTaskersScreen = ({ navigation }) => {
   // State
@@ -364,20 +379,85 @@ const SearchTaskersScreen = ({ navigation }) => {
       case 'discovery':
         return (
           <View style={styles.discoveryContent}>
-            <Text style={styles.discoveryTitle}>Find Taskers Near You</Text>
-            <Text style={styles.discoverySubtitle}>
-              Browse popular services or search for specific needs
-            </Text>
-            <View style={styles.popularServicesGrid}>
-              {SERVICE_SUGGESTIONS.slice(0, POPULAR_SERVICES_COUNT).map((service, index) => (
-                <TouchableOpacity
+            {/* Avatars Section */}
+            <View style={styles.avatarsHeader}>
+              <Text style={styles.avatarsTitle}>Taskers Ready to Help</Text>
+              <Text style={styles.avatarsSubtitle}>
+                {TASKER_AVATARS.length}+ professionals waiting for your request
+              </Text>
+            </View>
+            
+            <View style={styles.avatarGroup}>
+              {TASKER_AVATARS.slice(0, 5).map((avatar, index) => (
+                <Image
                   key={index}
-                  style={styles.popularServiceCard}
-                  onPress={() => handleServiceSelect(service)}
-                >
-                  <Text style={styles.popularServiceText}>{service}</Text>
-                </TouchableOpacity>
+                  source={{ uri: avatar }}
+                  style={[
+                    styles.groupAvatar,
+                    { marginLeft: index > 0 ? -20 : 0 }
+                  ]}
+                  resizeMode="cover"
+                  onError={(e) => console.log('Image load error:', avatar, e.nativeEvent.error)}
+                />
               ))}
+              <View style={styles.avatarCountBadge}>
+                <Text style={styles.avatarCountText}>+{TASKER_AVATARS.length}</Text>
+              </View>
+            </View>
+
+            {/* Welcome Message */}
+            <View style={styles.welcomeMessage}>
+              <View style={styles.welcomeIcon}>
+                <Ionicons name="hand-left" size={24} color="#3B82F6" />
+              </View>
+              <Text style={styles.welcomeText}>
+                Hi there! Ready to get things done? Search for a service or browse popular options below.
+              </Text>
+            </View>
+
+            {/* Popular Services */}
+            <View style={styles.popularServicesSection}>
+              <Text style={styles.sectionTitle}>Popular Services</Text>
+              <Text style={styles.sectionSubtitle}>
+                Tap any service to start your search
+              </Text>
+              <View style={styles.popularServicesGrid}>
+                {SERVICE_SUGGESTIONS.slice(0, POPULAR_SERVICES_COUNT).map((service, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.popularServiceCard}
+                    onPress={() => handleServiceSelect(service)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.popularServiceText}>{service}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Quick Tips */}
+            <View style={styles.tipsContainer}>
+              <Text style={styles.tipsTitle}>
+                <Ionicons name="bulb-outline" size={18} color="#F59E0B" /> Quick Tips
+              </Text>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipIcon, { backgroundColor: '#3B82F620' }]}>
+                  <Ionicons name="location-outline" size={16} color="#3B82F6" />
+                </View>
+                <Text style={styles.tipText}>Add your location to find nearby taskers</Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipIcon, { backgroundColor: '#10B98120' }]}>
+                  <Ionicons name="search-outline" size={16} color="#10B981" />
+                </View>
+                <Text style={styles.tipText}>Be specific about what you need help with</Text>
+              </View>
+              <View style={styles.tipItem}>
+                <View style={[styles.tipIcon, { backgroundColor: '#8B5CF620' }]}>
+                  <Ionicons name="people-outline" size={16} color="#8B5CF6" />
+                </View>
+                <Text style={styles.tipText}>Select multiple taskers to compare quotes & choose the best</Text>
+              </View>
             </View>
           </View>
         );
@@ -495,37 +575,165 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 18,
   },
+  // Discovery Section Styles
   discoveryContent: {
     paddingHorizontal: 16,
-    paddingVertical: 24,
+    paddingVertical: 20,
   },
-  discoveryTitle: {
-    fontSize: 24,
+  avatarsHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarsTitle: {
+    fontSize: 22,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
   },
-  discoverySubtitle: {
+  avatarsSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  avatarGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+    paddingHorizontal: 20,
+  },
+  groupAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: '#FFF',
+    backgroundColor: '#f0f0f0',
+    //shadowColor: '#000',
+    //shadowOffset: { width: 0, height: 2 },
+    //shadowOpacity: 0.1,
+    //shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarCountBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFF',
+    marginLeft: -20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarCountText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  welcomeMessage: {
+    backgroundColor: '#F0F9FF',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 28,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+  },
+  welcomeIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  welcomeText: {
     fontSize: 15,
-    color: '#8E8E93',
-    marginBottom: 20,
+    color: '#1E40AF',
+    lineHeight: 22,
+    fontWeight: '500',
+    flex: 1,
+  },
+  popularServicesSection: {
+    marginBottom: 28,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
   },
   popularServicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
   },
   popularServiceCard: {
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minWidth: '30%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   popularServiceText: {
-    fontSize: 14,
-    color: '#000',
+    fontSize: 13,
+    color: '#1F2937',
     fontWeight: '500',
+    textAlign: 'center',
+  },
+  tipsContainer: {
+    backgroundColor: '#F8FAFC',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  tipsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  tipIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#4B5563',
+    flex: 1,
+    lineHeight: 20,
   },
   emptyState: {
     alignItems: 'center',

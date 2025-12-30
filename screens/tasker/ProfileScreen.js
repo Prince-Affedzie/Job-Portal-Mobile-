@@ -863,7 +863,7 @@ const TaskerProfileScreen = ({ navigation }) => {
             {/* Profile Info */}
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{profileData.name || 'Tasker'}</Text>
-              <Text style={styles.profileTitle}>{getPrimarySkill()}</Text>
+              <Text style={styles.profileTitle}>{profileData?.primaryService?.serviceName || getPrimarySkill()}</Text>
               
               <View style={styles.ratingVerificationContainer}>
                 {profileData.rating > 0 && (

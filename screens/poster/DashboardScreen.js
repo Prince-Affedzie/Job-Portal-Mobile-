@@ -256,7 +256,7 @@ export default function DashboardScreen() {
                 {/* TRUTHFUL Welcome Section */}
                 <View style={styles.welcomeSection}>
                     <LinearGradient
-                        colors={['#1A1F3B', '#2D325D', '#4A4F8C']}
+                        colors={['#1A1F3B', '#2D1B69', '#4A4F8C']}
                         style={styles.welcomeGradient}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}

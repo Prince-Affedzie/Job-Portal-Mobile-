@@ -28,6 +28,7 @@ const TaskerCard = ({ tasker, onViewProfile, searchQuery }) => {
                 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1766495900/DefaultiImagePlaceHolder_r6ai4x.jpg',
             }}
             style={styles.profileImage}
+            resizeMode="cover"
           />
 
           {tasker.isVerified && (
@@ -75,6 +76,16 @@ const TaskerCard = ({ tasker, onViewProfile, searchQuery }) => {
           </View>
           <Text style={styles.hourlyRate}>{formatTaskerRate(tasker)}</Text>
         </View>
+
+        {/* Primary Service - Display only if available */}
+        {tasker.primaryService?.serviceName && (
+          <View style={styles.primaryServiceContainer}>
+            <Ionicons name="construct-outline" size={14} color="#3B82F6" />
+            <Text style={styles.primaryServiceText} numberOfLines={1}>
+              {tasker.primaryService.serviceName}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.locationRow}>
           <Ionicons name="location-outline" size={14} color="#64748B" />
@@ -149,17 +160,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    overflow: 'hidden',
+    overflow: 'hidden', // Important for image containment
   },
   profileImageContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
+  width: '100%',
+  height: 160,
+  position: 'relative',
+  backgroundColor: '#F8FAFC', 
   },
   profileImage: {
     width: '100%',
-    height: '150%',
-    resizeMode: 'cover',
+  height: undefined, // Let aspect ratio determine height
+  aspectRatio: 1.2, // Standard portrait ratio (adjust as needed)
+  // OR use flex to fill but maintain aspect ratio
+  flex: 1,
+  alignSelf: 'stretch',
   },
   verifiedBadge: {
     position: 'absolute',
@@ -176,6 +191,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+    zIndex: 10, // Ensure badge is above image
   },
   onlineIndicator: {
     position: 'absolute',
@@ -187,6 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
     borderWidth: 2,
     borderColor: '#FFFFFF',
+    zIndex: 10,
   },
   ratingBadge: {
     position: 'absolute',
@@ -194,6 +211,7 @@ const styles = StyleSheet.create({
     right: 12,
     alignItems: 'flex-end',
     gap: 6,
+    zIndex: 10,
   },
   ratingStars: {
     flexDirection: 'row',
@@ -235,7 +253,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8, // Reduced margin
   },
   nameContainer: {
     flexDirection: 'row',
@@ -265,6 +283,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#059669',
+  },
+  // NEW: Primary Service Styles
+  primaryServiceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  primaryServiceText: {
+    fontSize: 13,
+    color: '#1D4ED8',
+    fontWeight: '600',
   },
   locationRow: {
     flexDirection: 'row',

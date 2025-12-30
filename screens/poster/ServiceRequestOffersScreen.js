@@ -192,7 +192,7 @@ const OfferCard = ({ offer, request, canAccept, hasAccepted, onAccept, onDecline
         <View style={styles.skillBadge}>
           <Ionicons name="briefcase-outline" size={14} color="#6366F1" />
           <Text style={styles.skillText} numberOfLines={1}>
-            {userData?.skills?.[0] || 'Skilled Professional'}
+            { userData?.primaryService?.serviceName||userData?.skills?.[0] || 'Skilled Professional'}
           </Text>
         </View>
 
@@ -969,15 +969,19 @@ const styles = StyleSheet.create({
   },
   
   profileImageContainer: {
-    width: '100%',
-    height: '100%',
-    position: 'relative',
+  width: '100%',
+  height: 160,
+  position: 'relative',
+  backgroundColor: '#F8FAFC', 
   },
-  
+
   profileImage: {
     width: '100%',
-    height: '130%',
-    resizeMode: 'cover',
+   height: undefined, // Let aspect ratio determine height
+   aspectRatio: 1.25, // Standard portrait ratio (adjust as needed)
+  // OR use flex to fill but maintain aspect ratio
+  flex: 1,
+  alignSelf: 'stretch',
   },
   
   profileImagePlaceholder: {
