@@ -356,8 +356,40 @@ once you both confirm the task is completed satisfactorily.`,
     return `${exp}+ years`;
   };
 
-  // Get first 4 skills
-  const displaySkills = userData.skills?.slice(0, 4) || [];
+  // Combine services and skills in one section (max 5 items total)
+  const expertiseItems = [];
+  
+  // Add primary service first
+  if (userData.primaryService?.serviceName) {
+    expertiseItems.push({
+      type: 'primary',
+      text: userData.primaryService.serviceName,
+      icon: 'star'
+    });
+  }
+  
+  // Add secondary services (max 2)
+  if (userData.secondaryServices) {
+    userData.secondaryServices.slice(0, 2).forEach(service => {
+      expertiseItems.push({
+        type: 'secondary',
+        text: service.serviceName,
+        icon: 'check'
+      });
+    });
+  }
+  
+  // Add skills (fill remaining slots up to 5 total)
+  const remainingSlots = 5 - expertiseItems.length;
+  if (userData.skills && remainingSlots > 0) {
+    userData.skills.slice(0, remainingSlots).forEach(skill => {
+      expertiseItems.push({
+        type: 'skill',
+        text: skill,
+        icon: 'tool'
+      });
+    });
+  }
 
   return (
     <View style={styles.applicantCard}>
@@ -399,18 +431,36 @@ once you both confirm the task is completed satisfactorily.`,
               )}
             </View>
             
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.rating}>
-                {userData.rating?.toFixed(1) || '5.0'}
-              </Text>
-              <Text style={styles.ratingCount}>
-                ({userData.numberOfRatings || 0})
-              </Text>
-              <View style={styles.divider} />
+            <View style={styles.statsRow}>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color="#F59E0B" />
+                <Text style={styles.rating}>
+                  {userData.rating?.toFixed(1) || '5.0'}
+                </Text>
+                <Text style={styles.ratingCount}>
+                  ({userData.numberOfRatings || 0})
+                </Text>
+              </View>
+              
+              <View style={styles.locationRow}>
+                <Feather name="map-pin" size={12} color="#64748B" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {userData.location?.city || 'Nationwide'}
+                </Text>
+              </View>
+            </View>
+            
+            {/* Experience */}
+            <View style={styles.experienceRow}>
+              <Feather name="briefcase" size={12} color="#64748B" />
               <Text style={styles.experience}>
                 {formatExperience(userData.experience)}
               </Text>
+              {userData.completedJobs > 0 && (
+                <Text style={styles.jobsCount}>
+                  • {userData.completedJobs} jobs
+                </Text>
+              )}
             </View>
           </View>
         </TouchableOpacity>
@@ -435,52 +485,77 @@ once you both confirm the task is completed satisfactorily.`,
       {/* Price and Status Section */}
       <View style={styles.priceSection}>
         <View style={styles.priceContainer}>
-          {biddingType === 'open-bid' ? (
-            <>
-              <View style={styles.bidAmountContainer}>
-                <Feather name="tag" size={16} color="#6366F1" />
-                <Text style={styles.priceLabel}>Bid Amount:</Text>
-                <Text style={styles.priceValue}>₵{item.amount}</Text>
-              </View>
-              <Text style={[
-             styles.bidNote,
-             { color: item.isAccepted ? '#10B981' : '#F59E0B' }
-             ]}>
-                {item.isAccepted ? 'Bid Accepted' : 'Pending Acceptance'}
-              </Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.bidAmountContainer}>
-                <Feather name="dollar-sign" size={16} color="#6366F1" />
-                <Text style={styles.priceLabel}>Task Budget:</Text>
-                <Text style={styles.priceValue}>₵{task?.budget || '0'}</Text>
-              </View>
-              <Text style={styles.bidNote}>
-                {item.isAssigned ? 'Task Assigned' : 'Available for Assignment'}
-              </Text>
-            </>
-          )}
+          <View style={styles.priceRow}>
+            <Feather 
+              name={biddingType === 'open-bid' ? "tag" : "dollar-sign"} 
+              size={16} 
+              color="#6366F1" 
+            />
+            <Text style={styles.priceLabel}>
+              {biddingType === 'open-bid' ? 'Bid Amount:' : 'Task Budget:'}
+            </Text>
+            <Text style={styles.priceValue}>
+              ₵{biddingType === 'open-bid' ? item.amount : (task?.budget || '0')}
+            </Text>
+          </View>
+          <Text style={[
+            styles.statusBadge,
+            isAssigned ? styles.assignedStatus : styles.pendingStatus
+          ]}>
+            {isAssigned 
+              ? (biddingType === 'fixed' ? 'Task Assigned' : 'Bid Accepted')
+              : (biddingType === 'fixed' ? 'Available' : 'Pending')}
+          </Text>
         </View>
       </View>
 
-      {/* Skills Section */}
-      {displaySkills.length > 0 && (
-        <View style={styles.skillsSection}>
-          <View style={styles.skillsHeader}>
-            <Feather name="layers" size={14} color="#64748B" />
-            <Text style={styles.skillsTitle}>Skills</Text>
-          </View>
-          <View style={styles.skillsContainer}>
-            {displaySkills.map((skill, index) => (
-              <View key={index} style={styles.skillChip}>
-                <Text style={styles.skillText}>{skill}</Text>
+      {/* Combined Expertise Section - Services & Skills */}
+      {expertiseItems.length > 0 && (
+        <View style={styles.expertiseSection}>
+          <View style={styles.expertiseChips}>
+            {expertiseItems.map((item, index) => (
+              <View 
+                key={index} 
+                style={[
+                  styles.expertiseChip,
+                  item.type === 'primary' && styles.primaryExpertiseChip,
+                  item.type === 'secondary' && styles.secondaryExpertiseChip,
+                  item.type === 'skill' && styles.skillExpertiseChip,
+                ]}
+              >
+                {item.icon && (
+                  <Feather 
+                    name={item.icon} 
+                    size={10} 
+                    color={
+                      item.type === 'primary' ? '#FFFFFF' :
+                      item.type === 'secondary' ? '#3B82F6' : '#6B7280'
+                    } 
+                  />
+                )}
+                <Text 
+                  style={[
+                    styles.expertiseChipText,
+                    item.type === 'primary' && styles.primaryExpertiseChipText,
+                    item.type === 'secondary' && styles.secondaryExpertiseChipText,
+                    item.type === 'skill' && styles.skillExpertiseChipText,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.text}
+                </Text>
               </View>
             ))}
-            {userData.skills?.length > 4 && (
-              <View style={[styles.skillChip, styles.moreSkillsChip]}>
-                <Text style={styles.moreSkillsText}>
-                  +{userData.skills.length - 4}
+            
+            {/* Show total count if we have more items */}
+            {(userData.secondaryServices?.length > 2 || userData.skills?.length > 0) && (
+              <View style={styles.moreExpertiseChip}>
+                <Text style={styles.moreExpertiseText}>
+                  +
+                  {(userData.secondaryServices?.length > 2 ? userData.secondaryServices.length - 2 : 0) +
+                   (userData.skills?.length > (expertiseItems.filter(i => i.type === 'skill').length) 
+                    ? userData.skills.length - expertiseItems.filter(i => i.type === 'skill').length 
+                    : 0)}
                 </Text>
               </View>
             )}
@@ -488,57 +563,45 @@ once you both confirm the task is completed satisfactorily.`,
         </View>
       )}
 
-      {/* Location and Experience */}
-      <View style={styles.locationSection}>
-        <View style={styles.locationRow}>
-          <View style={styles.locationItem}>
-            <Feather name="map-pin" size={14} color="#64748B" />
-            <Text style={styles.locationText}>
-              {userData.location?.city || 'Nationwide'}
-            </Text>
-          </View>
-          <View style={styles.locationItem}>
-            <Feather name="briefcase" size={14} color="#64748B" />
-            <Text style={styles.locationText}>
-              {formatExperience(userData.experience)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Proposal/Bid Message */}
-      {(item.proposal || item.message) && (
-        <View style={styles.messageBox}>
-          <Feather name="message-square" size={14} color="#6366F1" style={styles.messageIcon} />
-          <Text style={styles.messageText} numberOfLines={3}>
-            {item.proposal || item.message}
-          </Text>
-        </View>
-      )}
-
-      {/* Performance Metrics */}
+      {/* Performance Metrics - Compact Version */}
       <View style={styles.metricsRow}>
         {userData.completedJobs > 0 && (
           <View style={styles.metricItem}>
-            <Feather name="check-circle" size={14} color="#10B981" />
+            <Feather name="check-circle" size={12} color="#10B981" />
             <Text style={styles.metricText}>{userData.completedJobs} jobs</Text>
           </View>
         )}
         
         {userData.onTimeRate && (
           <View style={styles.metricItem}>
-            <Feather name="clock" size={14} color="#6366F1" />
+            <Feather name="clock" size={12} color="#6366F1" />
             <Text style={styles.metricText}>{userData.onTimeRate}% on time</Text>
           </View>
         )}
         
         {userData.positiveReviews && (
           <View style={styles.metricItem}>
-            <Feather name="thumbs-up" size={14} color="#F59E0B" />
+            <Feather name="thumbs-up" size={12} color="#F59E0B" />
             <Text style={styles.metricText}>{userData.positiveReviews}% positive</Text>
           </View>
         )}
       </View>
+
+      {/* Proposal/Bid Message */}
+      {(item.proposal || item.message) && (
+        <TouchableOpacity 
+          style={styles.messageBox}
+          activeOpacity={0.7}
+          onPress={() => {
+            // Could expand message on press if needed
+          }}
+        >
+          <Feather name="message-square" size={14} color="#6366F1" style={styles.messageIcon} />
+          <Text style={styles.messageText} numberOfLines={2}>
+            {item.proposal || item.message}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Primary Action Button */}
       {!isAssigned ? (
@@ -569,9 +632,9 @@ once you both confirm the task is completed satisfactorily.`,
           )}
         </TouchableOpacity>
       ) : (
-        <View style={styles.assignedStatus}>
+        <View style={styles.assignedContainer}>
           <Feather name="check-circle" size={16} color="#10B981" />
-          <Text style={styles.assignedStatusText}>
+          <Text style={styles.assignedText}>
             {biddingType === 'fixed' ? 'Task Assigned' : 'Bid Accepted'}
           </Text>
         </View>
@@ -579,7 +642,6 @@ once you both confirm the task is completed satisfactorily.`,
     </View>
   );
 };
-
   const renderEmptyState = () => {
     const isFixedBid = biddingType === 'fixed';
     const emptyTitle = isFixedBid ? "No Applicants Yet" : "No Bids Yet";
@@ -1072,379 +1134,385 @@ const styles = StyleSheet.create({
   // Applicant Card
   applicantCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
+  
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 12,
   },
+  
   profileSection: {
     flexDirection: 'row',
     flex: 1,
-    gap: 12,
+    gap: 10,
   },
+  
   avatarContainer: {
     position: 'relative',
   },
+  
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 34,
     borderWidth: 2,
     borderColor: '#F1F5F9',
   },
+  
   verifiedBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: '#10B981',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
+  
   profileInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
+  
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    gap: 6,
+    marginBottom: 4,
     flexWrap: 'wrap',
   },
+  
   name: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1E293B',
     flex: 1,
   },
+  
   proBadge: {
     backgroundColor: '#F59E0B',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
+  
   proBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#FFFFFF',
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  
   assignedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
+  
   assignedBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#FFFFFF',
     fontWeight: '600',
   },
+  
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+  },
+  
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
+    gap: 4,
   },
+  
   rating: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#1E293B',
   },
+  
   ratingCount: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748B',
   },
-  divider: {
-    width: 1,
-    height: 12,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 8,
-  },
-  experience: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  scorePriceSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  scoreContainer: {
-    alignItems: 'center',
-  },
-  scoreCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  scoreValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  scoreLabel: {
-    fontSize: 11,
-    color: '#FFFFFF',
-    opacity: 0.9,
-    marginTop: 2,
-  },
-  priceSection: {
-    marginBottom: 16,
-  },
-  priceContainer: {
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  bidAmountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  priceValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  bidNote: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-
-  // Skills Section
-  skillsSection: {
-    marginBottom: 16,
-  },
-  skillsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  skillsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  skillChip: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E0E7FF',
-  },
-  skillText: {
-    fontSize: 13,
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  moreSkillsChip: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#E2E8F0',
-  },
-  moreSkillsText: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-
-  // Location Section
-  locationSection: {
-    marginBottom: 16,
-  },
+  
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    flexWrap: 'wrap',
+    gap: 4,
+    flex: 1,
   },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
+  
   locationText: {
-    fontSize: 14,
-    color: '#475569',
+    fontSize: 12,
+    color: '#64748B',
     fontWeight: '500',
+    flex: 1,
   },
-
-  // Metrics Row (updated)
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    flexWrap: 'wrap',
-  },
-  metricItem: {
+  
+  experienceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  metricText: {
+  
+  experience: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  
+  jobsCount: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  
+  quickActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  
+  actionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  
+  priceSection: {
+    marginBottom: 12,
+  },
+  
+  priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  
+  priceLabel: {
     fontSize: 13,
     color: '#64748B',
     fontWeight: '500',
   },
-  detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    flexWrap: 'wrap',
+  
+  priceValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
   },
-  detailItem: {
+  
+  statusBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    textAlign: 'center',
+  },
+  
+  assignedStatus: {
+    backgroundColor: '#D1FAE5',
+    color: '#065F46',
+  },
+  
+  pendingStatus: {
+    backgroundColor: '#FEF3C7',
+    color: '#92400E',
+  },
+  
+  // Combined Expertise Section
+  expertiseSection: {
+    marginBottom: 10,
+  },
+  
+  expertiseChips: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    flexWrap: 'wrap',
     gap: 6,
   },
-  detailText: {
-    fontSize: 13,
-    color: '#475569',
+  
+  expertiseChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 4,
+  },
+  
+  primaryExpertiseChip: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  
+  secondaryExpertiseChip: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#93C5FD',
+  },
+  
+  skillExpertiseChip: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+  },
+  
+  expertiseChipText: {
+    fontSize: 11,
+    color: '#4B5563',
     fontWeight: '500',
   },
-  messageBox: {
+  
+  primaryExpertiseChipText: {
+    color: '#92400E',
+    fontWeight: '600',
+  },
+  
+  secondaryExpertiseChipText: {
+    color: '#1E40AF',
+    fontWeight: '500',
+  },
+  
+  skillExpertiseChipText: {
+    color: '#4B5563',
+    fontWeight: '500',
+  },
+  
+  moreExpertiseChip: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  
+  moreExpertiseText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  
+  // Performance Metrics
+  metricsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  
+  metricText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  
+  messageBox: {
     backgroundColor: '#F8FAFC',
-    padding: 12,
+    padding: 10,
     borderRadius: 8,
-    marginBottom: 16,
-    gap: 8,
-    borderLeftWidth: 3,
+    marginBottom: 12,
+    borderLeftWidth: 2,
     borderLeftColor: '#6366F1',
   },
+  
   messageIcon: {
-    marginTop: 2,
+    marginRight: 6,
   },
+  
   messageText: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     color: '#475569',
-    lineHeight: 18,
+    lineHeight: 16,
     fontStyle: 'italic',
   },
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  metricItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metricText: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-  },
+  
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#6366F1',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    gap: 8,
+    gap: 6,
   },
+  
   primaryButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  
   disabledButton: {
     backgroundColor: '#9CA3AF',
     opacity: 0.6,
   },
-  assignedStatus: {
+  
+  assignedContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#D1FAE5',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
-  assignedStatusText: {
-    fontSize: 15,
+  
+  assignedText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#065F46',
   },
