@@ -98,6 +98,54 @@ export const serviceSkills = {
       'Skill Development', 'Learning Strategies', 'Curriculum Planning',
       'Progress Tracking', 'Online Teaching'
     ],
+
+    'Event Planning': [
+    'Venue Selection', 'Vendor Coordination', 'Timeline Planning', 'Budget Management',
+    'Theme Design', 'Guest Management', 'Entertainment Booking', 'Catering Coordination',
+    'Decor Setup', 'Event Marketing', 'Logistics Planning', 'Day-of Coordination'
+  ],
+  
+  'Video Production': [
+    'Script Writing', 'Storyboarding', 'Camera Operation', 'Lighting Setup',
+    'Sound Recording', 'Directing', 'Production Planning', 'Location Scouting',
+    'Equipment Setup', 'Post-Production', 'Color Correction', 'Audio Mixing'
+  ],
+  
+  'Software Engineering': [
+    'System Architecture', 'Code Development', 'Testing & QA', 'Debugging',
+    'Performance Optimization', 'Security Implementation', 'Code Review',
+    'Technical Documentation', 'API Development', 'Database Design', 'DevOps'
+  ],
+  
+  'IT Support': [
+    'Troubleshooting', 'Hardware Repair', 'Software Installation', 'Network Setup',
+    'System Maintenance', 'Data Backup', 'Security Setup', 'Remote Support',
+    'Virus Removal', 'System Updates', 'User Training', 'IT Consultation'
+  ],
+  
+  'Interior Decor': [
+    'Color Coordination', 'Furniture Arrangement', 'Accessory Selection',
+    'Lighting Design', 'Textile Selection', 'Wall Decor', 'Space Styling',
+    'Mood Boards', 'Budget Decorating', 'Seasonal Updates', 'Rental Styling'
+  ],
+  
+  'Home & Office Furnishing': [
+    'Furniture Assembly', 'Space Planning', 'Ergonomic Setup', 'Furniture Selection',
+    'Office Layout', 'Storage Solutions', 'Furniture Installation', 'Move Coordination',
+    'Inventory Management', 'Maintenance Advice', 'Upgrade Planning'
+  ],
+  
+  'Architectural Design': [
+    'Blueprint Reading', 'Space Planning', '3D Modeling', 'Building Codes',
+    'Material Selection', 'Structural Design', 'Sustainability Planning',
+    'Client Presentations', 'Construction Documentation', 'Site Analysis'
+  ],
+  
+  'Fashion Design': [
+    'Pattern Making', 'Garment Construction', 'Fabric Selection', 'Trend Analysis',
+    'Sketching', 'Fitting Sessions', 'Alterations', 'Collection Planning',
+    'Technical Drawings', 'Production Oversight', 'Quality Control'
+  ],
     
    
     'General': [

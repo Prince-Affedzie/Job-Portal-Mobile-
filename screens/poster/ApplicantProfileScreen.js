@@ -496,66 +496,113 @@ export default function ApplicantProfileScreen({ route }) {
 
   // FIXED: Render Overview Function
   const renderOverview = () => (
-    <View>
-      {/* Stats Grid */}
-      <View style={styles.section}>
-        <StatsGrid />
-      </View>
+  <View>
+    {/* Stats Grid */}
+    <View style={styles.section}>
+      <StatsGrid />
+    </View>
 
-      {/* Bio */}
-      {applicant?.Bio && (
-        <InfoSection title="About" icon="person-outline">
-          <Text style={styles.bioText}>{applicant.Bio}</Text>
-        </InfoSection>
-      )}
+    {/* Bio */}
+    {applicant?.Bio && (
+      <InfoSection title="About" icon="person-outline">
+        <Text style={styles.bioText}>{applicant.Bio}</Text>
+      </InfoSection>
+    )}
 
-      {/* Skills */}
-      {applicant?.skills && applicant.skills.length > 0 && (
-        <InfoSection title="Skills & Expertise" icon="construct-outline">
-          <View style={styles.skillsContainer}>
-            {applicant.skills.map((skill, index) => (
-              <View key={index} style={styles.skillTag}>
-                <Text style={styles.skillText}>{skill}</Text>
-              </View>
-            ))}
-          </View>
-        </InfoSection>
-      )}
-
-      {/* Verification Status */}
-      <InfoSection title="Verification" icon="shield-checkmark-outline">
-        <View style={styles.verificationGrid}>
-          <View style={styles.verificationItem}>
-            <Ionicons name={applicant?.isVerified ? "checkmark-circle" : "close-circle"} size={20} color={applicant?.isVerified ? "#10B981" : "#EF4444"} />
-            <Text style={styles.verificationText}>
-              {applicant?.isVerified ? 'Verified Professional' : 'Not Verified'}
-            </Text>
-          </View>
-          <View style={styles.verificationItem}>
-            <Ionicons name={applicant?.vettingStatus === 'approved' ? "checkmark-circle" : "time-outline"} size={20} color={applicant?.vettingStatus === 'approved' ? "#10B981" : "#F59E0B"} />
-            <Text style={styles.verificationText}>
-              {applicant?.vettingStatus === 'approved' ? 'Background Verified' : 'Vetting in Progress'}
+    {/* Services Offered */}
+    <InfoSection title="Services Offered" icon="briefcase-outline">
+      {/* Primary Service */}
+      {applicant?.primaryService?.serviceName && (
+        <View style={styles.serviceSection}>
+          <Text style={styles.serviceSectionTitle}>Primary Service</Text>
+          <View style={styles.serviceItem}>
+            <View style={[styles.serviceIcon, styles.primaryServiceIcon]}>
+              <Ionicons name="star" size={16} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.serviceName, styles.primaryServiceName]}>
+              {applicant.primaryService.serviceName}
             </Text>
           </View>
         </View>
-      </InfoSection>
-
-      {/* Location */}
-      {applicant?.location && (
-        <InfoSection title="Location" icon="location-outline">
-          <View style={styles.locationInfo}>
-            <Ionicons name="location" size={16} color="#6366F1" />
-            <Text style={styles.locationText}>
-              {[applicant.location.region, applicant.location.city, applicant.location.town]
-                .filter(Boolean)
-                .join(', ')}
-            </Text>
-          </View>
-        </InfoSection>
       )}
-    </View>
-  );
 
+      {/* Secondary Services */}
+      {applicant?.secondaryServices && applicant.secondaryServices.length > 0 && (
+        <View style={styles.serviceSection}>
+          <Text style={styles.serviceSectionTitle}>
+            Also Offers These {applicant.secondaryServices.length} 
+            {applicant.secondaryServices.length === 1 ? ' Service' : ' Services'}
+          </Text>
+          <View style={styles.secondaryServicesGrid}>
+            {applicant.secondaryServices.map((service, index) => (
+              <View key={index} style={styles.secondaryServiceItem}>
+                <View style={styles.serviceIcon}>
+                  <Ionicons name="checkmark" size={14} color="#3B82F6" />
+                </View>
+                <Text style={styles.secondaryServiceName} numberOfLines={2}>
+                  {service.serviceName}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* No services message */}
+      {!applicant?.primaryService?.serviceName && 
+       (!applicant?.secondaryServices || applicant.secondaryServices.length === 0) && (
+        <Text style={styles.noServicesText}>
+          No services listed yet
+        </Text>
+      )}
+    </InfoSection>
+
+    {/* Skills */}
+    {applicant?.skills && applicant.skills.length > 0 && (
+      <InfoSection title="Skills & Expertise" icon="construct-outline">
+        <View style={styles.skillsContainer}>
+          {applicant.skills.map((skill, index) => (
+            <View key={index} style={styles.skillTag}>
+              <Text style={styles.skillText}>{skill}</Text>
+            </View>
+          ))}
+        </View>
+      </InfoSection>
+    )}
+
+    {/* Verification Status */}
+    <InfoSection title="Verification" icon="shield-checkmark-outline">
+      <View style={styles.verificationGrid}>
+        <View style={styles.verificationItem}>
+          <Ionicons name={applicant?.isVerified ? "checkmark-circle" : "close-circle"} size={20} color={applicant?.isVerified ? "#10B981" : "#EF4444"} />
+          <Text style={styles.verificationText}>
+            {applicant?.isVerified ? 'Verified Professional' : 'Not Verified'}
+          </Text>
+        </View>
+        <View style={styles.verificationItem}>
+          <Ionicons name={applicant?.vettingStatus === 'approved' ? "checkmark-circle" : "time-outline"} size={20} color={applicant?.vettingStatus === 'approved' ? "#10B981" : "#F59E0B"} />
+          <Text style={styles.verificationText}>
+            {applicant?.vettingStatus === 'approved' ? 'Background Verified' : 'Vetting in Progress'}
+          </Text>
+        </View>
+      </View>
+    </InfoSection>
+
+    {/* Location */}
+    {applicant?.location && (
+      <InfoSection title="Location" icon="location-outline">
+        <View style={styles.locationInfo}>
+          <Ionicons name="location" size={16} color="#6366F1" />
+          <Text style={styles.locationText}>
+            {[applicant.location.region, applicant.location.city, applicant.location.town]
+              .filter(Boolean)
+              .join(', ')}
+          </Text>
+        </View>
+      </InfoSection>
+    )}
+  </View>
+);
   // FIXED: Render Experience Function
   const renderExperience = () => (
     <View>
@@ -767,34 +814,8 @@ export default function ApplicantProfileScreen({ route }) {
               <Text style={styles.memberSince}>Member since {stats.memberSince}</Text>
             </View>
           </View>
-         {/* <StatsGrid />*/}
+        
         </LinearGradient>
-
-        {/* Bid Information
-        {isBidder && (
-          <View style={styles.bidCard}>
-            <View style={styles.bidHeader}>
-              <Ionicons name="pricetag-outline" size={24} color="#6366F1" />
-              <Text style={styles.bidTitle}>Bid Details</Text>
-            </View>
-            <View style={styles.bidDetails}>
-              <View style={styles.bidInfo}>
-                <Text style={styles.bidAmount}>₵{applicant.amount}</Text>
-                <Text style={styles.bidLabel}>Bid Amount</Text>
-              </View>
-              {applicant.timeline && (
-                <View style={styles.bidInfo}>
-                  <Text style={styles.bidTimeline}>{applicant.timeline} days</Text>
-                  <Text style={styles.bidLabel}>Timeline</Text>
-                </View>
-              )}
-            </View>
-            {applicant.message && (
-              <Text style={styles.bidMessage}>"{applicant.message}"</Text>
-            )}
-          </View>
-        )} */}
-
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
           {tabs.map((tab) => (
@@ -845,6 +866,71 @@ const styles = StyleSheet.create({
   statIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   statValue: { fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 },
   statLabel: { fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', textAlign: 'center' },
+  serviceSection: {
+    marginBottom: 20,
+  },
+  serviceSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  serviceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  primaryServiceIcon: {
+    backgroundColor: '#F59E0B',
+  },
+  serviceIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  primaryServiceName: {
+    color: '#D97706',
+  },
+  
+  // Secondary Services Grid
+  secondaryServicesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  secondaryServiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '50%',
+    paddingHorizontal: 6,
+    marginBottom: 12,
+  },
+  secondaryServiceName: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 18,
+  },
+  noServicesText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+
   
   // Bid Card
   bidCard: { backgroundColor: '#FFFFFF', margin: 16, marginTop: -40, padding: 20, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, zIndex: 1 },
