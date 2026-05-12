@@ -18,10 +18,12 @@ import ChatScreen from "../screens/tasker/ChatScreen";
 import AllReviewsScreen from "../screens/tasker/AllReviewsScreen";
 import EmployerHelpSupportScreen from "../screens/poster/ClientSupportScreen"
 import SearchTaskersScreen from "../screens/poster/SearchTaskersScreen"
-import  ServiceRequestFormScreen from "../screens/poster/ServiceRequestFormScreen"
+import  BookingScreen from "../screens/poster/BookingScreen"
 import ServiceRequestDetailScreen from "../screens/poster/ServiceRequestDetailScreen"
 import ServiceRequestOffersScreen from "../screens/poster/ServiceRequestOffersScreen"
 import EditServiceRequestScreen from "../screens/poster/EditServiceRequestScreen"
+import MyBookingsScreen from "../screens/poster/MyBookings"
+import BookingDetailScreen from "../screens/poster/BookingDetailScreen"
 import { Ionicons } from "@expo/vector-icons";
 
 
@@ -47,7 +49,8 @@ function PosterStackNavigator() {
      {/* <Stack.Screen name="Notifications" component={NotificationsScreen} />*/}
       <Stack.Screen name="Payments" component={PaymentsScreen} />
       <Stack.Screen name="ClientSupport" component={EmployerHelpSupportScreen} />
-      <Stack.Screen name="ServiceRequestForm" component={ServiceRequestFormScreen} />
+      <Stack.Screen name="Booking" component={BookingScreen} />
+      <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
       <Stack.Screen name="ServiceRequestOffers" component={ServiceRequestOffersScreen} />
       <Stack.Screen name="EditServiceRequest" component={EditServiceRequestScreen} />
@@ -100,6 +103,22 @@ function PosterTabs() {
             ),
           }}
         />
+
+        <Tab.Screen
+          name="MyBookings"
+          component={MyBookingsScreen}
+          options={{
+            tabBarLabel: 'My Bookings',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? "calendar" : "calendar-outline"}
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+          
+        />
        
         <Tab.Screen
           name="PostedTasks"
@@ -141,7 +160,7 @@ function PosterTabs() {
         />
 
 
-         <Tab.Screen
+        {/* <Tab.Screen
           name="Dashboard"
           component={DashboardScreen}
           options={{
@@ -163,7 +182,7 @@ function PosterTabs() {
               });
             },
           })}
-        />
+        />*/}
 
 
         

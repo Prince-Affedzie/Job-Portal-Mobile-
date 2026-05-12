@@ -9,6 +9,7 @@ import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen'
 import VerifyResetScreen from '../screens/auth/VerifyResetScreen'
 import TaskerStack from "./TaskerStack";
 import PosterStack from "./PosterStack";
+import TaskerOnboardingScreen from '../screens/auth/TaskerOnboarding'
 
 
 const Stack = createNativeStackNavigator();
@@ -22,6 +23,7 @@ export default function AuthStack() {
        <Stack.Screen name="VerifyReset" component={VerifyResetScreen} />
        <Stack.Screen name="TaskerStack" component={TaskerStack} />
        <Stack.Screen name="PosterStack" component={PosterStack} />
+       <Stack.Screen name="OnboardTasker" component={TaskerOnboardingScreen}/>
     </Stack.Navigator>
   );
 }

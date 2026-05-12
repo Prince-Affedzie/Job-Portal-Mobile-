@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from "react";
 import {getTasksNearby, getMiniTasks, getYourAppliedMiniTasks } from "../api/miniTaskApi";
 import {applyToMiniTask,bidOnMiniTask} from "../api/miniTaskApi";
 import {getAvailableRequests} from "../api/serviceRequestAPI/taskerAPI"
+import {taskerGetMyProfile} from "../api/taskerApi"
 import { AuthContext } from "./AuthContext";
 import {viewAllEarnings} from "../api/paymentApi"
 
@@ -9,6 +10,7 @@ export const TaskerContext = createContext();
 
 export const TaskerProvider = ({ children }) => {
   const { user, token } = useContext(AuthContext);
+  const [tasker,setTasker] = useState(null)
   const [availableTasks, setAvailableTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [bids, setBids] = useState([])
@@ -17,6 +19,23 @@ export const TaskerProvider = ({ children }) => {
   const [earnings,setEarnings] = useState([])
   const [serviceRequests, setServiceRequests] = useState([])
   const [applications,setApplications] = useState([])
+
+  const fetchTasker = async()=>{
+      if (!token) return;
+     setLoading(true);
+     try{
+        const res = await taskerGetMyProfile()
+        if(res.status ===200){
+          setTasker(res.data.taskerProfile)
+        }
+
+     }catch(error){
+      console.log(error)
+     }finally {
+      setLoading(false);
+    }
+      
+  }
 
   // Load available tasks for tasker
   const loadAvailableTasks = async (params) => {
@@ -53,11 +72,15 @@ export const TaskerProvider = ({ children }) => {
     setLoading(true);
     try {
       const res = await getYourAppliedMiniTasks();
+      if(res.status === 200){
       setBids(res.data.bids)
       setApplications(res.data.applications)
+      console.log(res)
       return res
-    } catch (err) {
-      console.log("Failed to fetch my tasks:", err);
+      }
+      
+    } catch (error) {
+      console.log("Failed to fetch my tasks:", error);
     } finally {
       setLoading(false);
     }
@@ -120,6 +143,7 @@ export const TaskerProvider = ({ children }) => {
       loadNearbyTasks();
       loadMyTasks();
       getAllEarnings();
+      fetchTasker();
     }
   }, [user]);
 
@@ -131,6 +155,7 @@ export const TaskerProvider = ({ children }) => {
         myTasks,
         applications,
         bids,
+        tasker,
         serviceRequests,
         loading,
         loadAvailableTasks,
@@ -140,6 +165,7 @@ export const TaskerProvider = ({ children }) => {
         applyTask,
         bidOnTask,
         getAllEarnings,
+        fetchTasker,
         earnings,
       }}
     >

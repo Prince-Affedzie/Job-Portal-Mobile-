@@ -258,7 +258,7 @@ export default function AllTasksScreen() {
         {/* Hero Section */}
         <View style={styles.heroSection}>
         <LinearGradient
-          colors={['#1A1F3B', '#2D1B69']}
+          colors={['#1A1A1B', '#1A1A1B']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroBackground}

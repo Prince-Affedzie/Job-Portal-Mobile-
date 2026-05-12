@@ -11,15 +11,15 @@ import {
   Alert,
   ActivityIndicator,
   StatusBar,
-  Modal,
-  FlatList,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
 } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { useNavigation } from '@react-navigation/native';
 import { navigate } from '../../services/navigationService';
 import { completeProfile, fetchUser, uploadProfileImage } from '../../api/authApi';
 import { sendFileToS3 } from '../../api/commonApi';
@@ -27,28 +27,48 @@ import { AuthContext } from '../../context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
-const DRAFT_KEY = 'onboarding_draft';
+const DRAFT_KEY = 'client_onboarding_draft';
 
-const GHANA_REGIONS = [
-  "Greater Accra", "Ashanti", "Central", "Eastern", "Western", 
-  "Western North", "Volta", "Oti", "Northern", "North East", 
-  "Savannah", "Bono", "Bono East", "Ahafo", "Upper East", "Upper West"
-];
+// ─── Theme: Pacific Indigo & Warm Gold ──────────────────────────────────────
+const C = {
+  bg: '#F9FAFC',
+  surface: '#FFFFFF',
+  border: '#E4E8EE',
+  accent: '#1E3A6E',         // deep indigo
+  accentLight: '#DDE7F5',
+  gold: '#D49B3F',
+  goldLight: '#FCF3E1',
+  green: '#0F766E',
+  greenLight: '#D1FAE5',
+  red: '#DC2626',
+  redLight: '#FEE2E2',
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  white: '#FFFFFF',
+  shadow: '#1E3A6E14',
+};
 
 const TaskPosterOnboarding = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setUser } = useContext(AuthContext);
-  const [showRegionModal, setShowRegionModal] = useState(false);
-  const [regionSearch, setRegionSearch] = useState('');
+  const navigation = useNavigation();
 
   const [profile, setProfile] = useState({
-    phone: "",
-    location: { city: "", region: "", town: "" },
+    phone: '',
     profileImage: null,
-    profileImageUri: "",
+    profileImageUri: '',
   });
 
   const [errors, setErrors] = useState({});
+
+
+  const handleChange = (field, value) => {
+  setProfile(prev => ({ ...prev, [field]: value }));
+  if (errors[field]) {
+    setErrors(prev => ({ ...prev, [field]: null }));
+  }
+};
 
   // Load draft on mount
   useEffect(() => {
@@ -57,7 +77,7 @@ const TaskPosterOnboarding = () => {
 
   // Auto-save draft
   useEffect(() => {
-    if (profile.phone || profile.location.city || profile.location.region) {
+    if (profile.phone) {
       saveDraft();
     }
   }, [profile]);
@@ -70,7 +90,6 @@ const TaskPosterOnboarding = () => {
         setProfile(prev => ({
           ...prev,
           phone: parsedDraft.phone || prev.phone,
-          location: parsedDraft.location || prev.location,
         }));
       }
     } catch (error) {
@@ -82,7 +101,6 @@ const TaskPosterOnboarding = () => {
     try {
       await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({
         phone: profile.phone,
-        location: profile.location,
       }));
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -97,6 +115,7 @@ const TaskPosterOnboarding = () => {
     }
   };
 
+  // ── Image upload logic (unchanged) ──────────────────────────────────────
   const uploadImageToS3 = async (imageData) => {
     try {
       const filename = imageData.name || 'profile.jpg';
@@ -129,52 +148,6 @@ const TaskPosterOnboarding = () => {
     } catch (error) {
       console.error('Image upload error:', error);
       throw new Error('Failed to upload image');
-    }
-  };
-
-  const validateForm = () => {
-    let formErrors = {};
-    let isValid = true;
-
-    if (!profile.phone.trim()) {
-      formErrors.phone = "Phone number is required";
-      isValid = false;
-    } else {
-      const cleaned = profile.phone.replace(/[^0-9]/g, '');
-      if (cleaned.length < 9 || cleaned.length > 13) {
-        formErrors.phone = "Please enter a valid phone number";
-        isValid = false;
-      }
-    }
-
-    if (!profile.location.region) {
-      formErrors.region = "Please select your region";
-      isValid = false;
-    }
-
-    if (!profile.location.city.trim()) {
-      formErrors.city = "Please enter your city";
-      isValid = false;
-    }
-
-    setErrors(formErrors);
-    return isValid;
-  };
-
-  const handleChange = (field, value) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
-    }
-  };
-
-  const handleLocationChange = (field, value) => {
-    setProfile(prev => ({
-      ...prev,
-      location: { ...prev.location, [field]: value },
-    }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
@@ -269,6 +242,27 @@ const TaskPosterOnboarding = () => {
     }));
   };
 
+  // ── Validation ─────────────────────────────────────────────────────────
+  const validateForm = () => {
+    let formErrors = {};
+    let isValid = true;
+
+    if (!profile.phone.trim()) {
+      formErrors.phone = "Phone number is required";
+      isValid = false;
+    } else {
+      const cleaned = profile.phone.replace(/[^0-9]/g, '');
+      if (cleaned.length < 9 || cleaned.length > 13) {
+        formErrors.phone = "Please enter a valid phone number";
+        isValid = false;
+      }
+    }
+
+    setErrors(formErrors);
+    return isValid;
+  };
+
+  // ── Submit handler ─────────────────────────────────────────────────────
   const handleSubmit = async (skipImage = false) => {
     if (!validateForm()) return;
 
@@ -289,35 +283,33 @@ const TaskPosterOnboarding = () => {
 
       const requestData = {
         phone: profile.phone,
-        location: {
-          city: profile.location.city,
-          region: profile.location.region,
-          town: profile.location.town || ""
-        }
+        profileImage: profileImageUrl || undefined,
       };
-
-      if (profileImageUrl) {
-        requestData.profileImage = profileImageUrl;
-      }
 
       const response = await completeProfile(requestData);
       
       if (response.status === 200) {
         const res = await fetchUser();
+        console.log(res.data)
         setUser(res.data);
         await clearDraft();
 
-        Alert.alert(
-          "Profile Complete!", 
-          "You're ready to start hiring taskers.",
-          [
-            { 
-              text: 'Get Started', 
-              onPress: () => navigate('PosterStack'),
-              style: 'default'
-            }
-          ]
-        );
+       Alert.alert(
+  "Profile Complete!", 
+  "You're ready to start hiring taskers.",
+  [
+    { 
+      text: 'Get Started', 
+      onPress: () => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'PosterStack' }],
+        });
+      },
+      style: 'default'
+    }
+  ]
+);
       }  
      
     } catch (error) {
@@ -334,77 +326,9 @@ const TaskPosterOnboarding = () => {
     }
   };
 
-  const filteredRegions = GHANA_REGIONS.filter(region =>
-    region.toLowerCase().includes(regionSearch.toLowerCase())
-  );
-
-  const RegionModal = () => (
-    <Modal
-      visible={showRegionModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowRegionModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Region</Text>
-            <TouchableOpacity 
-              onPress={() => setShowRegionModal(false)}
-              style={styles.modalCloseButton}
-            >
-              <Feather name="x" size={22} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.searchContainer}>
-            <Feather name="search" size={18} color="#94A3B8" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search regions..."
-              placeholderTextColor="#94A3B8"
-              value={regionSearch}
-              onChangeText={setRegionSearch}
-              autoFocus
-            />
-          </View>
-
-          <FlatList
-            data={filteredRegions}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.regionItem,
-                  profile.location.region === item && styles.regionItemSelected
-                ]}
-                onPress={() => {
-                  handleLocationChange('region', item);
-                  setShowRegionModal(false);
-                  setRegionSearch('');
-                }}
-              >
-                <Text style={[
-                  styles.regionItemText,
-                  profile.location.region === item && styles.regionItemTextSelected
-                ]}>
-                  {item}
-                </Text>
-                {profile.location.region === item && (
-                  <Feather name="check" size={18} color="#6366F1" />
-                )}
-              </TouchableOpacity>
-            )}
-            showsVerticalScrollIndicator={false}
-          />
-        </View>
-      </View>
-    </Modal>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
       
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
@@ -420,93 +344,36 @@ const TaskPosterOnboarding = () => {
           <View style={styles.header}>
             <Text style={styles.title}>Complete Your Profile</Text>
             <Text style={styles.subtitle}>
-              Tell us a bit about yourself to get started
+              Tell us a little about yourself to get started
             </Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
+            
             {/* Phone Number */}
             <View style={styles.formSection}>
               <Text style={styles.sectionLabel}>Phone Number</Text>
               <View style={[
-                styles.inputContainer,
+                styles.phoneRow,
                 errors.phone && styles.inputError
               ]}>
                 <View style={styles.phonePrefix}>
                   <Text style={styles.phonePrefixText}>🇬🇭 +233</Text>
                 </View>
                 <TextInput
-                  style={styles.input}
-                  placeholder="Phone number"
-                  placeholderTextColor="#94A3B8"
+                  style={styles.phoneInput}
+                  placeholder="XX XXX XXXX"
+                  placeholderTextColor={C.textMuted}
                   value={profile.phone}
                   onChangeText={(value) => handleChange('phone', value)}
                   keyboardType="phone-pad"
+                  maxLength={12}
                 />
               </View>
               {errors.phone && (
                 <Text style={styles.errorText}>{errors.phone}</Text>
               )}
-            </View>
-
-            {/* Location */}
-            <View style={styles.formSection}>
-              <Text style={styles.sectionLabel}>Location</Text>
-              
-              {/* Region */}
-              <Text style={styles.fieldLabel}>Region</Text>
-              <TouchableOpacity
-                style={[
-                  styles.inputContainer,
-                  styles.selectContainer,
-                  errors.region && styles.inputError
-                ]}
-                onPress={() => setShowRegionModal(true)}
-              >
-                <Text style={[
-                  styles.selectText,
-                  !profile.location.region && styles.placeholderText
-                ]}>
-                  {profile.location.region || "Select region"}
-                </Text>
-                <Feather name="chevron-down" size={20} color="#64748B" />
-              </TouchableOpacity>
-              {errors.region && (
-                <Text style={styles.errorText}>{errors.region}</Text>
-              )}
-
-              {/* City */}
-              <Text style={styles.fieldLabel}>City</Text>
-              <View style={[
-                styles.inputContainer,
-                errors.city && styles.inputError
-              ]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="City"
-                  placeholderTextColor="#94A3B8"
-                  value={profile.location.city}
-                  onChangeText={(value) => handleLocationChange('city', value)}
-                />
-              </View>
-              {errors.city && (
-                <Text style={styles.errorText}>{errors.city}</Text>
-              )}
-
-              {/* Town (Optional) */}
-              <Text style={styles.fieldLabel}>
-                Town/Suburb <Text style={styles.optionalText}>(Optional)</Text>
-              </Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Town or suburb"
-                  placeholderTextColor="#94A3B8"
-                  value={profile.location.town}
-                  onChangeText={(value) => handleLocationChange('town', value)}
-                />
-              </View>
             </View>
 
             {/* Profile Photo */}
@@ -516,39 +383,38 @@ const TaskPosterOnboarding = () => {
                 <Text style={styles.optionalBadge}>Optional</Text>
               </View>
               
-              {!profile.profileImageUri ? (
-                <TouchableOpacity 
-                  style={styles.uploadArea}
-                  onPress={() => handleImageUpload(false)}
-                >
-                  <View style={styles.uploadIcon}>
-                    <Feather name="camera" size={32} color="#6366F1" />
+              {/* Photo preview / picker (matching tasker step 1) */}
+              <View style={styles.photoHero}>
+                <TouchableOpacity onPress={() => handleImageUpload(false)} activeOpacity={0.85} style={styles.photoCircleWrap}>
+                  {profile.profileImageUri ? (
+                    <Image source={{ uri: profile.profileImageUri }} style={styles.photoCircle} />
+                  ) : (
+                    <LinearGradient colors={[C.accentLight, C.surface]} style={styles.photoCircle}>
+                      <Ionicons name="person" size={52} color={C.textMuted} />
+                    </LinearGradient>
+                  )}
+                  <View style={styles.photoEditBadge}>
+                    <Ionicons name="camera" size={18} color={C.white} />
                   </View>
-                  <Text style={styles.uploadText}>Add Photo</Text>
-                  <Text style={styles.uploadHint}>Tap to upload</Text>
                 </TouchableOpacity>
-              ) : (
-                <View style={styles.photoPreview}>
-                  <Image 
-                    source={{ uri: profile.profileImageUri }}
-                    style={styles.photo}
-                  />
-                  <View style={styles.photoActions}>
-                    <TouchableOpacity 
-                      style={styles.photoActionButton}
-                      onPress={() => handleImageUpload(false)}
-                    >
-                      <Feather name="edit-2" size={16} color="#6366F1" />
-                      <Text style={styles.photoActionText}>Change</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      style={styles.photoActionButton}
-                      onPress={removeImage}
-                    >
-                      <Feather name="trash-2" size={16} color="#EF4444" />
-                      <Text style={styles.photoActionTextRemove}>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
+              </View>
+
+              {profile.profileImageUri && (
+                <View style={styles.photoActions}>
+                  <TouchableOpacity 
+                    style={styles.photoActionButton}
+                    onPress={() => handleImageUpload(false)}
+                  >
+                    <Ionicons name="create-outline" size={16} color={C.accent} />
+                    <Text style={styles.photoActionText}>Change</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.photoActionButton}
+                    onPress={removeImage}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={C.red} />
+                    <Text style={styles.photoActionTextRemove}>Remove</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -566,18 +432,25 @@ const TaskPosterOnboarding = () => {
               ]}
               onPress={() => handleSubmit(false)}
               disabled={isSubmitting}
+              activeOpacity={0.88}
             >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Text style={styles.submitButtonText}>Complete Profile</Text>
-                  <Feather name="arrow-right" size={20} color="#FFFFFF" />
-                </>
-              )}
+              <LinearGradient
+                colors={isSubmitting ? [C.textMuted, C.textMuted] : [C.accent, '#152C4F']}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={styles.submitGradient}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color={C.white} />
+                ) : (
+                  <>
+                    <Text style={styles.submitButtonText}>Complete Profile</Text>
+                    <Ionicons name="arrow-forward" size={20} color={C.white} />
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
-            {/* Optional: Skip for now */}
+            {/* Optional skip photo */}
             {!profile.profileImageUri && (
               <TouchableOpacity 
                 style={styles.skipButton}
@@ -588,23 +461,23 @@ const TaskPosterOnboarding = () => {
               </TouchableOpacity>
             )}
 
-            {/* Terms */}
             <Text style={styles.termsText}>
               By continuing, you agree to our Terms of Service and Privacy Policy
             </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <RegionModal />
     </SafeAreaView>
   );
 };
 
+
+
+// ─── Styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.bg,
   },
   scrollView: {
     flex: 1,
@@ -612,285 +485,206 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
   },
-  // Header
   header: {
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: 40,
     paddingBottom: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.bg,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1E293B',
+    fontSize: 30,
+    fontWeight: '800',
+    color: C.textPrimary,
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#64748B',
+    color: C.textSecondary,
     lineHeight: 24,
   },
-  // Form
   form: {
     paddingHorizontal: 24,
   },
   formSection: {
-    marginBottom: 32,
+    marginBottom: 36,
   },
   sectionLabel: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: '700',
+    color: C.textPrimary,
     marginBottom: 16,
+    letterSpacing: 0.1,
   },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  optionalText: {
-    color: '#94A3B8',
-    fontWeight: '400',
-  },
-  // Inputs
-  inputContainer: {
+
+  // Phone
+  phoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
+    borderColor: C.border,
+    borderRadius: 12,
+    overflow: 'hidden',
     height: 56,
   },
   inputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
+    borderColor: C.red,
+    backgroundColor: C.redLight,
   },
   phonePrefix: {
-    paddingRight: 12,
+    paddingHorizontal: 16,
     borderRightWidth: 1,
-    borderRightColor: '#E2E8F0',
+    borderRightColor: C.border,
+    justifyContent: 'center',
+    height: '100%',
+    backgroundColor: C.bg,
   },
   phonePrefixText: {
     fontSize: 16,
-    color: '#1E293B',
-    fontWeight: '500',
+    color: C.textPrimary,
+    fontWeight: '600',
   },
-  input: {
+  phoneInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 0,
-  },
-  selectContainer: {
-    justifyContent: 'space-between',
-  },
-  selectText: {
-    fontSize: 16,
-    color: '#1E293B',
-  },
-  placeholderText: {
-    color: '#94A3B8',
+    color: C.textPrimary,
+    paddingHorizontal: 14,
+    height: '100%',
   },
   errorText: {
     fontSize: 13,
-    color: '#EF4444',
-    marginTop: 4,
+    color: C.red,
+    marginTop: 6,
     fontWeight: '500',
   },
-  // Photo Upload
+
+  // Photo section (mimics tasker Step 1)
   photoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   optionalBadge: {
     fontSize: 13,
-    color: '#64748B',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
+    color: C.textMuted,
+    backgroundColor: C.border,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
-  },
-  uploadArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
-    borderStyle: 'dashed',
     borderRadius: 12,
-    padding: 40,
-    height: 200,
+    fontWeight: '600',
   },
-  uploadIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#E0E7FF',
+  photoHero: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  photoCircleWrap: {
+    position: 'relative',
+  },
+  photoCircle: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: C.border,
   },
-  uploadText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  uploadHint: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  // Photo Preview
-  photoPreview: {
+  photoEditBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: C.accent,
+    borderWidth: 3,
+    borderColor: C.bg,
     alignItems: 'center',
-  },
-  photo: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F1F5F9',
-    marginBottom: 16,
+    justifyContent: 'center',
   },
   photoActions: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 12,
   },
   photoActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
+    borderColor: C.border,
+    borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
   },
   photoActionText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#6366F1',
+    fontWeight: '600',
+    color: C.accent,
   },
   photoActionTextRemove: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#EF4444',
+    fontWeight: '600',
+    color: C.red,
   },
   uploadTips: {
-    marginTop: 12,
+    marginTop: 4,
   },
   tip: {
     fontSize: 13,
-    color: '#64748B',
+    color: C.textMuted,
     marginBottom: 4,
   },
-  // Submit Button
+
+  // Submit button
   submitButton: {
-    backgroundColor: '#6366F1',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 12,
     marginBottom: 16,
-    flexDirection: 'row',
-    gap: 8,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.65,
+  },
+  submitGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 10,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: C.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   skipButton: {
     alignItems: 'center',
     padding: 16,
+    marginBottom: 8,
   },
   skipButtonText: {
-    color: '#64748B',
+    color: C.textMuted,
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   termsText: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: C.textMuted,
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 24,
-  },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1E293B',
-    padding: 0,
-  },
-  regionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-  },
-  regionItemSelected: {
-    backgroundColor: '#F8FAFC',
-  },
-  regionItemText: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  regionItemTextSelected: {
-    color: '#6366F1',
-    fontWeight: '500',
   },
 });
 

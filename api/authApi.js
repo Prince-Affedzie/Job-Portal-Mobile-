@@ -2,7 +2,10 @@ import API from "./apiClient";
 
 // Auth
 export const signUp = (data) => API.post("/api/user/signup", data);
+export const googleSignUp = (data) => API.post('/api/user/google-signup',data)
 export const loginUser = (data) => API.post("/api/user/login", data);
+export const googleLogin = (data)=> API.post("/api/user/google-login",data);
+export const appleSignUp = (data)=>API.post("/api/user/apple-signup",data)
 export const logoutUser = () => API.post("/api/user/logout");
 export const switchAccount = ()=>API.put("/api/user/switch/account")
 export const deleteAccount = ()=>API.delete("/api/user/delete/account")
@@ -23,14 +26,16 @@ export const completeProfile = (data) =>
     headers: { "Content-Type": "multipart/form-data" },
   });
 
+export const taskerOnboarding =(data) =>
+  API.post("/api/tasker/onboard", data, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+
+
 export const uploadProfileImage = (data) => API.post("/api/user/upload-profile-image",data);
 export const uploadIdCard = (data)=>API.post("/api/user/upload-id-card",data)
 
-export const uploadPortfolioFiles = (data) => API.post("/api/user/upload_portfolio", data);
-export const addWorkSampleToProfile = (data)=>API.post('/api/h1/v2/add_work_sample_to_profile',data)
-export const removeWorkSampleFromProfile = (sampleId)=>API.delete(`/api/h1/v2/remove_work_sample_from_profile/${sampleId}`)
-
-export const modifyProfile = (formData) => 
+export const modifyProfile =(formData)=>
     API.put("/api/user/edit_profile", formData, {
       headers: {
         'Content-Type': 'multipart/form-data',

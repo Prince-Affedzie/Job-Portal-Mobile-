@@ -54,7 +54,7 @@ export default function RootNavigator() {
         {!user ? (
           //  Auth flow
           <Stack.Screen name="AuthStack" component={AuthStack} />
-        ) : user.role === "job_seeker" ? (
+        ) : user.role === "tasker" ? (
           //  Tasker flow
          
            

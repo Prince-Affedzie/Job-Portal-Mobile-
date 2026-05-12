@@ -12,7 +12,20 @@
           "package_name": "com.affedziep44.jobportalmobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "830161939039-drbgh6aruhfjvarb12i5p76464dvll9i.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.affedziep44.jobportalmobile",
+            "certificate_hash": "145d071626e031f8f2f6a8d4a8a37cf1e49cf601"
+          }
+        },
+        {
+          "client_id": "830161939039-chcube7voaggltt861nrga6g7uq13ndl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDbKl4vRUL0YzWIeqV4Y6g7KG2jKNJnDlo"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "830161939039-chcube7voaggltt861nrga6g7uq13ndl.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "830161939039-hqi7kl8gff9dd1oo06indv89somq5nal.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.affedziep44.JobPortalMobile"
+              }
+            }
+          ]
         }
       }
     }

@@ -81,6 +81,7 @@ const HeroSection = ({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.cardContainer}
+        
       >
         {/* Minimal Background Decorations */}
         <View style={styles.decorationOrb1} />
@@ -209,7 +210,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   cardContainer: {
-    borderRadius: 24,
+   
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#000',
@@ -218,6 +219,8 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 12,
     backgroundColor: '#1A1F3B',
+    borderTopLeftRadius:24,
+    borderTopRightRadius:24,
   },
   cardContent: {
     padding: 20,

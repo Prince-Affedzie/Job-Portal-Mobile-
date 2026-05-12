@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { loginUser, fetchUser, logoutUser,signUp,modifyProfile,deleteAccount } from "../api/authApi";
+import { loginUser, fetchUser, logoutUser,signUp,modifyProfile,deleteAccount,googleLogin,googleSignUp,appleSignUp } from "../api/authApi";
 import { navigate } from '../services/navigationService';
 
 
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
       if (res.data?.token) {
         await AsyncStorage.setItem("authToken", res.data.token);
         setToken(res.data.token);
-        setUser(res.data.user);
+        //setUser(res.data.user);
         return res;
       }
       return false;
@@ -52,6 +52,53 @@ export const AuthProvider = ({ children }) => {
   };
 
 
+
+   const google_signup= async (credentials) => {
+    try {
+      const res = await googleSignUp(credentials);
+      console.log(res)
+      if (res.data?.token) {
+        await AsyncStorage.setItem("authToken", res.data.token);
+        setToken(res.data.token);
+        return res;
+      }
+      return false;
+    } catch (err) {
+        const errorMessage =
+        err.res?.data?.message ||
+        err.message
+      console.log("Sign Up Failed:", errorMessage);
+      return false;
+    }
+  };
+
+
+
+  const apple_signup= async (credentials) => {
+    try {
+      const res = await appleSignUp(credentials);
+      console.log(res)
+      if (res.data?.token) {
+        await AsyncStorage.setItem("authToken", res.data.token);
+        setToken(res.data.token);
+        return res;
+      }
+      return {
+      status: res.status || 400,
+      success: false,
+      message: 'No token received from server',
+    };
+    } catch (err) {
+        const errorMessage =
+        err.res?.data?.message ||
+        err.message
+      console.log("Sign Up Failed:", errorMessage);
+      return false;
+    }
+  };
+
+
+
  
 const login = async (credentials) => {
   try {
@@ -60,7 +107,45 @@ const login = async (credentials) => {
       await AsyncStorage.setItem('authToken', res.data.token);
       setToken(res.data.token);
       setUser(res.data.user);
-      res.data.user?.role === "job_seeker"?navigate('TaskerStack'):navigate('PosterStack')
+      res.data.user?.role === "tasker"?navigate('TaskerStack'):navigate('PosterStack')
+      return {
+        status: res.status,
+        user: res.data.user,
+        success: true,
+      };
+    }
+    return {
+      status: res.status || 400,
+      success: false,
+      message: 'No token received from server',
+    };
+  } catch (err) {
+    console.error('Login failed:', err);
+    return {
+      success: false,
+      status: err.response?.status || (err.request ? 0 : 500),
+      message:
+        err.response?.data?.message ||
+        (err.response?.status === 404
+          ? 'User not found. Please check your email or sign up.'
+          : err.response?.status === 401
+          ? 'Invalid email or password. Please try again.'
+          : err.request
+          ? 'Network error. Please check your internet connection.'
+          : 'An unexpected error occurred. Please try again.'),
+    };
+  }
+};
+
+
+const google_login = async (credentials) => {
+  try {
+    const res = await googleLogin(credentials);
+    if (res.data?.token) {
+      await AsyncStorage.setItem('authToken', res.data.token);
+      setToken(res.data.token);
+      setUser(res.data.user);
+      res.data.user?.role === "tasker"?navigate('TaskerStack'):navigate('PosterStack')
       return {
         status: res.status,
         user: res.data.user,
@@ -134,7 +219,7 @@ const login = async (credentials) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token,register, login, logout,removeAccount, updateProfile, loading, setUser }}>
+    <AuthContext.Provider value={{ user, token,register, login,google_signup,google_login,apple_signup, logout,removeAccount, updateProfile, loading, setUser }}>
       {children}
     </AuthContext.Provider>
   );

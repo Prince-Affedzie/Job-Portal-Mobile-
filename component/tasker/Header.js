@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
 import { NotificationContext } from "../../context/NotificationContext";
 import { navigate, goBack } from '../../services/navigationService';
-import { useContext } from 'react';
 import { useNavigation } from "@react-navigation/native";
 
 const Header = ({ 
@@ -25,49 +24,49 @@ const Header = ({
   onRightPress,
   rightComponent,
   showProfile = false,
-  showNotifications = true, // New prop to show notification icon
-  backgroundColor = '#1A1F3B',
-  gradient = true,
+  showNotifications = true,
+  backgroundColor = '#FFFFFF',        // now light
+  gradient = false,                   // gradient off by default
   customContent,
 }) => {
   const { user } = React.useContext(AuthContext);
   const insets = useSafeAreaInsets();
-  const {notifications}  = useContext(NotificationContext)
+  const { notifications } = React.useContext(NotificationContext);
   const unreadNotifications = notifications.filter(n => !n.read);
- const notificationCount = unreadNotifications.length > 0 ? unreadNotifications.length :0
+  const notificationCount = unreadNotifications.length > 0 ? unreadNotifications.length : 0;
+
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
     } else {
-      // Default back behavior
       goBack();
     }
   };
 
-  const navigation = useNavigation()
+  const navigation = useNavigation();
 
   const handleProfilePress = () => {
     navigate('ProfileTab');
   };
 
   const handleNotificationPress = () => {
-   navigation.navigate('Notifications'); // Replace with your actual notification screen name
+    navigation.navigate('Notifications');
   };
 
+  // If gradient is used (rare in light theme), provide a subtle light gradient
   const HeaderBackground = gradient ? LinearGradient : View;
   const backgroundProps = gradient 
-    ? { colors: ['#1A1F3B', '#2D325D'] }
+    ? { colors: ['#FFFFFF', '#F8FAFF'] }
     : { style: [styles.background, { backgroundColor }] };
 
-  // Determine if we should use left-aligned layout
   const useLeftLayout = !!rightComponent;
 
   return (
     <>
       <StatusBar 
-        barStyle="light-content" 
-        backgroundColor="#1A1F3B" 
-        translucent={true} 
+        barStyle="dark-content" 
+        backgroundColor={backgroundColor} 
+        translucent={false} 
       />
       <HeaderBackground 
         {...backgroundProps}
@@ -82,7 +81,7 @@ const Header = ({
                 onPress={handleBackPress}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="chevron-back" size={24} color="#E2E8F0" />
+                <Ionicons name="chevron-back" size={24} color="#111827" />
               </TouchableOpacity>
             )}
             {!showBackButton && customContent && (
@@ -91,7 +90,6 @@ const Header = ({
               </View>
             )}
             
-            {/* Title in left section when rightComponent exists */}
             {useLeftLayout && (
               <Text style={[styles.title, styles.titleLeft]} numberOfLines={1}>
                 {title}
@@ -116,7 +114,6 @@ const Header = ({
               </View>
             ) : (
               <>
-                {/* Notification Icon */}
                 {showNotifications && (
                   <TouchableOpacity 
                     style={styles.notificationButton} 
@@ -124,7 +121,7 @@ const Header = ({
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <View style={styles.notificationContainer}>
-                      <Ionicons name="notifications-outline" size={30} color="#E2E8F0" />
+                      <Ionicons name="notifications-outline" size={26} color="#374151" />
                       {notificationCount > 0 && (
                         <View style={[
                           styles.notificationBadge,
@@ -145,7 +142,7 @@ const Header = ({
                     onPress={onRightPress}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name={rightIcon} size={24} color="#E2E8F0" />
+                    <Ionicons name={rightIcon} size={24} color="#374151" />
                   </TouchableOpacity>
                 )}
                 
@@ -183,36 +180,32 @@ const Header = ({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    marginTop: 0,
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    marginBottom: 0,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 3,
   },
   background: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: '#FFFFFF',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
-    paddingVertical: 8,
+    minHeight: 48,
+    paddingVertical: 6,
   },
   leftSection: {
-    alignItems: 'flex-start',
-    minWidth: 40,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    minWidth: 40,
   },
   leftSectionExpanded: {
     flex: 1,
@@ -224,11 +217,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   rightSection: {
-    alignItems: 'flex-end',
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'flex-end',
-    flexShrink: 0,
-    gap: 8, // Added gap for better spacing
+    gap: 12,
   },
   rightComponentContainer: {
     flexDirection: 'row',
@@ -236,36 +228,35 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   backButton: {
-    padding: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
   },
   rightButton: {
-    padding: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
   },
   notificationButton: {
     padding: 4,
-    borderRadius: 8,
-    
+    borderRadius: 10,
   },
   notificationContainer: {
     position: 'relative',
-    padding: 8,
+    padding: 6,
   },
   notificationBadge: {
     position: 'absolute',
-    top: 4,
-    right: -1,
+    top: 2,
+    right: 0,
     backgroundColor: '#EF4444',
     borderRadius: 10,
     minWidth: 18,
     height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#1A1F3B',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   notificationBadgeSmall: {
     minWidth: 18,
@@ -273,15 +264,15 @@ const styles = StyleSheet.create({
   },
   notificationText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 12,
+    lineHeight: 18,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#E2E8F0',
+    color: '#111827',
     textAlign: 'center',
   },
   titleLeft: {
@@ -298,17 +289,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#1A56DB',   // accent blue
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   avatarImage: {
     width: 36,
@@ -316,7 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   avatarText: {
-    color: '#E2E8F0',
+    color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -324,12 +312,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#22D3EE',
     borderWidth: 2,
-    borderColor: '#1A1F3B',
+    borderColor: '#FFFFFF',
   },
   customContent: {
     alignItems: 'flex-start',

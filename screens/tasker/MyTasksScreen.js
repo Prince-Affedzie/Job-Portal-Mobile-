@@ -1,4 +1,4 @@
-// screens/tasker/TaskerTasksScreen.js - PROFESSIONAL REDESIGN (FIXED VERSION)
+// screens/tasker/TaskerTasksScreen.js - BIDS ONLY (Clean Version)
 import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  FlatList,
   RefreshControl,
   Dimensions,
   Animated,
@@ -14,27 +13,20 @@ import {
   Platform,
   StatusBar,
   TextInput,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { TaskerContext } from '../../context/TaskerContext';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
-import Header from '../../component/tasker/Header'; // Using your Header component
+import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 import FilterModal from '../../component/tasker/FilterModal';
 import PendingNoticeBanner from '../../component/tasker/TaskPendingNotice';
 
-const { width, height } = Dimensions.get('window');
-
-const TABS = {
-  BIDS: 'bids',
-  SERVICE_REQUESTS: 'service_requests'
-};
+const { width } = Dimensions.get('window');
 
 const TaskerTasksScreen = () => {
-  const [activeTab, setActiveTab] = useState(TABS.BIDS);
   const [refreshing, setRefreshing] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,13 +36,7 @@ const TaskerTasksScreen = () => {
   const [showPendingNotice, setShowPendingNotice] = useState(true);
 
   const { user } = useContext(AuthContext);
-  const { 
-    bids, 
-    loading, 
-    loadMyTasks,
-    serviceRequests,
-    loadTaskerServiceRequests   
-  } = useContext(TaskerContext);
+  const { bids, loading, loadMyTasks } = useContext(TaskerContext);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const headerOpacity = scrollY.interpolate({
@@ -66,307 +52,154 @@ const TaskerTasksScreen = () => {
   const loadData = async () => {
     try {
       setRefreshing(true);
-      await Promise.all([
-        loadMyTasks(),
-        loadTaskerServiceRequests()
-      ]);
+      await loadMyTasks();   // only loads bids
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading bids:', error);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    loadData();
-  };
+  const onRefresh = () => loadData();
 
   const handleSearch = useCallback((query) => {
     setSearchQuery(query);
   }, []);
 
-  // Get current data based on active tab
-  const getCurrentData = () => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return bids || [];
-      case TABS.SERVICE_REQUESTS:
-        return serviceRequests || [];
-      default:
-        return [];
-    }
-  };
-
-  // Calculate statistics for current tab
-  const calculateStats = () => {
-    const data = getCurrentData();
-    const total = data.length;
-    
-    let accepted = 0;
-    let pending = 0;
-    let successRate = 0;
-
-    switch (activeTab) {
-      case TABS.BIDS:
-        accepted = data.filter(bid => 
-          bid.bid?.status?.toLowerCase() === 'accepted'
-        ).length;
-        pending = data.filter(bid => 
-          bid.bid?.status?.toLowerCase() === 'pending'
-        ).length;
-        break;
-      
-      case TABS.SERVICE_REQUESTS:
-        accepted = data.filter(request => 
-          ['booked', 'in-progress', 'completed'].includes(request.status?.toLowerCase())
-        ).length;
-        pending = data.filter(request => 
-          ['pending', 'quoted'].includes(request.status?.toLowerCase())
-        ).length;
-        break;
-    }
-
-    successRate = total > 0 ? Math.round((accepted / total) * 100) : 0;
-
-    return { total, accepted, pending, successRate };
-  };
-
-  const stats = calculateStats();
-
-  // Filter and search logic (keep existing)
+  // ─── Data filtering & sorting (unchanged, but now only for bids) ────────
   const getFilteredData = () => {
-    let data = getCurrentData();
-    
+    let data = bids || [];
+
     if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
       data = data.filter(item => {
-        const searchableText = getSearchableText(item);
-        return searchableText.includes(searchQuery.toLowerCase());
+        const task = item.task;
+        return (
+          task?.title?.toLowerCase().includes(q) ||
+          task?.description?.toLowerCase().includes(q) ||
+          task?.category?.toLowerCase().includes(q) ||
+          task?.employer?.name?.toLowerCase().includes(q) ||
+          item.bid?.message?.toLowerCase().includes(q)
+        );
       });
     }
 
     if (selectedStatus !== 'all') {
       data = data.filter(item => {
-        const status = getItemStatus(item);
-        const normalizedDataStatus = status?.toLowerCase().replace(/-/g, '');
-        const normalizedSelectedStatus = selectedStatus.toLowerCase().replace(/-/g, '');
-        return normalizedDataStatus === normalizedSelectedStatus;
+        const st = (item.bid?.status || '').toLowerCase();
+        return st === selectedStatus.toLowerCase();
       });
     }
 
     if (selectedCategory !== 'all') {
-      data = data.filter(item => {
-        const category = getItemCategory(item);
-        return category === selectedCategory;
-      });
+      data = data.filter(item => item.task?.category === selectedCategory);
     }
 
-    // Sort data
     data = [...data].sort((a, b) => {
+      const getDate = (item) => new Date(item.bid?.createdAt || item.createdAt || 0);
+      const getBudget = (item) => item.bid?.amount || 0;
       switch (sortBy) {
-        case 'newest':
-          return new Date(getItemDate(b)) - new Date(getItemDate(a));
-        case 'oldest':
-          return new Date(getItemDate(a)) - new Date(getItemDate(b));
-        case 'budget-high':
-          return getItemBudget(b) - getItemBudget(a);
-        case 'budget-low':
-          return getItemBudget(a) - getItemBudget(b);
-        default:
-          return 0;
+        case 'newest':  return getDate(b) - getDate(a);
+        case 'oldest':  return getDate(a) - getDate(b);
+        case 'budget-high': return getBudget(b) - getBudget(a);
+        case 'budget-low':  return getBudget(a) - getBudget(b);
+        default: return 0;
       }
     });
 
     return data;
   };
 
-  // Helper functions for different data types
-  const getSearchableText = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return `${item.task?.title} ${item.task?.description} ${item.task?.category} ${item.task?.employer?.name} ${item.bid?.message}`.toLowerCase();
-      case TABS.SERVICE_REQUESTS:
-        return `${item.type} ${item.description} ${item.client?.name} ${item.requirements?.join(' ')}`.toLowerCase();
-      default:
-        return '';
-    }
-  };
+  const filteredData = getFilteredData();
 
-  const getItemStatus = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return item.bid?.status;
-      case TABS.SERVICE_REQUESTS:
-        return item.status;
-      default:
-        return '';
-    }
-  };
-
-  const getItemCategory = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return item.task?.category;
-      case TABS.SERVICE_REQUESTS:
-        return item.type;
-      default:
-        return '';
-    }
-  };
-
-  const getItemDate = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return item.bid?.createdAt;
-      case TABS.SERVICE_REQUESTS:
-        return item.createdAt;
-      default:
-        return new Date();
-    }
-  };
-
-  const getItemBudget = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        return item.bid?.amount || 0;
-      case TABS.SERVICE_REQUESTS:
-        return item.budget || 0;
-      default:
-        return 0;
-    }
-  };
-
-  const clearAllFilters = useCallback(() => {
+  const clearAllFilters = () => {
     setSearchQuery('');
     setSelectedStatus('all');
     setSelectedCategory('all');
     setSortBy('newest');
-  }, []);
-
-  const hasActiveFilters = searchQuery || selectedStatus !== 'all' || selectedCategory !== 'all' || sortBy !== 'newest';
-
-  const filteredData = getFilteredData();
-  const isEmpty = filteredData.length === 0;
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'accepted':
-      case 'completed':
-      case 'booked':
-        return '#10B981';
-      case 'pending':
-      case 'quoted':
-        return '#F59E0B';
-      case 'in-progress':
-      case 'reviewing':
-        return '#3B82F6';
-      case 'declined':
-      case 'cancelled':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
   };
 
-  const formatStatus = (status) => {
-    if (!status) return 'Unknown';
-    return status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ');
-  };
+  const hasActiveFilters =
+    searchQuery || selectedStatus !== 'all' || selectedCategory !== 'all' || sortBy !== 'newest';
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Recently';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
-  };
+  // ─── Stats for bids ────────────────────────────────────────────────────
+  const totalBids = bids?.length || 0;
+  const acceptedBids = bids?.filter(b => b.bid?.status === 'accepted').length || 0;
+  const pendingBids = bids?.filter(b => b.bid?.status === 'pending').length || 0;
 
-  // Redesigned TaskCard component
-  const TaskCard = ({ item, type, onPress }) => {
-    const isBid = type === TABS.BIDS;
-    const task = isBid ? item.task : item;
-    const bid = isBid ? item.bid : null;
-    const status = getItemStatus(item);
-    const statusColor = getStatusColor(status);
+  // ─── Card rendering ────────────────────────────────────────────────────
+  const BidCard = ({ item, onPress }) => {
+    const task = item.task;
+    const bid = item.bid;
+    const status = bid?.status || 'unknown';
+    const statusColor = {
+      accepted: '#10B981',
+      pending: '#F59E0B',
+      declined: '#EF4444',
+      cancelled: '#EF4444',
+      completed: '#10B981',
+    }[status.toLowerCase()] || '#6B7280';
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.taskCard}
         activeOpacity={0.7}
         onPress={onPress}
       >
-        {/* Top Section with Status and Type */}
+        {/* Header */}
         <View style={styles.taskCardHeader}>
           <View style={styles.typeBadge}>
-            <MaterialIcons 
-              name={isBid ? 'handshake' : 'assignment'} 
-              size={16} 
-              color="#6366F1" 
-            />
-            <Text style={styles.typeText}>
-              {isBid ? 'Bid' : 'Service Request'}
-            </Text>
+            <MaterialIcons name="handshake" size={16} color="#6366F1" />
+            <Text style={styles.typeText}>Bid</Text>
           </View>
-          
           <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-            <Text style={styles.statusText}>{formatStatus(status)}</Text>
+            <Text style={styles.statusText}>
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </Text>
           </View>
         </View>
 
-        {/* Main Content */}
         <View style={styles.taskContent}>
           <Text style={styles.taskTitle} numberOfLines={2}>
-            {task?.title || item.type || 'Untitled Task'}
+            {task?.title || 'Untitled Task'}
           </Text>
-          
-          {/* Client/Employer Info */}
+
           <View style={styles.clientRow}>
             <View style={styles.clientAvatar}>
               <MaterialIcons name="person" size={16} color="#6B7280" />
             </View>
             <View style={styles.clientInfo}>
               <Text style={styles.clientName}>
-                {task?.employer?.name || item.client?.name || 'Anonymous'}
+                {task?.employer?.name || 'Anonymous'}
               </Text>
               <Text style={styles.taskDate}>
-                {formatDate(bid?.createdAt || item.createdAt)}
+                {bid?.createdAt
+                  ? new Date(bid.createdAt).toLocaleDateString()
+                  : 'Recently'}
               </Text>
             </View>
           </View>
 
-          {/* Task Description */}
           {task?.description && (
             <Text style={styles.taskDescription} numberOfLines={3}>
               {task.description}
             </Text>
           )}
 
-          {/* Category and Budget */}
           <View style={styles.taskMeta}>
             <View style={styles.metaItem}>
               <MaterialIcons name="category" size={15} color="#6B7280" />
-              <Text style={styles.metaText}>
-                {getItemCategory(item) || 'Uncategorized'}
-              </Text>
+              <Text style={styles.metaText}>{task?.category || 'Uncategorized'}</Text>
             </View>
-            
             <View style={styles.metaItem}>
               <MaterialIcons name="money" size={15} color="#6B7280" />
               <Text style={styles.metaText}>
-               ₵ {getItemBudget(item).toLocaleString()}
+                ₵ {(bid?.amount || 0).toLocaleString()}
               </Text>
             </View>
           </View>
 
-          {/* Action Button */}
-          <TouchableOpacity 
-            style={styles.viewDetailsButton}
-            onPress={onPress}
-          >
+          <TouchableOpacity style={styles.viewDetailsButton} onPress={onPress}>
             <Text style={styles.viewDetailsText}>View Details</Text>
             <MaterialIcons name="arrow-forward" size={16} color="#4F46E5" />
           </TouchableOpacity>
@@ -375,83 +208,48 @@ const TaskerTasksScreen = () => {
     );
   };
 
-  const handleItemPress = (item) => {
-    switch (activeTab) {
-      case TABS.BIDS:
-        navigate('BidDetails', { bidId: item.bid?._id });
-        break;
-      case TABS.SERVICE_REQUESTS:
-        navigate('ServiceRequestDetail', { requestId: item._id });
-        break;
-    }
+  const handleBidPress = (item) => {
+    navigate('BidDetails', { bidId: item.bid?._id });
   };
 
+  // ─── Header section (simplified, no tabs) ─────────────────────────────
   const renderHeader = () => (
     <Animated.View style={styles.headerContainer}>
       <LinearGradient
         colors={['#1A1F3B', '#2D1B69']}
-        style={[StyleSheet.absoluteFill, { borderRadius: 34 }]}
+        style={[StyleSheet.absoluteFill, { borderTopLeftRadius:34,
+         borderTopRightRadius:34, }]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
-      
       <View style={styles.headerContent}>
-        <View>
-          <Text style={styles.welcomeText}>Tasks you've applied and Offers Received from clients</Text>
+        <Text style={styles.welcomeText}>My Bids</Text>
+        <Text style={styles.userName}>{user?.name || 'Tasker'}</Text>
+      </View>
+
+      {/* Stats row (bids only) */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{totalBids}</Text>
+          <Text style={styles.statLabel}>Total</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statValue, { color: '#10B981' }]}>{acceptedBids}</Text>
+          <Text style={styles.statLabel}>Accepted</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statValue, { color: '#F59E0B' }]}>{pendingBids}</Text>
+          <Text style={styles.statLabel}>Pending</Text>
         </View>
       </View>
 
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        {Object.entries(TABS).map(([key, value]) => {
-          const tabConfig = {
-            [TABS.BIDS]: { label: 'Bids', icon: 'handshake', count: bids.length },
-            [TABS.SERVICE_REQUESTS]: { label: 'Received Offers', icon: 'assignment', count: serviceRequests.length },
-          };
-          
-          const config = tabConfig[value];
-          
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[
-                styles.tabButton,
-                activeTab === value && styles.tabButtonActive
-              ]}
-              onPress={() => setActiveTab(value)}
-            >
-              <MaterialIcons 
-                name={config.icon} 
-                size={20} 
-                color={activeTab === value ? '#4F46E5' : '#6B7280'} 
-              />
-              <Text style={[
-                styles.tabLabel,
-                activeTab === value && styles.tabLabelActive
-              ]}>
-                {config.label}
-              </Text>
-              {config.count > 0 && (
-                <View style={[
-                  styles.tabBadge,
-                  activeTab === value && styles.tabBadgeActive
-                ]}>
-                  <Text style={styles.tabBadgeText}>{config.count}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Search Bar */}
+      {/* Search / Filter */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder={`Search ${activeTab === TABS.BIDS ? 'bids' : 'requests'}...`}
+            placeholder="Search bids..."
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={handleSearch}
@@ -467,7 +265,6 @@ const TaskerTasksScreen = () => {
             </TouchableOpacity>
           )}
         </View>
-        
         {hasActiveFilters && (
           <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
             <Text style={styles.clearFiltersText}>Clear Filters</Text>
@@ -478,26 +275,22 @@ const TaskerTasksScreen = () => {
     </Animated.View>
   );
 
-  const renderEmptyState = () => (
+  // ─── Empty state ──────────────────────────────────────────────────────
+  const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <MaterialIcons name="assignment" size={80} color="#E5E7EB" />
-      <Text style={styles.emptyTitle}>
-        {activeTab === TABS.BIDS ? 'No Bids Found' : 'No Service Requests'}
-      </Text>
+      <MaterialIcons name="handshake" size={80} color="#E5E7EB" />
+      <Text style={styles.emptyTitle}>No Bids Found</Text>
       <Text style={styles.emptyText}>
         {hasActiveFilters
-          ? "Try adjusting your filters or search terms"
-          : activeTab === TABS.BIDS
-          ? "You haven't placed any bids yet"
-          : "Service requests come from clients who discover your profile. Enhance your profile to attract more direct hiring opportunities."}
+          ? 'Try adjusting your filters or search terms'
+          : "You haven't placed any bids yet"}
       </Text>
-      
       {hasActiveFilters ? (
         <TouchableOpacity style={styles.emptyActionButton} onPress={clearAllFilters}>
           <Text style={styles.emptyActionText}>Clear All Filters</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.emptyActionButton}
           onPress={() => navigate('AvailableTasks')}
         >
@@ -507,19 +300,11 @@ const TaskerTasksScreen = () => {
     </View>
   );
 
-  const renderItem = ({ item }) => (
-    <TaskCard 
-      item={item} 
-      type={activeTab} 
-      onPress={() => handleItemPress(item)}
-    />
-  );
-
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <Header title="My Tasks" />
-        <LoadingIndicator text="Loading Tasks" />
+        <Header title="My Bids" />
+        <LoadingIndicator text="Loading Bids" />
       </View>
     );
   }
@@ -527,10 +312,8 @@ const TaskerTasksScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-      
-      {/* Your Header Component */}
-      <Header title="My Tasks" />
-      
+      <Header title="My Bids" />
+
       <Animated.ScrollView
         scrollEventThrottle={16}
         onScroll={Animated.event(
@@ -548,46 +331,31 @@ const TaskerTasksScreen = () => {
         showsVerticalScrollIndicator={false}
         style={styles.scrollView}
       >
-        {/* Main Header */}
         {renderHeader()}
         {showPendingNotice && (
-       <PendingNoticeBanner
-       onDismiss={() => setShowPendingNotice(false)}
-     />
-      )}
-        
-        {/* Tasks List */}
+          <PendingNoticeBanner onDismiss={() => setShowPendingNotice(false)} />
+        )}
+
         <View style={styles.tasksContainer}>
           {filteredData.length > 0 ? (
             <>
               <Text style={styles.sectionTitle}>
-                {activeTab === TABS.BIDS ? 'Your Bids' : 'Received Offers'}
-                <Text style={styles.sectionCount}> • {filteredData.length}</Text>
+                Your Bids <Text style={styles.sectionCount}>• {filteredData.length}</Text>
               </Text>
-              
               {filteredData.map((item, index) => (
                 <View key={item._id || index}>
-                  <TaskCard 
-                    item={item} 
-                    type={activeTab} 
-                    onPress={() => handleItemPress(item)}
-                  />
-                  {index < filteredData.length - 1 && (
-                    <View style={styles.taskDivider} />
-                  )}
+                  <BidCard item={item} onPress={() => handleBidPress(item)} />
+                  {index < filteredData.length - 1 && <View style={styles.taskDivider} />}
                 </View>
               ))}
             </>
           ) : (
-            renderEmptyState()
+            renderEmpty()
           )}
         </View>
-        
-        {/* Quick Stats Footer */}
-        
       </Animated.ScrollView>
-      
-      {/* Filter Modal */}
+
+      {/* Filter Modal (unchanged) */}
       <FilterModal
         visible={filterOpen}
         onClose={() => setFilterOpen(false)}
@@ -598,11 +366,11 @@ const TaskerTasksScreen = () => {
         onCategoryChange={setSelectedCategory}
         onSortChange={setSortBy}
         onClearFilters={clearAllFilters}
-        activeTab={activeTab}
+        activeTab="bids"  // we only have bids now
       />
-      
-      {/* FAB for Quick Actions */}
-      <TouchableOpacity 
+
+      {/* FAB */}
+      <TouchableOpacity
         style={styles.fab}
         onPress={() => navigate('AvailableTasks')}
       >
@@ -617,15 +385,11 @@ const TaskerTasksScreen = () => {
   );
 };
 
+// ─── Styles (kept identical, removing any unused references) ────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
@@ -635,18 +399,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     backgroundColor: '#4F46E5',
-    overflow:'hidden',
-    marginHorizontal:12,
-    borderRadius:34,
+    overflow: 'hidden',
+    marginHorizontal: 12,
+    borderTopLeftRadius:34,
+    borderTopRightRadius:34,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 20,
   },
   welcomeText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#E0E7FF',
     marginBottom: 4,
   },
@@ -654,14 +416,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#FFF',
-  },
-  searchButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -672,93 +426,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFF',
     borderRadius: 12,
-    padding: 8,
+    padding: 12,
     marginHorizontal: 4,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5F3FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statContent: {
     alignItems: 'center',
   },
   statValue: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    position: 'relative',
-  },
-  tabButtonActive: {
-    backgroundColor: '#F5F3FF',
-  },
-  tabLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginLeft: 8,
-  },
-  tabLabelActive: {
-    color: '#4F46E5',
-  },
-  tabBadge: {
-    position: 'absolute',
-    top: -2,
-    left: 0,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 10,
-    minWidth: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  tabBadgeActive: {
-    backgroundColor: '#4F46E5',
-  },
-  tabBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
     color: '#6B7280',
   },
   searchContainer: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   searchInputContainer: {
     flexDirection: 'row',
@@ -767,11 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 8,
   },
   searchIcon: {
     marginRight: 12,
@@ -786,7 +465,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#FEF2F2',
@@ -803,7 +481,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
-    paddingHorizontal: 16, // Proper padding for wide cards
+    paddingHorizontal: 16,
     minHeight: 400,
   },
   sectionTitle: {
@@ -913,13 +591,11 @@ const styles = StyleSheet.create({
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   metaText: {
     fontSize: 13,
     color: '#6B7280',
     marginLeft: 6,
-    flex: 1,
   },
   viewDetailsButton: {
     flexDirection: 'row',
@@ -970,38 +646,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFF',
-  },
-  footerContainer: {
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  footerGradient: {
-    padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  footerStats: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  footerStat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  footerStatValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  footerStatLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  footerDivider: {
-    width: 1,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 20,
   },
   fab: {
     position: 'absolute',

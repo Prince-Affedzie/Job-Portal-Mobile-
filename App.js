@@ -13,6 +13,7 @@ import usePushNotifications from "./hooks/usePushNotifications";
 import { PaystackProvider } from "react-native-paystack-webview";
 import { StatusBar } from "react-native";
 import * as Updates from 'expo-updates';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
 import VerificationBanner from "./component/common/VerificationBanner";
 
@@ -23,6 +24,14 @@ function PushNotificationInitializer() {
 }
 
 export default function App() {
+
+
+   useEffect(()=>{
+          GoogleSignin.configure({
+           webClientId:'830161939039-chcube7voaggltt861nrga6g7uq13ndl.apps.googleusercontent.com',
+          })
+      },[])
+  
 
 
   useEffect(() => {
@@ -57,7 +66,9 @@ export default function App() {
           <PushNotificationInitializer />
            <NotificationPopup/>
            <VerificationBanner position="top" autoHideDuration={10000} />
+           <SafeAreaView style={{ flex: 1, backgroundColor: '#1E3A6E' }} edges={['top']}>
           <RootNavigator />
+          </SafeAreaView>
           </PaystackProvider>
           </ServiceRequestProvider>
           </NotificationProvider>

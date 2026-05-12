@@ -11,7 +11,7 @@ import {
   StatusBar,
   TouchableOpacity,
   Dimensions,
-  Animated, 
+  Animated,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,9 +22,7 @@ import { navigate } from '../../services/navigationService';
 
 // Components
 import Header from '../../component/tasker/Header';
-import RequestServiceFAB from '../../component/client/RequestServiceFAB';
-import SelectionHeader from '../../component/client/SelectionHeader';
-import TaskerSelectionCard from '../../component/client/TaskerSelectionCard';
+import BookNowFAB from '../../component/client/BookNowFAB';
 
 // New Components
 import SearchSection from '../../component/client/SearchSection';
@@ -39,22 +37,18 @@ import { useLocationSearch } from '../../hooks/useLocationSearch';
 
 const { height } = Dimensions.get('window');
 
-// Multiple avatar images from Unsplash (real, diverse people)
 const TASKER_AVATARS = [
   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132141/casual-young-african-man-smiling-isolated-white_pjfa64.jpg',
   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132132/african-teenage-girl-portrait-happy-smiling-face_iqapqm.jpg',
   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/attractive-plus-size-model-white-shirt-apparel_szenla.jpg',
-   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/blackprofile_lee5qh.jpg',
-  // For Unsplash ones (not Cloudinary), add ?fm=jpg or keep as-is
+  'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/blackprofile_lee5qh.jpg',
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
   'https://images.unsplash.com/photo-1494790108755-2616b786d4d1?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
   'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
-  'https://images.unsplash.com/photo-1507591064344-4c6ce005-128?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&h=200&q=80&crop=faces',
 ];
 
 const SearchTaskersScreen = ({ navigation }) => {
-  // State
   const [loading, setLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [error, setError] = useState(null);
@@ -65,19 +59,15 @@ const SearchTaskersScreen = ({ navigation }) => {
   const [serviceSuggestions, setServiceSuggestions] = useState([]);
   const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
   const [isServiceInputFocused, setIsServiceInputFocused] = useState(false);
-  const [selectedTaskers, setSelectedTaskers] = useState([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedTasker, setSelectedTasker] = useState(null); // single selection
   const [showLocationModal, setShowLocationModal] = useState(false);
 
-  // Hooks and Refs
   const locationSearch = useLocationSearch();
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // Derived values
-  const showFAB = searchResults.length > 0 && hasSearched && !loading;
+  const showFAB = selectedTasker !== null;
 
-  // Effects
   useEffect(() => {
     const filtered = filterServiceSuggestions(searchQuery, SERVICE_SUGGESTIONS);
     setServiceSuggestions(filtered);
@@ -106,8 +96,7 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (searchResults.length > 0) {
-      setSelectedTaskers([]);
-      setIsSelectionMode(false);
+      setSelectedTasker(null);
     }
   }, [searchResults]);
 
@@ -115,13 +104,11 @@ const SearchTaskersScreen = ({ navigation }) => {
     locationSearch.debouncedSearch(locationSearch.locationQuery);
   }, [locationSearch.locationQuery]);
 
-  // Helper functions
   const resetSearchState = () => {
     setHasSearched(false);
     setSearchResults([]);
     setError(null);
-    setSelectedTaskers([]);
-    setIsSelectionMode(false);
+    setSelectedTasker(null);
     setShowServiceSuggestions(false);
   };
 
@@ -134,7 +121,6 @@ const SearchTaskersScreen = ({ navigation }) => {
     setShowLocationModal(false);
   };
 
-  // Event handlers
   const handleServiceSelect = (serviceName) => {
     setSearchQuery(serviceName);
     setShowServiceSuggestions(false);
@@ -153,20 +139,14 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   const handleSkillChange = (text) => {
     setSearchQuery(text);
-    if (!text.trim()) {
-      resetSearchState();
-    }
+    if (!text.trim()) resetSearchState();
   };
 
-  const handleLocationFocus = () => {
-    setShowLocationModal(true);
-  };
+  const handleLocationFocus = () => setShowLocationModal(true);
 
   const handleLocationQueryChange = (text) => {
     locationSearch.setLocationQuery(text);
-    if (text.length > 2 && !showLocationModal) {
-      setShowLocationModal(true);
-    }
+    if (text.length > 2 && !showLocationModal) setShowLocationModal(true);
     if (!text.trim()) {
       setLocation('');
       setLocationDetails(null);
@@ -175,7 +155,7 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   const handleLocationSelect = (suggestion) => {
     const { suburb, city, town, village, county, state, region } = suggestion.address;
-    const addressString = `${suburb || town || village || ""}, ${city || county || ""}, ${state || region || ""}`
+    const addressString = `${suburb || town || village || ''}, ${city || county || ''}, ${state || region || ''}`
       .trim()
       .replace(/^, |, $/g, '');
 
@@ -192,39 +172,35 @@ const SearchTaskersScreen = ({ navigation }) => {
     setShowLocationModal(false);
   };
 
-  const toggleTaskerSelection = (tasker) => {
-    setSelectedTaskers((prev) => {
-      const exists = prev.find((t) => t._id === tasker._id);
-      return exists ? prev.filter((t) => t._id !== tasker._id) : [...prev, tasker];
+  // Single-select toggle: tapping the same tasker deselects
+  const handleSelectTasker = (tasker) => {
+    const taskerId = tasker._id || tasker.id;
+
+  setSelectedTasker((prev) => {
+    const prevId = prev?._id || prev?.id;
+    // If the same tasker is already selected, deselect – otherwise select
+    if (prevId && taskerId && prevId === taskerId) return null;
+    return tasker;
+  });
+  };
+
+  const handleBookNow = () => {
+    if (!selectedTasker) return;
+    navigate('Booking', {
+      selectedTasker,
+      serviceType: searchQuery,
+      location: locationDetails || {
+        suburb: location,
+        city: location,
+        region: location,
+        town: location,
+        village: location,
+      },
     });
   };
 
-  const selectAllTaskers = () => setSelectedTaskers([...searchResults]);
-  const clearAllSelection = () => setSelectedTaskers([]);
-
-  const handleFABPress = () => {
-    if (!isSelectionMode) {
-      setIsSelectionMode(true);
-    } else if (selectedTaskers.length > 0) {
-      navigate('ServiceRequestForm', {
-        selectedTaskers,
-        serviceType: searchQuery,
-        location: locationDetails || {
-          suburb: location,
-          city: location,
-          region: location,
-          town: location,
-          village: location,
-        },
-        notifiedTaskers: selectedTaskers.map((t) => t._id),
-      });
-    } else {
-      setIsSelectionMode(false);
-    }
-  };
-
   const handleViewProfile = (tasker) => {
-    navigate('ApplicantProfile', { applicant: tasker });
+    navigate('ApplicantProfile', { taskerId: tasker._id });
   };
 
   const handleSearch = useCallback(async () => {
@@ -236,8 +212,7 @@ const SearchTaskersScreen = ({ navigation }) => {
     setLoading(true);
     setError(null);
     setSearchResults([]);
-    setSelectedTaskers([]);
-    setIsSelectionMode(false);
+    setSelectedTasker(null);
     setShowServiceSuggestions(false);
     setShowLocationModal(false);
     setHasSearched(true);
@@ -270,7 +245,6 @@ const SearchTaskersScreen = ({ navigation }) => {
     }
   }, [searchQuery, location, locationDetails]);
 
-  // Render helpers
   const getSections = () => {
     const sections = [{ type: 'search', key: 'search' }];
 
@@ -326,7 +300,7 @@ const SearchTaskersScreen = ({ navigation }) => {
       case 'loading':
         return (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#000" />
+            <ActivityIndicator size="large" color="#1A56DB" />
             <Text style={styles.loadingText}>Finding taskers near you...</Text>
           </View>
         );
@@ -336,41 +310,38 @@ const SearchTaskersScreen = ({ navigation }) => {
           <View style={styles.resultsSection}>
             <View style={styles.resultHeader}>
               <Text style={styles.resultsTitle}>
-                {searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Found
+                {searchResults.length} Tasker{searchResults.length !== 1 ? 's' : ''} Available
               </Text>
               <Text style={styles.resultsSubtitle}>
-                for "{searchQuery}" near {locationDetails?.city || location}
+                "{searchQuery}" near {locationDetails?.city || location}
               </Text>
-              {isSelectionMode && (
-                <View style={styles.selectionInfoContainer}>
-                  <Text style={styles.selectionModeText}>
-                    Select multiple taskers to receive competitive offers
-                  </Text>
-                  <Text style={styles.selectionSubtext}>
-                    Invite multiple professionals to submit proposals, then choose the best offer
-                  </Text>
-                </View>
-              )}
+              <View style={styles.bookingHintContainer}>
+                <Ionicons name="information-circle-outline" size={16} color="#1A56DB" />
+                <Text style={styles.bookingHintText}>
+                  Tap a tasker's card to select, then press Book Now
+                </Text>
+              </View>
             </View>
           </View>
         );
 
       case 'tasker':
-        return isSelectionMode ? (
-          <TaskerSelectionCard
+        return (
+          <TaskerCard
             tasker={item.tasker}
-            isSelected={selectedTaskers.some((t) => t._id === item.tasker._id)}
-            onToggleSelect={toggleTaskerSelection}
+            isSelected={selectedTasker?._id === item.tasker._id}
+            onSelect={handleSelectTasker}
             onViewProfile={handleViewProfile}
+            searchQuery={searchQuery}
           />
-        ) : (
-          <TaskerCard tasker={item.tasker} onViewProfile={handleViewProfile} searchQuery={searchQuery} />
         );
 
       case 'empty':
         return (
           <View style={styles.emptyState}>
-            <Ionicons name="search" size={64} color="#C7C7CC" />
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="search-outline" size={36} color="#1A56DB" />
+            </View>
             <Text style={styles.emptyTitle}>No taskers found</Text>
             <Text style={styles.emptyText}>Try adjusting your search terms or location</Text>
           </View>
@@ -379,25 +350,20 @@ const SearchTaskersScreen = ({ navigation }) => {
       case 'discovery':
         return (
           <View style={styles.discoveryContent}>
-            {/* Avatars Section */}
             <View style={styles.avatarsHeader}>
               <Text style={styles.avatarsTitle}>Taskers Ready to Help</Text>
               <Text style={styles.avatarsSubtitle}>
-                {TASKER_AVATARS.length}+ professionals waiting for your request
+                {TASKER_AVATARS.length}+ vetted professionals in your area
               </Text>
             </View>
-            
+
             <View style={styles.avatarGroup}>
               {TASKER_AVATARS.slice(0, 5).map((avatar, index) => (
                 <Image
                   key={index}
                   source={{ uri: avatar }}
-                  style={[
-                    styles.groupAvatar,
-                    { marginLeft: index > 0 ? -20 : 0 }
-                  ]}
+                  style={[styles.groupAvatar, { marginLeft: index > 0 ? -20 : 0 }]}
                   resizeMode="cover"
-                  onError={(e) => console.log('Image load error:', avatar, e.nativeEvent.error)}
                 />
               ))}
               <View style={styles.avatarCountBadge}>
@@ -405,22 +371,18 @@ const SearchTaskersScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Welcome Message */}
             <View style={styles.welcomeMessage}>
               <View style={styles.welcomeIcon}>
-                <Ionicons name="hand-left" size={24} color="#3B82F6" />
+                <Ionicons name="hand-left" size={22} color="#1A56DB" />
               </View>
               <Text style={styles.welcomeText}>
-                Hi there! Ready to get things done? Search for a service or browse popular options below.
+                Hi there! Search for a service and your location to find and book a tasker instantly.
               </Text>
             </View>
 
-            {/* Popular Services */}
             <View style={styles.popularServicesSection}>
               <Text style={styles.sectionTitle}>Popular Services</Text>
-              <Text style={styles.sectionSubtitle}>
-                Tap any service to start your search
-              </Text>
+              <Text style={styles.sectionSubtitle}>Tap any service to start your search</Text>
               <View style={styles.popularServicesGrid}>
                 {SERVICE_SUGGESTIONS.slice(0, POPULAR_SERVICES_COUNT).map((service, index) => (
                   <TouchableOpacity
@@ -435,29 +397,20 @@ const SearchTaskersScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Quick Tips */}
             <View style={styles.tipsContainer}>
-              <Text style={styles.tipsTitle}>
-                <Ionicons name="bulb-outline" size={18} color="#F59E0B" /> Quick Tips
-              </Text>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipIcon, { backgroundColor: '#3B82F620' }]}>
-                  <Ionicons name="location-outline" size={16} color="#3B82F6" />
+              <Text style={styles.tipsTitle}>How it works</Text>
+              {[
+                { icon: 'search-outline', color: '#1A56DB', bg: '#EBF5FF', text: 'Search for any service and enter your location' },
+                { icon: 'person-outline', color: '#0E9F6E', bg: '#E3FCEC', text: 'Browse profiles and select your preferred tasker' },
+                { icon: 'calendar-outline', color: '#7E3AF2', bg: '#F3F0FF', text: 'Confirm your booking and get it done' },
+              ].map((tip, i) => (
+                <View key={i} style={styles.tipItem}>
+                  <View style={[styles.tipIcon, { backgroundColor: tip.bg }]}>
+                    <Ionicons name={tip.icon} size={16} color={tip.color} />
+                  </View>
+                  <Text style={styles.tipText}>{tip.text}</Text>
                 </View>
-                <Text style={styles.tipText}>Add your location to find nearby taskers</Text>
-              </View>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipIcon, { backgroundColor: '#10B98120' }]}>
-                  <Ionicons name="search-outline" size={16} color="#10B981" />
-                </View>
-                <Text style={styles.tipText}>Be specific about what you need help with</Text>
-              </View>
-              <View style={styles.tipItem}>
-                <View style={[styles.tipIcon, { backgroundColor: '#8B5CF620' }]}>
-                  <Ionicons name="people-outline" size={16} color="#8B5CF6" />
-                </View>
-                <Text style={styles.tipText}>Select multiple taskers to compare quotes & choose the best</Text>
-              </View>
+              ))}
             </View>
           </View>
         );
@@ -469,7 +422,7 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <Header title="Find Taskers" />
 
       <KeyboardAvoidingView
@@ -477,16 +430,6 @@ const SearchTaskersScreen = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {isSelectionMode && (
-          <SelectionHeader
-            selectedCount={selectedTaskers.length}
-            totalCount={searchResults.length}
-            onSelectAll={selectAllTaskers}
-            onClearAll={clearAllSelection}
-            allSelected={selectedTaskers.length === searchResults.length}
-          />
-        )}
-
         <FlatList
           data={getSections()}
           renderItem={renderSection}
@@ -497,11 +440,10 @@ const SearchTaskersScreen = ({ navigation }) => {
         />
       </KeyboardAvoidingView>
 
-      <RequestServiceFAB
-        selectedCount={selectedTaskers.length}
-        onPress={handleFABPress}
-        isVisible={showFAB}
-        isSelectionMode={isSelectionMode}
+      <BookNowFAB
+        tasker={selectedTasker}
+        onPress={handleBookNow}
+        isVisible={true}
       />
 
       <LocationModal
@@ -522,10 +464,10 @@ const SearchTaskersScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F8FAFF',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -533,9 +475,9 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 14,
     fontSize: 15,
-    color: '#8E8E93',
+    color: '#6B7280',
     fontWeight: '400',
   },
   resultsSection: {
@@ -543,51 +485,48 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   resultHeader: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   resultsTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
-    marginBottom: 4,
+    color: '#111827',
+    marginBottom: 3,
   },
   resultsSubtitle: {
     fontSize: 14,
-    color: '#8E8E93',
-    fontWeight: '400',
-  },
-  selectionInfoContainer: {
-    backgroundColor: '#F0F9FF',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
-    marginTop: 8,
-  },
-  selectionModeText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E40AF',
-    marginBottom: 4,
-  },
-  selectionSubtext: {
-    fontSize: 14,
     color: '#6B7280',
-    lineHeight: 18,
+    marginBottom: 10,
   },
-  // Discovery Section Styles
+  bookingHintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#EBF5FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#1A56DB',
+  },
+  bookingHintText: {
+    fontSize: 13,
+    color: '#1E40AF',
+    fontWeight: '500',
+    flex: 1,
+  },
   discoveryContent: {
     paddingHorizontal: 16,
     paddingVertical: 20,
   },
   avatarsHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatarsTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
+    color: '#111827',
     marginBottom: 6,
     textAlign: 'center',
   },
@@ -601,61 +540,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 30,
-    paddingHorizontal: 20,
+    marginBottom: 28,
   },
   groupAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 3,
-    borderColor: '#FFF',
-    backgroundColor: '#f0f0f0',
-    //shadowColor: '#000',
-    //shadowOffset: { width: 0, height: 2 },
-    //shadowOpacity: 0.1,
-    //shadowRadius: 6,
-    elevation: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#E5E7EB',
+    elevation: 2,
   },
   avatarCountBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#3B82F6',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#1A56DB',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
-    borderColor: '#FFF',
+    borderColor: '#FFFFFF',
     marginLeft: -20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
     elevation: 3,
   },
   avatarCountText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
   welcomeMessage: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#EBF5FF',
     padding: 16,
     borderRadius: 12,
     marginBottom: 28,
     flexDirection: 'row',
     alignItems: 'flex-start',
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#1A56DB',
   },
   welcomeIcon: {
     marginRight: 12,
-    marginTop: 2,
+    marginTop: 1,
   },
   welcomeText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#1E40AF',
-    lineHeight: 22,
+    lineHeight: 21,
     fontWeight: '500',
     flex: 1,
   },
@@ -663,58 +593,51 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 6,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B7280',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   popularServicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   popularServiceCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    minWidth: '30%',
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
     elevation: 1,
   },
   popularServiceText: {
     fontSize: 13,
-    color: '#1F2937',
-    fontWeight: '500',
-    textAlign: 'center',
+    color: '#1A56DB',
+    fontWeight: '600',
   },
   tipsContainer: {
-    backgroundColor: '#F8FAFC',
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E5E7EB',
     marginBottom: 20,
+    elevation: 1,
   },
   tipsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   tipItem: {
     flexDirection: 'row',
@@ -722,16 +645,16 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   tipIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   tipText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#374151',
     flex: 1,
     lineHeight: 20,
   },
@@ -741,16 +664,24 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
+  emptyIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#EBF5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#8E8E93',
-    marginTop: 16,
+    fontWeight: '700',
+    color: '#374151',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#C7C7CC',
+    color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 20,
   },

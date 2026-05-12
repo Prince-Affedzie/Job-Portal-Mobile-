@@ -19,6 +19,9 @@ import PaymentMethodScreen from '../screens/tasker/PaymentMethodScreen'
 import WorkSamplesScreen from '../screens/tasker/WorkSamplesScreen'
 import ServiceRequestDetailScreen from '../screens/tasker/ServiceRequestDetailScreen'
 import BidDetailsScreen from "../screens/tasker/BidDetailsScreen";
+import TaskerProfileDetailScreen from '../screens/tasker/TaskerProfileDetails'
+import TaskerBookingsScreen from '../screens/tasker/TaskerBookingScreen'
+import TaskerBookingDetailScreen from '../screens/tasker/BookingDetailScreen'
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -44,6 +47,8 @@ function TaskerStackNavigator() {
       <Stack.Screen name="PaymentMethodScreen" component={PaymentMethodScreen} />
       <Stack.Screen name="WorkSamples" component={WorkSamplesScreen} />
       <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
+      <Stack.Screen name="TaskerProfileDetail" component={TaskerProfileDetailScreen} />
+      <Stack.Screen name="BookingDetail" component={TaskerBookingDetailScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
@@ -102,11 +107,37 @@ function TaskerTabs() {
           })}
         />
 
+
+        <Tab.Screen
+          name="Bookings"
+          component={TaskerBookingsScreen}
+          options={{
+            tabBarLabel: 'Bookings',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? "calendar" : "calendar-outline"}
+                color={color}
+                size={size}
+              />
+            ),
+          }}
+          listeners={({ navigation }) => ({
+            tabPress: (e) => {
+              // Reset to top of my tasks when tab is pressed
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Bookings' }],
+              });
+            },
+          })}
+        />
+
+
         <Tab.Screen
           name="MyTasks"
           component={TaskerTasksScreen}
           options={{
-            tabBarLabel: 'My Tasks',
+            tabBarLabel: 'Bidings',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
                 name={focused ? "briefcase" : "briefcase-outline"}
@@ -141,7 +172,7 @@ function TaskerTabs() {
           }}
         />
 
-        <Tab.Screen
+        {/*<Tab.Screen
           name="Dashboard"
           component={TaskerDashboard}
           options={{
@@ -163,7 +194,7 @@ function TaskerTabs() {
               });
             },
           })}
-        />
+        />*/}
 
         <Tab.Screen
           name="Profile"

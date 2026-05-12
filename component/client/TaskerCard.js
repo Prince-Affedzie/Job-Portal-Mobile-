@@ -7,42 +7,74 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { taskerCardUtils } from '../../utils/taskerUtils';
 
-const TaskerCard = ({ tasker, onViewProfile, searchQuery }) => {
-  const { formatTaskerRate, formatTaskerLocation, formatDistance } = taskerCardUtils;
+/**
+ * TaskerCard – updated for separated TaskerProfile schema
+ *
+ * Expected tasker object:
+ * {
+ *   _id,
+ *   businessName,
+ *   name,                // fallback from user account
+ *   brandBanner,         // URL – high priority
+ *   profileImage,        // fallback if no brandBanner
+ *   tagline,
+ *   servicesOffered: [{ name, priceType, price, currency, ... }],
+ *   rating,
+ *   numberOfRatings,
+ *   distance,
+ *   isVerified,
+ *   location: { city, region }
+ * }
+ */
+
+const TaskerCard = ({ tasker, isSelected, onSelect, onViewProfile }) => {
+  // ── Derived values ────────────────────────────────────────────
+  const displayName = tasker.businessName || tasker.name || 'Professional Tasker';
+  const primaryService = tasker.servicesOffered?.[0];
+  const rateString = primaryService
+    ? `${primaryService.currency || 'GHS'} ${primaryService.price} (${primaryService.priceType})`
+    : null;
+  const locationStr = tasker.location?.city || tasker.location?.region || 'Available Nationwide';
+
+  // ── Image priority: brandBanner > profileImage > placeholder
+  const imageSource =
+    tasker.brandBanner ||
+    tasker.profileImage ||
+    'https://res.cloudinary.com/duv3qvvjz/image/upload/v1766495900/DefaultiImagePlaceHolder_r6ai4x.jpg';
 
   return (
     <TouchableOpacity
-      style={styles.taskerCard}
-      activeOpacity={0.8}
-      onPress={() => onViewProfile(tasker)}
+      style={[styles.card, isSelected && styles.cardSelected]}
+      activeOpacity={0.9}
+      onPress={() => onSelect(tasker)}
     >
-      {/* Top Section with Image and Badges */}
-      <View style={styles.taskerTopSection}>
-        <View style={styles.profileImageContainer}>
-          <Image
-            source={{
-              uri:
-                tasker.profileImage ||
-                'https://res.cloudinary.com/duv3qvvjz/image/upload/v1766495900/DefaultiImagePlaceHolder_r6ai4x.jpg',
-            }}
-            style={styles.profileImage}
-            resizeMode="cover"
-          />
-
-          {tasker.isVerified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-            </View>
-          )}
-
-          {tasker.isOnline && <View style={styles.onlineIndicator} />}
+      {/* Selected checkmark badge */}
+      {isSelected && (
+        <View style={styles.selectedBadge}>
+          <Ionicons name="checkmark" size={14} color="#FFFFFF" />
         </View>
+      )}
 
-        <View style={styles.ratingBadge}>
-          <View style={styles.ratingStars}>
-            <Ionicons name="star" size={14} color="#F59E0B" />
+      {/* Image section */}
+      <View style={styles.imageSection}>
+        <Image
+          source={{ uri: imageSource }}
+          style={styles.coverImage}
+          resizeMode="cover"
+        />
+
+        {/* Verified badge */}
+        {tasker.isVerified && (
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+          </View>
+        )}
+
+        {/* Rating + distance overlay */}
+        <View style={styles.overlayBadges}>
+          <View style={styles.ratingPill}>
+            <Ionicons name="star" size={13} color="#F59E0B" />
             <Text style={styles.ratingText}>
               {tasker.rating?.toFixed(1) || '5.0'}
             </Text>
@@ -50,88 +82,87 @@ const TaskerCard = ({ tasker, onViewProfile, searchQuery }) => {
               <Text style={styles.ratingCount}>({tasker.numberOfRatings})</Text>
             )}
           </View>
-          {tasker.distance && (
-            <View style={styles.distanceBadge}>
-              <Ionicons name="navigate" size={12} color="#FFFFFF" />
+
+          {tasker.distance != null && (
+            <View style={styles.distancePill}>
+              <Ionicons name="navigate" size={11} color="#FFFFFF" />
               <Text style={styles.distanceText}>
-                {formatDistance(tasker.distance)}
+                {typeof tasker.distance === 'number'
+                  ? `${((tasker.distance)/1000).toFixed(1)} km`
+                  : tasker.distance}
               </Text>
             </View>
           )}
         </View>
       </View>
 
-      {/* Tasker Details Section */}
-      <View style={styles.taskerDetails}>
-        <View style={styles.nameAndRate}>
-          <View style={styles.nameContainer}>
-            <Text style={styles.taskerName} numberOfLines={1}>
-              {tasker.name || 'Professional Tasker'}
-            </Text>
-            {tasker.isPro && (
-              <View style={styles.proBadge}>
-                <Text style={styles.proBadgeText}>PRO</Text>
-              </View>
+      {/* Details */}
+      <View style={styles.details}>
+        {/* Name & tagline */}
+        <View style={styles.nameRow}>
+          <Text style={styles.businessName} numberOfLines={1}>
+            {displayName}
+          </Text>
+          {tasker.isVerified && (
+            <Ionicons name="shield-checkmark" size={16} color="#0E9F6E" />
+          )}
+        </View>
+
+        {tasker.tagline ? (
+          <Text style={styles.tagline} numberOfLines={1}>
+            {tasker.tagline}
+          </Text>
+        ) : null}
+
+        {/* Primary service info */}
+        {primaryService && (
+          <View style={styles.serviceRow}>
+            <View style={styles.serviceBadge}>
+              <Ionicons name="construct-outline" size={12} color="#1E3A6E" />
+              <Text style={styles.serviceName} numberOfLines={1}>
+                {primaryService.name}
+              </Text>
+            </View>
+            {rateString && (
+              <Text style={styles.rateText}>{rateString}</Text>
             )}
           </View>
-          <Text style={styles.hourlyRate}>{formatTaskerRate(tasker)}</Text>
-        </View>
-
-        {/* Primary Service - Display only if available */}
-        {tasker.primaryService?.serviceName && (
-          <View style={styles.primaryServiceContainer}>
-            <Ionicons name="construct-outline" size={14} color="#3B82F6" />
-            <Text style={styles.primaryServiceText} numberOfLines={1}>
-              {tasker.primaryService.serviceName}
-            </Text>
-          </View>
         )}
 
+        {/* Location */}
         <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={14} color="#64748B" />
+          <Ionicons name="location-outline" size={13} color="#6B7280" />
           <Text style={styles.locationText} numberOfLines={1}>
-            {formatTaskerLocation(tasker.location) || 'Available Nationwide'}
+            {locationStr}
           </Text>
         </View>
 
-        {tasker.Bio && (
-          <Text style={styles.taskerBio} numberOfLines={2}>
-            {tasker.Bio.length > 80
-              ? `${tasker.Bio.substring(0, 80)}...`
-              : tasker.Bio}
-          </Text>
-        )}
-
-        <View style={styles.statsRow}>
-          {tasker.completedJobs > 0 && (
-            <View style={styles.statItem}>
-              <Ionicons name="checkmark-done" size={14} color="#10B981" />
-              <Text style={styles.statText}>{tasker.completedJobs} jobs</Text>
-            </View>
-          )}
-
-          {tasker.responseRate && (
-            <View style={styles.statItem}>
-              <Ionicons name="chatbubble-outline" size={14} color="#6366F1" />
-              <Text style={styles.statText}>{tasker.responseRate}% response</Text>
-            </View>
-          )}
-
-          {tasker.onTimeRate && (
-            <View style={styles.statItem}>
-              <Ionicons name="time-outline" size={14} color="#F59E0B" />
-              <Text style={styles.statText}>{tasker.onTimeRate}% on time</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.actionButtons}>
+        {/* Action buttons */}
+        <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.hireButton}
+            style={styles.viewProfileBtn}
             onPress={() => onViewProfile(tasker)}
+            activeOpacity={0.75}
           >
-            <Text style={styles.hireButtonText}>View Profile</Text>
-            <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+            <Text style={styles.viewProfileText}>View Profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.selectBtn, isSelected && styles.selectBtnActive]}
+            onPress={() => onSelect(tasker)}
+            activeOpacity={0.85}
+          >
+            {isSelected ? (
+              <>
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.selectBtnText}>Selected</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.selectBtnText}>Book Now</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -139,221 +170,201 @@ const TaskerCard = ({ tasker, onViewProfile, searchQuery }) => {
   );
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  taskerCard: {
+  card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     marginHorizontal: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#1E3A6E',      // soft indigo shadow
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowRadius: 10,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E5E7EB',
     overflow: 'hidden',
   },
-  taskerTopSection: {
-    position: 'relative',
+  cardSelected: {
+    borderColor: '#1E3A6E',
+    borderWidth: 2,
+    shadowColor: '#1E3A6E',
+    shadowOpacity: 0.18,
+    elevation: 8,
+  },
+  selectedBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 20,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#1E3A6E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Image
+  imageSection: {
     height: 160,
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden', // Important for image containment
+    backgroundColor: '#F3F4F6',
+    position: 'relative',
   },
-  profileImageContainer: {
-  width: '100%',
-  height: 160,
-  position: 'relative',
-  backgroundColor: '#F8FAFC', 
-  },
-  profileImage: {
+  coverImage: {
     width: '100%',
-  height: undefined, // Let aspect ratio determine height
-  aspectRatio: 1.2, // Standard portrait ratio (adjust as needed)
-  // OR use flex to fill but maintain aspect ratio
-  flex: 1,
-  alignSelf: 'stretch',
+    height: '100%',
   },
   verifiedBadge: {
     position: 'absolute',
-    bottom: 12,
-    left: 12,
-    backgroundColor: '#10B981',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 10,
+    left: 10,
+    backgroundColor: '#0E9F6E',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 10, // Ensure badge is above image
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#10B981',
     borderWidth: 2,
     borderColor: '#FFFFFF',
     zIndex: 10,
   },
-  ratingBadge: {
+  overlayBadges: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
     alignItems: 'flex-end',
     gap: 6,
     zIndex: 10,
   },
-  ratingStars: {
+  ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 20,
     gap: 4,
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#111827',
   },
   ratingCount: {
-    fontSize: 12,
-    color: '#64748B',
+    fontSize: 11,
+    color: '#6B7280',
     fontWeight: '500',
   },
-  distanceBadge: {
+  distancePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
   distanceText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  taskerDetails: {
-    padding: 16,
+
+  // Details
+  details: {
+    padding: 14,
   },
-  nameAndRate: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8, // Reduced margin
-  },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
-  taskerName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    flex: 1,
-  },
-  proBadge: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  proBadgeText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  hourlyRate: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  // NEW: Primary Service Styles
-  primaryServiceContainer: {
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+    marginBottom: 4,
   },
-  primaryServiceText: {
+  businessName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    flex: 1,
+  },
+  tagline: {
     fontSize: 13,
-    color: '#1D4ED8',
+    color: '#6B7280',
+    fontStyle: 'italic',
+    marginBottom: 8,
+    lineHeight: 18,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  serviceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EBF5FF',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+  },
+  serviceName: {
+    fontSize: 12,
+    color: '#1E3A6E',
     fontWeight: '600',
+  },
+  rateText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0E9F6E',
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 12,
   },
   locationText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: 13,
+    color: '#6B7280',
     fontWeight: '500',
     flex: 1,
   },
-  taskerBio: {
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  viewProfileBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  viewProfileText: {
     fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    marginBottom: 14,
-    fontStyle: 'italic',
+    color: '#374151',
+    fontWeight: '600',
   },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  hireButton: {
-    flex: 2,
+  selectBtn: {
+    flex: 1.6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#000000',
-    paddingVertical: 12,
+    backgroundColor: '#1E3A6E',   // indigo
+    paddingVertical: 11,
     borderRadius: 10,
-    gap: 8,
+    gap: 6,
   },
-  hireButtonText: {
+  selectBtnActive: {
+    backgroundColor: '#D49B3F',   // gold when selected
+  },
+  selectBtnText: {
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '700',

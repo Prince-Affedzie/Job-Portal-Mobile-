@@ -1,1202 +1,897 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet,
   SafeAreaView,
   Image,
   ActivityIndicator,
-  Switch,
+  TextInput,
+  StyleSheet,
   Alert,
   Dimensions,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 
-// Context & API
 import { AuthContext } from '../../context/AuthContext';
-import { PosterContext } from '../../context/PosterContext';
 import { navigate } from '../../services/navigationService';
 import { sendFileToS3 } from '../../api/commonApi';
 import { uploadProfileImage, switchAccount } from '../../api/authApi';
+import Header from '../../component/tasker/Header';
 
-// Components
-import Header from "../../component/tasker/Header";
-import ReviewsComponent from '../../component/common/ReviewsComponent';
-import { ProfileField } from '../../component/tasker/ProfileField';
-import { LocationField } from '../../component/tasker/LocationField';
-
-// Constants
 const { width } = Dimensions.get('window');
-const DEFAULT_PROFILE_IMAGE = 'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
-// Theme Colors
-const THEME = {
-  primary: '#1A1F3B',
-  secondary: '#2D1B69',
+// ─── Palette (same as tasker profile) ─────────────────────────────────────
+const T = {
+  bg: '#F4F6FB',
+  surface: '#FFFFFF',
+  navyDeep: '#0F1729',
+  navyMid: '#1A2744',
+  navyLight: '#243458',
+  accentBlue: '#3B6FE8',
+  accentTeal: '#00C2A8',
+  accentGold: '#F5B731',
+  textPrimary: '#0F1729',
+  textSecondary: '#5A6480',
+  textMuted: '#9BA3BB',
+  border: '#E4E8F1',
+  danger: '#E84B3B',
+  success: '#10C98F',
   white: '#FFFFFF',
-  lightBg: '#F8FAFC',
-  cardBg: '#FFFFFF',
-  border: '#E2E8F0',
-  textPrimary: '#1E293B',
-  textSecondary: '#64748B',
-  accent: '#6366F1',
-  success: '#10B981',
-  warning: '#F59E0B',
-  danger: '#EF4444',
-  info: '#3B82F6'
+  cardShadow: '#1A274420',
 };
 
-const ClientProfileScreen = ({ navigation }) => {
-  // States
-  const [editingSections, setEditingSections] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [imageUploading, setImageUploading] = useState(false);
-  const { user, logout, updateProfile, setUser ,removeAccount} = useContext(AuthContext);
-  const { postedTasks, payments } = useContext(PosterContext);
-  const [profileData, setProfileData] = useState({});
-  const [originalProfileImage, setOriginalProfileImage] = useState('');
-  const [notifications, setNotifications] = useState({
-    taskUpdates: true,
-    applicantAlerts: true,
-    messageNotifications: true,
-    paymentAlerts: true,
-  });
-  const [preferences, setPreferences] = useState({
-    verifiedOnly: false,
-    highRatedOnly: false,
-  });
-  const [fadeAnim] = useState(new Animated.Value(0));
-  
-  const insets = useSafeAreaInsets();
+const DEFAULT_IMAGE =
+  'https://res.cloudinary.com/duv3qvvjz/image/upload/v1760376396/male_avatar_fwgmfd.jpg';
 
-  // Calculate client stats
-  const totalTasksPosted = postedTasks?.length || 0;
-  const activeTasks = postedTasks?.filter(task => 
-    ['Open', 'Assigned', 'In-progress'].includes(task.status)
-  ).length || 0;
-  const completedTasks = postedTasks?.filter(task => 
-    ['Completed', 'Closed'].includes(task.status)
-  ).length || 0;
-  const totalSpent = payments?.filter(payment => payment.status === 'released')
-    .reduce((sum, payment) => sum + (payment.amount || 0), 0) || 0;
+function getInitials(name = '') {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
 
-  // Initialize profile data
-  useEffect(() => {
-    if (user) {
-      const initialData = {
-        name: user.name || '',
-        email: user.email || '',
-        phone: user.phone || '',
-        location: user.location || {
-          region: '',
-          city: '',
-          town: '',
-          street: ''
-        },
-        profileImage: user.profileImage || DEFAULT_PROFILE_IMAGE,
-        Bio: user.Bio || '',
-        verified: user.verified || false,
-        rating: user.rating || 0,
-        numberOfRatings: user.numberOfRatings || 0,
-        ratingsReceived: user.ratingsReceived || [],
-        memberSince: user.createdAt || new Date().toISOString(),
-        ...user
-      };
-
-      setProfileData(initialData);
-      setOriginalProfileImage(user.profileImage || DEFAULT_PROFILE_IMAGE);
-      setPreferences(user.preferences || preferences);
-    }
-  }, [user]);
+// ─── Fade‑Slide Animation ─────────────────────────────────────────────────
+function FadeSlide({ delay = 0, children }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, tension: 60, friction: 12, delay, useNativeDriver: true }),
+    ]).start();
   }, []);
 
-  // Image upload
-  const uploadImageToS3 = async (imageUri) => {
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// ─── Field Row (editable / read‑only) ─────────────────────────────────────
+function FieldRow({ icon, label, value, editing, onChange, keyboardType, placeholder, editable = true }) {
+  return (
+    <View style={styles.fieldRow}>
+      <View style={styles.fieldIconWrap}>
+        <Ionicons name={icon} size={16} color={T.accentBlue} />
+      </View>
+      <View style={styles.fieldBody}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {editing && editable ? (
+          <TextInput
+            style={styles.fieldInput}
+            value={value}
+            onChangeText={onChange}
+            keyboardType={keyboardType || 'default'}
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+            placeholderTextColor={T.textMuted}
+            autoCapitalize="none"
+          />
+        ) : (
+          <Text style={[styles.fieldValue, !value && styles.fieldEmpty]}>
+            {value || `No ${label.toLowerCase()} set`}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────
+export default function ClientProfileScreen({ navigation }) {
+  const { user, logout, updateProfile, setUser, removeAccount } = useContext(AuthContext);
+
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    profileImage: DEFAULT_IMAGE,
+    role: '',
+  });
+  const [originalData, setOriginalData] = useState({});
+  const [originalImage, setOriginalImage] = useState(DEFAULT_IMAGE);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const base = {
+      name: user.name || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      profileImage: user.profileImage || DEFAULT_IMAGE,
+      role: user.role || 'client',
+    };
+    setProfileData(base);
+    setOriginalData(base);
+    setOriginalImage(user.profileImage || DEFAULT_IMAGE);
+  }, [user]);
+
+  // ── Image Picker ───────────────────────────────────────────────────────
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow photo library access.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+    if (!result.canceled) {
+      setImgErr(false);
+      setProfileData(p => ({ ...p, profileImage: result.assets[0].uri }));
+    }
+  };
+
+  const uploadImageToS3 = async (uri) => {
+    setImageUploading(true);
     try {
-      setImageUploading(true);
-      const filename = imageUri.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
-      const file = {
-        uri: imageUri,
-        name: filename,
-        type: type,
-      };
-
-      const res = await uploadProfileImage({ 
-        filename: file.name, 
-        contentType: file.type 
-      });
-
-      if (res.status !== 200) {
-        throw new Error('Failed to get upload URL');
-      }
-
-      const { fileKey, fileUrl, publicUrl } = res.data;
+      const filename = uri.split('/').pop();
+      const ext = /\.(\w+)$/.exec(filename)?.[1] || 'jpeg';
+      const file = { uri, name: filename, type: `image/${ext}` };
+      const res = await uploadProfileImage({ filename: file.name, contentType: file.type });
+      if (res.status !== 200) throw new Error('Upload URL failed');
+      const { fileUrl, publicUrl } = res.data;
       await sendFileToS3(fileUrl, file);
       return publicUrl;
-    } catch (error) {
-      console.error('Image upload error:', error);
-      throw new Error('Failed to upload image');
     } finally {
       setImageUploading(false);
     }
   };
 
-  // Account switching
-  const handleSwitchToTasker = async () => {
-    Alert.alert(
-      'Switch to Tasker Mode',
-      'Are you sure you want to switch to tasker mode? You can switch back anytime.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Switch', 
-          onPress: async () => {
-            try {
-              const res = await switchAccount();
-              if (res.status === 200) {
-                setUser(res.data.user);
-              }
-            } catch (error) {
-              console.error('Switch account error:', error);
-              Alert.alert('Error', 'Failed to switch account');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  // Save section
-  const handleSaveSection = async (section) => {
-    setLoading(true);
+  const handleSave = async () => {
+    setSaving(true);
     try {
-      let finalProfileImage = profileData.profileImage;
-      
-      const hasImageChanged = profileData.profileImage !== originalProfileImage && 
-                           (profileData.profileImage.startsWith('file://') || 
-                            profileData.profileImage.startsWith('content://'));
-      
-      if (hasImageChanged && section === 'personalInfo') {
-        try {
-          finalProfileImage = await uploadImageToS3(profileData.profileImage);
-        } catch (error) {
-          Alert.alert('Upload Error', 'Failed to upload profile image. Please try again.');
-          setLoading(false);
-          return;
-        }
-      }
+      let finalImage = profileData.profileImage;
+      const imageChanged =
+        profileData.profileImage !== originalImage &&
+        (profileData.profileImage.startsWith('file://') ||
+         profileData.profileImage.startsWith('content://'));
 
-      const formData = new FormData();
-      
-      if (section === 'personalInfo') {
-        formData.append('name', profileData.name);
-        formData.append('email', profileData.email);
-        formData.append('phone', profileData.phone);
-        formData.append('Bio', profileData.Bio || '');
-        
-        if (hasImageChanged) {
-          formData.append('profileImage', finalProfileImage);
-        }
-        
-        if (profileData.location) {
-          formData.append('location[region]', profileData.location.region || '');
-          formData.append('location[city]', profileData.location.city || '');
-          formData.append('location[town]', profileData.location.town || '');
-          formData.append('location[street]', profileData.location.street || '');
-        }
-      }
+      if (imageChanged) finalImage = await uploadImageToS3(profileData.profileImage);
 
-      if (section === 'preferences') {
-        formData.append('preferences[verifiedOnly]', preferences.verifiedOnly.toString());
-        formData.append('preferences[highRatedOnly]', preferences.highRatedOnly.toString());
-      }
+      const form = new FormData();
+      form.append('name', profileData.name.trim());
+      form.append('email', profileData.email.trim());
+      form.append('phone', profileData.phone.trim());
+      if (imageChanged) form.append('profileImage', finalImage);
 
-      const res = await updateProfile(formData);
+      const res = await updateProfile(form);
       if (res?.status === 200) {
-        if (hasImageChanged) {
-          setOriginalProfileImage(finalProfileImage);
-        }
-        setEditingSections(prev => ({ ...prev, [section]: false }));
-        Alert.alert('Success', `${getSectionDisplayName(section)} updated successfully!`);
+        const updated = { ...profileData, profileImage: finalImage };
+        setProfileData(updated);
+        setOriginalData(updated);
+        setOriginalImage(finalImage);
+        setEditing(false);
+        Alert.alert('Saved', 'Your account details have been updated.');
       } else {
-        throw new Error('Failed to update profile');
+        throw new Error('Server error');
       }
-    } catch (error) {
-      console.error('Update error:', error);
-      Alert.alert('Error', `Failed to update ${getSectionDisplayName(section).toLowerCase()}. Please try again.`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getSectionDisplayName = (section) => {
-    const names = {
-      personalInfo: 'Personal information',
-      preferences: 'Task preferences',
-      notifications: 'Notification settings',
-    };
-    return names[section] || section;
-  };
-
-  // Image picker
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photos to change your profile picture.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setProfileData({
-        ...profileData,
-        profileImage: result.assets[0].uri,
-      });
-    }
-  };
-
-  // Toggle functions
-  const toggleNotification = (type) => {
-    setNotifications({
-      ...notifications,
-      [type]: !notifications[type],
-    });
-  };
-
-  const togglePreference = (type) => {
-    setPreferences({
-      ...preferences,
-      [type]: !preferences[type],
-    });
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Log Out', onPress: logout, style: 'destructive' }
-      ]
-    );
-  };
-
-
-  const handleDeleteAccount = () => {
-      Alert.alert(
-        'Delete Account',
-        'Are you sure you want to delete your account?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', onPress: removeAccount, style: 'destructive' }
-        ]
-      );
-    };
-  
-
-  
-  const formatMemberSince = () => {
-    try {
-      return new Date(profileData.memberSince).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long'
-      });
     } catch {
-      return 'Recently';
+      Alert.alert('Error', 'Could not save changes. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Component: Stats Card
-  const StatsCard = ({ value, label, icon, color }) => (
-    <View style={styles.statsCard}>
-      <View style={[styles.statsIcon, { backgroundColor: color }]}>
-        <Ionicons name={icon} size={18} color={THEME.white} />
-      </View>
-      <Text style={styles.statsValue}>{value}</Text>
-      <Text style={styles.statsLabel}>{label}</Text>
-    </View>
-  );
+  const handleCancel = () => {
+    setProfileData(originalData);
+    setEditing(false);
+  };
 
-  // Component: Section Header
-  const SectionHeader = ({ title, section, icon, showEdit = true }) => (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleContainer}>
-        <Ionicons name={icon} size={20} color={THEME.accent} />
-        <Text style={styles.sectionTitle}>{title}</Text>
-      </View>
-      {showEdit && !editingSections[section] ? (
-        <TouchableOpacity 
-          style={styles.sectionEditButton}
-          onPress={() => setEditingSections(prev => ({ ...prev, [section]: true }))}
-        >
-          <Ionicons name="create-outline" size={16} color={THEME.accent} />
-        </TouchableOpacity>
-      ) : showEdit && editingSections[section] && (
-        <View style={styles.sectionActionButtons}>
-          <TouchableOpacity 
-            style={styles.sectionCancelButton}
-            onPress={() => {
-              setEditingSections(prev => ({ ...prev, [section]: false }));
-              // Reset to original data if needed
-            }}
-            disabled={loading}
-          >
-            <Text style={styles.sectionCancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.sectionSaveButton}
-            onPress={() => handleSaveSection(section)}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={THEME.white} />
-            ) : (
-              <Text style={styles.sectionSaveButtonText}>Save</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
+  const handleSwitch = () => {
+    Alert.alert('Switch to Tasker Mode', 'You can switch back to Client mode at any time.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Switch',
+        onPress: async () => {
+          setSwitching(true);
+          try {
+            const res = await switchAccount();
+            if (res.status === 200) setUser(res.data.user);
+          } catch {
+            Alert.alert('Error', 'Could not switch account. Try again.');
+          } finally {
+            setSwitching(false);
+          }
+        },
+      },
+    ]);
+  };
 
-  // Component: Quick Action Button
-  const QuickActionButton = ({ title, icon, color, onPress }) => (
-    <TouchableOpacity style={styles.quickActionButton} onPress={onPress}>
-      <LinearGradient
-        colors={[color, `${color}CC`]}
-        style={styles.quickActionGradient}
-      >
-        <Ionicons name={icon} size={24} color={THEME.white} />
-        <Text style={styles.quickActionText}>{title}</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+  const handleLogout = () =>
+    Alert.alert('Log Out', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: logout },
+    ]);
+
+  const handleDelete = () =>
+    Alert.alert('Delete Account', 'This action is permanent and cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: removeAccount },
+    ]);
+
+  const imageChanged =
+    profileData.profileImage !== originalImage &&
+    (profileData.profileImage?.startsWith('file://') ||
+     profileData.profileImage?.startsWith('content://'));
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header 
-        title="My Profile" 
-        showBackButton={false}
-      />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
+      <Header title="My Account" showBack={false} />
 
-      <Animated.ScrollView 
-        style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.scrollContent}
+      <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        scrollEventThrottle={16}
       >
-        {/* Enhanced Profile Header */}
-        <LinearGradient
-          colors={[THEME.primary, THEME.secondary]}
-          style={styles.profileHeader}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={styles.profileHeaderContent}>
-            {/* Profile Image */}
-            <View style={styles.profileImageWrapper}>
-              <View style={styles.profileImageContainer}>
-                <Image
-                  source={{ uri: profileData.profileImage || DEFAULT_PROFILE_IMAGE }}
-                  style={styles.profileImage}
-                  defaultSource={{ uri: DEFAULT_PROFILE_IMAGE }}
-                />
-                
-                {editingSections.personalInfo ? (
-                  <TouchableOpacity 
-                    style={styles.editImageButton} 
-                    onPress={pickImage}
-                    disabled={imageUploading}
+        {/* ── Hero Banner ───────────────────────────────────────────────── */}
+        <FadeSlide delay={0}>
+          <View style={styles.heroBanner}>
+            <LinearGradient
+              colors={[T.navyDeep, T.navyMid, T.navyLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.heroGradient}
+            >
+              <View style={styles.ring1} />
+              <View style={styles.ring2} />
+
+              <View style={styles.heroContent}>
+                <View style={styles.heroLeft}>
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {profileData.name || 'Your Name'}
+                  </Text>
+                  <Text style={styles.heroEmail} numberOfLines={1}>
+                    {profileData.email || '—'}
+                  </Text>
+                  <View style={styles.heroPills}>
+                    <View style={styles.rolePill}>
+                      <Ionicons name="person-outline" size={11} color={T.accentTeal} />
+                      <Text style={styles.rolePillText}>
+                        {profileData.role === 'client' ? 'Client' : profileData.role || 'Client'}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={editing ? pickImage : undefined}
+                  activeOpacity={editing ? 0.8 : 1}
+                  style={styles.avatarWrap}
+                >
+                  {profileData.profileImage && !imgErr ? (
+                    <Image
+                      source={{ uri: profileData.profileImage }}
+                      style={styles.avatar}
+                      onError={() => setImgErr(true)}
+                    />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarInitials}>{getInitials(profileData.name)}</Text>
+                    </View>
+                  )}
+                  {editing && (
+                    <View style={styles.avatarEditBadge}>
+                      {imageUploading ? (
+                        <ActivityIndicator size="small" color={T.white} />
+                      ) : (
+                        <Ionicons name="camera" size={13} color={T.white} />
+                      )}
+                    </View>
+                  )}
+                  {imageChanged && !editing && <View style={styles.avatarChangedDot} />}
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+
+            {/* Edit / Save bar */}
+            <View style={styles.editBar}>
+              {!editing ? (
+                <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+                  <Ionicons name="create-outline" size={15} color={T.accentBlue} />
+                  <Text style={styles.editBtnText}>Edit Account Info</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.editBarRow}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+                    onPress={handleSave}
+                    disabled={saving}
                   >
-                    {imageUploading ? (
-                      <ActivityIndicator size="small" color={THEME.white} />
+                    {saving ? (
+                      <ActivityIndicator size="small" color={T.white} />
                     ) : (
-                      <Ionicons name="camera" size={16} color={THEME.white} />
+                      <Text style={styles.saveBtnText}>Save Changes</Text>
                     )}
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.editImageButton} 
-                    onPress={() => setEditingSections(prev => ({ ...prev, personalInfo: true }))}
-                  >
-                    <Ionicons name="camera" size={16} color={THEME.white} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-            
-            {/* Profile Info */}
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileData.name || 'Client'}</Text>
-              <Text style={styles.profileEmail}>{profileData.email}</Text>
-              
-              <View style={styles.ratingVerificationContainer}>
-                {profileData.rating > 0 && (
-                  <View style={[styles.ratingContainer, { backgroundColor: THEME.success }]}>
-                    <Ionicons name="star" size={12} color={THEME.white} />
-                    <Text style={styles.ratingText}>
-                      {parseFloat(profileData.rating || 0).toFixed(1)}
-                    </Text>
-                  </View>
-                )}
-                
-                {profileData.verified && (
-                  <View style={styles.verificationBadge}>
-                    <Ionicons name="checkmark-circle" size={12} color={THEME.success} />
-                    <Text style={styles.verificationText}>Verified Client</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-
-          {/* Quick Stats */}
-          <View style={styles.headerStats}>
-            <View style={styles.headerStatItem}>
-              <Text style={styles.headerStatValue}>{totalTasksPosted}</Text>
-              <Text style={styles.headerStatLabel}>Posted</Text>
-            </View>
-            <View style={styles.headerStatDivider} />
-            <View style={styles.headerStatItem}>
-              <Text style={styles.headerStatValue}>{activeTasks}</Text>
-              <Text style={styles.headerStatLabel}>Active</Text>
-            </View>
-            <View style={styles.headerStatDivider} />
-            <View style={styles.headerStatItem}>
-              <Text style={styles.headerStatValue}>₵{totalSpent.toLocaleString()}</Text>
-              <Text style={styles.headerStatLabel}>Spent</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Switch to Tasker Button */}
-        <TouchableOpacity 
-          style={styles.switchAccountButton}
-          onPress={handleSwitchToTasker}
-        >
-          <Ionicons name="swap-horizontal" size={18} color={THEME.primary} />
-          <Text style={styles.switchAccountText}>Switch to Tasker Mode</Text>
-          <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
-        </TouchableOpacity>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="flash-outline" size={20} color={THEME.accent} />
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-            </View>
-          </View>
-          
-          <View style={styles.quickActionsGrid}>
-            <QuickActionButton
-              title="Post Task"
-              icon="add-circle"
-              color={THEME.success}
-              onPress={() => navigate('PostedTasks', { screen: 'CreateTask' })}
-            />
-            <QuickActionButton
-              title="My Tasks"
-              icon="list"
-              color={THEME.accent}
-              onPress={() => navigate('PostedTasks')}
-            />
-            <QuickActionButton
-              title="Messages"
-              icon="chatbubbles"
-              color="#8B5CF6"
-              onPress={() => navigate('Chat')}
-            />
-            <QuickActionButton
-              title="Payments"
-              icon="wallet"
-              color={THEME.warning}
-              onPress={() => navigate('Payments')}
-            />
-          </View>
-        </View>
-
-        {/* Personal Information */}
-        <View style={styles.section}>
-          <SectionHeader 
-            title="Personal Information" 
-            section="personalInfo" 
-            icon="person-outline" 
-          />
-          
-          <View style={styles.sectionContent}>
-            <View style={styles.formGrid}>
-              <ProfileField
-                label="Full Name"
-                value={profileData.name}
-                editable={editingSections.personalInfo}
-                onChange={(text) => setProfileData({ ...profileData, name: text })}
-                placeholder="Your full name"
-                editing={editingSections.personalInfo}
-                setProfileData={setProfileData}
-                containerStyle={styles.formField}
-              />
-              
-              <ProfileField
-                label="Email"
-                value={profileData.email}
-                editable={editingSections.personalInfo}
-                onChange={(text) => setProfileData({ ...profileData, email: text })}
-                placeholder="Your email"
-                editing={editingSections.personalInfo}
-                setProfileData={setProfileData}
-                containerStyle={styles.formField}
-              />
-              
-              <ProfileField
-                label="Phone"
-                value={profileData.phone}
-                editable={editingSections.personalInfo}
-                onChange={(text) => setProfileData({ ...profileData, phone: text })}
-                placeholder="Phone number"
-                editing={editingSections.personalInfo}
-                setProfileData={setProfileData}
-                containerStyle={styles.formField}
-              />
-            </View>
-
-            {/* Location Fields */}
-            <View style={styles.locationSection}>
-              <Text style={styles.sectionSubtitle}>Location</Text>
-              <View style={styles.locationGrid}>
-                <LocationField
-                  label="Region"
-                  field="region"
-                  value={profileData.location?.region}
-                  editable={editingSections.personalInfo}
-                  editing={editingSections.personalInfo}
-                  setProfileData={setProfileData}
-                  profileData={profileData}
-                  containerStyle={styles.locationField}
-                />
-                <LocationField
-                  label="City"
-                  field="city"
-                  value={profileData.location?.city}
-                  editable={editingSections.personalInfo}
-                  editing={editingSections.personalInfo}
-                  setProfileData={setProfileData}
-                  profileData={profileData}
-                  containerStyle={styles.locationField}
-                />
-                <LocationField
-                  label="Town"
-                  field="town"
-                  value={profileData.location?.town}
-                  editable={editingSections.personalInfo}
-                  editing={editingSections.personalInfo}
-                  setProfileData={setProfileData}
-                  profileData={profileData}
-                  containerStyle={styles.locationField}
-                />
-                <LocationField
-                  label="Street"
-                  field="street"
-                  value={profileData.location?.street}
-                  editable={editingSections.personalInfo}
-                  editing={editingSections.personalInfo}
-                  setProfileData={setProfileData}
-                  profileData={profileData}
-                  containerStyle={styles.locationField}
-                />
-              </View>
-            </View>
-
-            {/* Bio */}
-            <ProfileField
-              label="About Me"
-              value={profileData.Bio}
-              editable={editingSections.personalInfo}
-              onChange={(text) => setProfileData({ ...profileData, Bio: text })}
-              multiline
-              placeholder="Tell taskers about yourself and what kind of tasks you usually post..."
-              editing={editingSections.personalInfo}
-              setProfileData={setProfileData}
-              characterCount
-              maxLength={500}
-              containerStyle={styles.bioField}
-            />
-          </View>
-        </View>
-
-        {/* Task Preferences */}
-        <View style={styles.section}>
-          <SectionHeader 
-            title="Task Preferences" 
-            section="preferences" 
-            icon="options-outline" 
-          />
-          
-          <View style={styles.preferencesList}>
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={THEME.accent} />
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>Verified Taskers Only</Text>
-                  <Text style={styles.preferenceDescription}>Only show verified taskers in applications</Text>
                 </View>
-              </View>
-              <Switch
-                value={preferences.verifiedOnly}
-                onValueChange={() => togglePreference('verifiedOnly')}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={preferences.verifiedOnly ? THEME.accent : '#9CA3AF'}
-                disabled={!editingSections.preferences}
-              />
-            </View>
-            
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <Ionicons name="star-outline" size={20} color={THEME.accent} />
-                <View style={styles.preferenceText}>
-                  <Text style={styles.preferenceLabel}>High-Rated Taskers</Text>
-                  <Text style={styles.preferenceDescription}>Prioritize taskers with 4+ star ratings</Text>
-                </View>
-              </View>
-              <Switch
-                value={preferences.highRatedOnly}
-                onValueChange={() => togglePreference('highRatedOnly')}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={preferences.highRatedOnly ? THEME.accent : '#9CA3AF'}
-                disabled={!editingSections.preferences}
-              />
+              )}
             </View>
           </View>
-        </View>
+        </FadeSlide>
 
-        {/* Reviews & Ratings */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="star-outline" size={20} color={THEME.accent} />
-              <Text style={styles.sectionTitle}>Reviews & Ratings</Text>
-            </View>
-            {profileData.ratingsReceived && profileData.ratingsReceived.length > 0 && (
-              <TouchableOpacity 
-                style={styles.viewAllButton}
-                onPress={() => navigation.navigate('AllReviews', { 
-                  reviews: profileData.ratingsReceived || [],
-                  userName: profileData.name,
-                  averageRating: profileData.rating || 0,
-                  totalReviews: profileData.numberOfRatings || 0
-                })}
+        {/* ── Switch to Tasker CTA ──────────────────────────────────────── */}
+        <FadeSlide delay={100}>
+          <View style={styles.ctaSection}>
+            <TouchableOpacity
+              style={styles.switchCta}
+              onPress={handleSwitch}
+              activeOpacity={0.85}
+              delayPressIn={100}
+            >
+              <LinearGradient
+                colors={[T.navyDeep, T.navyMid]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.ctaGradient}
               >
-                <Text style={styles.viewAllText}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color={THEME.accent} />
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <ReviewsComponent 
-            reviews={profileData.ratingsReceived || []}
-            averageRating={profileData.rating || 0}
-            totalReviews={profileData.numberOfRatings || 0}
-            onViewAll={() => navigation.navigate('AllReviews', { 
-              reviews: profileData.ratingsReceived || [],
-              userName: profileData.name,
-              averageRating: profileData.rating || 0,
-              totalReviews: profileData.numberOfRatings || 0
-            })}
-          />
-        </View>
-
-        {/* Notifications */}
-        <View style={styles.section}>
-          <SectionHeader 
-            title="Notifications" 
-            section="notifications" 
-            icon="notifications-outline" 
-          />
-          
-          <View style={styles.notificationList}>
-            <View style={styles.notificationItem}>
-              <View style={styles.notificationInfo}>
-                <Ionicons name="person-add-outline" size={20} color={THEME.accent} />
-                <View style={styles.notificationText}>
-                  <Text style={styles.notificationLabel}>New Applicants</Text>
-                  <Text style={styles.notificationDescription}>When someone applies to your tasks</Text>
+                <View style={styles.ctaLeft}>
+                  <View style={styles.ctaIconRing}>
+                    <Ionicons name="swap-horizontal-outline" size={24} color={T.accentTeal} />
+                  </View>
+                  <View style={styles.ctaTextBlock}>
+                    <Text style={styles.ctaTitle}>Switch to Tasker Mode</Text>
+                    <Text style={styles.ctaSub}>Find jobs and earn money</Text>
+                  </View>
                 </View>
-              </View>
-              <Switch
-                value={notifications.applicantAlerts}
-                onValueChange={() => toggleNotification('applicantAlerts')}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.applicantAlerts ? THEME.accent : '#9CA3AF'}
-              />
-            </View>
-            
-            <View style={styles.notificationItem}>
-              <View style={styles.notificationInfo}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color={THEME.accent} />
-                <View style={styles.notificationText}>
-                  <Text style={styles.notificationLabel}>Messages</Text>
-                  <Text style={styles.notificationDescription}>New messages from taskers</Text>
+                <View style={styles.ctaArrowWrap}>
+                  <Ionicons name="arrow-forward" size={18} color={T.accentTeal} />
                 </View>
-              </View>
-              <Switch
-                value={notifications.messageNotifications}
-                onValueChange={() => toggleNotification('messageNotifications')}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.messageNotifications ? THEME.accent : '#9CA3AF'}
-              />
-            </View>
-
-            <View style={styles.notificationItem}>
-              <View style={styles.notificationInfo}>
-                <Ionicons name="checkmark-done-outline" size={20} color={THEME.accent} />
-                <View style={styles.notificationText}>
-                  <Text style={styles.notificationLabel}>Task Updates</Text>
-                  <Text style={styles.notificationDescription}>Task status changes and completions</Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications.taskUpdates}
-                onValueChange={() => toggleNotification('taskUpdates')}
-                trackColor={{ false: '#E5E7EB', true: '#A5B4FC' }}
-                thumbColor={notifications.taskUpdates ? THEME.accent : '#9CA3AF'}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Account Settings */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="settings-outline" size={20} color={THEME.accent} />
-              <Text style={styles.sectionTitle}>Account Settings</Text>
-            </View>
-          </View>
-          
-          <View style={styles.settingsList}>
-            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('PostedTasks')}>
-              <Ionicons name="list-outline" size={20} color={THEME.accent} />
-              <Text style={styles.settingText}>My Posted Tasks</Text>
-              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('Payments')}>
-              <Ionicons name="receipt-outline" size={20} color={THEME.accent} />
-              <Text style={styles.settingText}>Payment History</Text>
-              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.settingItem} onPress={() => navigate('ClientSupport')}>
-              <Ionicons name="help-circle-outline" size={20} color={THEME.accent} />
-              <Text style={styles.settingText}>Help & Support</Text>
-              <Ionicons name="chevron-forward" size={16} color={THEME.textSecondary} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={20} color={THEME.danger} />
-              <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleDeleteAccount}>
-              <Ionicons name="trash-outline" size={20} color={THEME.danger} />
-                <Text style={[styles.settingText, styles.logoutText]}>Delete Account</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
+        </FadeSlide>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Client since {formatMemberSince()}</Text>
-          <Text style={styles.footerSubtext}>
-            {totalTasksPosted} tasks posted • {completedTasks} completed • ₵{totalSpent.toLocaleString()} spent
+        {/* ── Account Details Card ─────────────────────────────────────── */}
+        <FadeSlide delay={180}>
+          <View style={styles.sectionLabelWrap}>
+            <Text style={styles.sectionLabel}>ACCOUNT DETAILS</Text>
+          </View>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="person-circle-outline" size={18} color={T.accentBlue} />
+              <Text style={styles.cardTitle}>Account Details</Text>
+            </View>
+
+            <FieldRow
+              icon="person-outline"
+              label="Full Name"
+              value={profileData.name}
+              editing={editing}
+              onChange={t => setProfileData(p => ({ ...p, name: t }))}
+              placeholder="Your full name"
+            />
+            <View style={styles.fieldDivider} />
+            <FieldRow
+              icon="mail-outline"
+              label="Email Address"
+              value={profileData.email}
+              editing={editing}
+              onChange={t => setProfileData(p => ({ ...p, email: t }))}
+              keyboardType="email-address"
+              placeholder="your@email.com"
+            />
+            <View style={styles.fieldDivider} />
+            <FieldRow
+              icon="call-outline"
+              label="Phone Number"
+              value={profileData.phone}
+              editing={editing}
+              onChange={t => setProfileData(p => ({ ...p, phone: t }))}
+              keyboardType="phone-pad"
+              placeholder="+233 XX XXX XXXX"
+            />
+            <View style={styles.fieldDivider} />
+            <FieldRow
+              icon="shield-checkmark-outline"
+              label="Account Role"
+              value={
+                profileData.role
+                  ? profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1)
+                  : ''
+              }
+              editing={false}
+              editable={false}
+            />
+          </View>
+        </FadeSlide>
+
+        {/* ── Quick Access ─────────────────────────────────────────────── */}
+        <FadeSlide delay={260}>
+          <Text style={[styles.sectionLabel, { marginHorizontal: 18, marginTop: 28, marginBottom: 10 }]}>
+            QUICK ACCESS
           </Text>
-        </View>
-      </Animated.ScrollView>
+        </FadeSlide>
+
+        <QuickNavCard
+          icon="list-outline"
+          label="My Posted Tasks"
+          sublabel="View and manage your tasks"
+          accent={T.accentBlue}
+          delay={300}
+          onPress={() => navigate('PostedTasks')}
+        />
+        <QuickNavCard
+          icon="cash-outline"
+          label="Payment History"
+          sublabel="View your spending & receipts"
+          accent={T.accentTeal}
+          delay={340}
+          onPress={() => navigate('Payments')}
+        />
+        <QuickNavCard
+          icon="help-circle-outline"
+          label="Help & Support"
+          sublabel="FAQs, contact and feedback"
+          accent="#7C6FE8"
+          delay={380}
+          onPress={() => navigate('ClientSupport')}
+        />
+
+        {/* ── Danger Zone ───────────────────────────────────────────────── */}
+        <FadeSlide delay={450}>
+          <View style={styles.dangerCard}>
+            <TouchableOpacity
+              style={styles.dangerRow}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+              delayPressIn={100}
+            >
+              <Ionicons name="log-out-outline" size={20} color={T.danger} />
+              <Text style={styles.dangerText}>Log Out</Text>
+            </TouchableOpacity>
+            <View style={styles.dangerDivider} />
+            <TouchableOpacity
+              style={styles.dangerRow}
+              onPress={handleDelete}
+              activeOpacity={0.7}
+              delayPressIn={100}
+            >
+              <Ionicons name="trash-outline" size={20} color={T.danger} />
+              <Text style={styles.dangerText}>Delete Account</Text>
+            </TouchableOpacity>
+          </View>
+        </FadeSlide>
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
+// ─── Quick Nav Card (reusable) ────────────────────────────────────────────
+function QuickNavCard({ icon, label, sublabel, accent, delay, onPress }) {
+  return (
+    <FadeSlide delay={delay}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={onPress}
+        style={[styles.navCard, { borderLeftColor: accent }]}
+        delayPressIn={100}
+      >
+        <View style={[styles.navCardIcon, { backgroundColor: accent + '18' }]}>
+          <Ionicons name={icon} size={22} color={accent} />
+        </View>
+        <View style={styles.navCardText}>
+          <Text style={styles.navCardLabel}>{label}</Text>
+          <Text style={styles.navCardSub}>{sublabel}</Text>
+        </View>
+        <View style={[styles.navCardArrow, { backgroundColor: accent + '12' }]}>
+          <Ionicons name="chevron-forward" size={16} color={accent} />
+        </View>
+      </TouchableOpacity>
+    </FadeSlide>
+  );
+}
+
+// ─── Styles ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.lightBg,
+  safe: { flex: 1, backgroundColor: T.bg },
+  scroll: { paddingBottom: 24 },
+
+  // ── Hero Banner ──────────────────────────────────────────────────────────
+  heroBanner: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: 'hidden',
+    shadowColor: T.navyDeep,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 10,
+    backgroundColor: T.surface,
   },
-  scrollContent: {
-    paddingBottom: 30,
+  heroGradient: {
+    paddingTop: 32,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  profileHeader: {
-    padding: 20,
-    borderRadius: 34,
-    marginHorizontal: 12,
-    marginTop: 12,
+  ring1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1,
+    borderColor: '#FFFFFF08',
+    top: -50,
+    right: -50,
   },
-  profileHeaderContent: {
+  ring2: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1,
+    borderColor: '#FFFFFF06',
+    bottom: -20,
+    left: -30,
+  },
+  heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
   },
-  profileImageWrapper: {
-    marginRight: 16,
+  heroLeft: {
+    flex: 1,
+    paddingRight: 16,
   },
-  profileImageContainer: {
+  heroName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: T.white,
+    letterSpacing: -0.4,
+    marginBottom: 4,
+  },
+  heroEmail: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.55)',
+    marginBottom: 14,
+    letterSpacing: 0.1,
+  },
+  heroPills: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  rolePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: T.accentTeal + '50',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 5,
+  },
+  rolePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: T.accentTeal,
+    letterSpacing: 0.2,
+  },
+
+  avatarWrap: {
     position: 'relative',
+    alignSelf: 'flex-start',
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  avatar: {
+    width: 84,
+    height: 84,
+    borderRadius: 20,
     borderWidth: 3,
-    borderColor: THEME.white,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  editImageButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: THEME.accent,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  avatarFallback: {
+    width: 84,
+    height: 84,
+    borderRadius: 20,
+    backgroundColor: T.accentBlue + '30',
+    borderWidth: 3,
+    borderColor: T.accentBlue + '40',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: T.accentBlue,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: T.accentBlue,
     borderWidth: 2,
-    borderColor: THEME.white,
+    borderColor: T.navyMid,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profileInfo: {
-    flex: 1,
+  avatarChangedDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: T.accentTeal,
+    borderWidth: 2,
+    borderColor: T.navyMid,
   },
-  profileName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: THEME.white,
-    marginBottom: 4,
+
+  // ── Edit bar ──────────────────────────────────────────────────────────────
+  editBar: {
+    backgroundColor: T.surface,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: T.border,
   },
-  profileEmail: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
-  },
-  ratingVerificationContainer: {
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  ratingText: {
-    color: THEME.white,
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  verificationText: {
-    color: THEME.success,
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  headerStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 16,
-  },
-  headerStatItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerStatValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: THEME.white,
-    marginBottom: 4,
-  },
-  headerStatLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  headerStatDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 8,
-  },
-  switchAccountButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.white,
-    marginHorizontal: 16,
-    marginTop: -20,
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 16,
-  },
-  switchAccountText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: THEME.primary,
-    marginLeft: 12,
-  },
-  section: {
-    backgroundColor: THEME.cardBg,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  sectionTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: THEME.textPrimary,
-    marginLeft: 12,
-  },
-  sectionEditButton: {
-    padding: 8,
-  },
-  sectionActionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionCancelButton: {
-    paddingHorizontal: 12,
+    alignSelf: 'flex-end',
+    backgroundColor: T.accentBlue + '12',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    marginRight: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: T.accentBlue + '30',
   },
-  sectionCancelButtonText: {
-    color: THEME.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  sectionSaveButton: {
-    backgroundColor: THEME.accent,
+  editBtnText: { fontSize: 14, fontWeight: '600', color: T.accentBlue },
+  editBarRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  cancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: T.border,
+    backgroundColor: T.surface,
   },
-  sectionSaveButtonText: {
-    color: THEME.white,
-    fontSize: 14,
-    fontWeight: '600',
+  cancelBtnText: { fontSize: 14, fontWeight: '600', color: T.textSecondary },
+  saveBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: T.accentBlue,
+    minWidth: 110,
+    alignItems: 'center',
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+  saveBtnDisabled: { backgroundColor: T.accentBlue + '60' },
+  saveBtnText: { fontSize: 14, fontWeight: '700', color: T.white },
+
+  // ── Switch CTA ────────────────────────────────────────────────────────────
+  ctaSection: {
+    marginHorizontal: 16,
+    marginTop: 22,
   },
-  quickActionButton: {
-    flex: 1,
-    minWidth: '45%',
-    borderRadius: 12,
+  switchCta: {
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: T.navyDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    elevation: 8,
   },
-  quickActionGradient: {
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
-  },
-  quickActionText: {
-    color: THEME.white,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  sectionContent: {
-    gap: 16,
-  },
-  formGrid: {
+  ctaGradient: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 20,
   },
-  formField: {
-    width: '48%',
-    marginBottom: 16,
-  },
-  locationSection: {
-    marginTop: 8,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: THEME.textPrimary,
-    marginBottom: 12,
-  },
-  locationGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  locationField: {
-    width: '48%',
-    marginBottom: 12,
-  },
-  bioField: {
-    marginTop: 8,
-  },
-  preferencesList: {
-    gap: 12,
-  },
-  preferenceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  ctaLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  ctaIconRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: T.accentTeal + '40',
+    backgroundColor: T.accentTeal + '15',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  preferenceInfo: {
-    flexDirection: 'row',
+  ctaTextBlock: { flex: 1 },
+  ctaTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: T.white,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  ctaSub: { fontSize: 12, color: 'rgba(255,255,255,0.65)', letterSpacing: 0.2 },
+  ctaArrowWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: T.accentTeal + '20',
+    borderWidth: 1,
+    borderColor: T.accentTeal + '40',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  preferenceText: {
-    flex: 1,
-  },
-  preferenceLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: THEME.textPrimary,
-    marginBottom: 2,
-  },
-  preferenceDescription: {
-    fontSize: 14,
-    color: THEME.textSecondary,
-    lineHeight: 18,
-  },
-  notificationList: {
-    gap: 12,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  notificationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  notificationText: {
-    flex: 1,
-  },
-  notificationLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: THEME.textPrimary,
-    marginBottom: 2,
-  },
-  notificationDescription: {
-    fontSize: 14,
-    color: THEME.textSecondary,
-    lineHeight: 18,
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: THEME.accent,
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  settingsList: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.border,
-  },
-  settingText: {
-    flex: 1,
-    fontSize: 16,
-    color: THEME.textPrimary,
+    justifyContent: 'center',
     marginLeft: 12,
   },
-  logoutItem: {
-    borderBottomWidth: 0,
-  },
-  logoutText: {
-    color: THEME.danger,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  footerText: {
-    fontSize: 14,
-    color: THEME.textSecondary,
-  },
-  footerSubtext: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-});
 
-export default ClientProfileScreen;
+  // ── Section Label ─────────────────────────────────────────────────────────
+  sectionLabelWrap: {
+    marginHorizontal: 18,
+    marginTop: 22,
+    marginBottom: 0,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: T.textMuted,
+    letterSpacing: 1.5,
+    marginBottom: 10,
+    marginLeft: 2,
+  },
+
+  // ── Account Details Card ─────────────────────────────────────────────────
+  card: {
+    backgroundColor: T.surface,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 20,
+    paddingVertical: 8,
+    shadowColor: T.cardShadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: T.border,
+    marginBottom: 4,
+  },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: T.textPrimary, letterSpacing: 0.1 },
+
+  // ── Fields ────────────────────────────────────────────────────────────────
+  fieldRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  fieldIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: T.accentBlue + '10',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    marginTop: 2,
+  },
+  fieldBody: { flex: 1 },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: T.textMuted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  fieldValue: { fontSize: 15, color: T.textPrimary, fontWeight: '500' },
+  fieldEmpty: { color: T.textMuted, fontStyle: 'italic' },
+  fieldInput: {
+    fontSize: 15,
+    color: T.textPrimary,
+    fontWeight: '500',
+    borderBottomWidth: 1.5,
+    borderBottomColor: T.accentBlue + '60',
+    paddingBottom: 4,
+    paddingTop: 0,
+  },
+  fieldDivider: { height: 1, backgroundColor: T.border, marginHorizontal: 18 },
+
+  // ── Quick Nav Cards ───────────────────────────────────────────────────────
+  navCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: T.surface,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 16,
+    padding: 16,
+    borderLeftWidth: 3,
+    shadowColor: T.cardShadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: T.border,
+  },
+  navCardIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  navCardText: { flex: 1 },
+  navCardLabel: { fontSize: 15, fontWeight: '700', color: T.textPrimary, marginBottom: 2 },
+  navCardSub: { fontSize: 12, color: T.textSecondary },
+  navCardArrow: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Danger Zone ───────────────────────────────────────────────────────────
+  dangerCard: {
+    backgroundColor: T.surface,
+    marginHorizontal: 16,
+    marginTop: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: T.danger + '20',
+  },
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+  },
+  dangerText: { fontSize: 15, fontWeight: '600', color: T.danger },
+  dangerDivider: { height: 1, backgroundColor: T.danger + '15', marginHorizontal: 16 },
+});
