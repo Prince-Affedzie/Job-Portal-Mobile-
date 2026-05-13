@@ -1,36 +1,55 @@
 // screens/tasker/AllTasksScreen.js
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Dimensions, Alert, TouchableOpacity, FlatList, Modal, RefreshControl, TextInput, ActivityIndicator } from 'react-native'
-import React, { useState, useContext, useEffect } from 'react'
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Dimensions,
+  Alert,
+  TouchableOpacity,
+  Modal,
+  RefreshControl,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
 import Entypo from '@expo/vector-icons/Entypo';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { LinearGradient } from 'expo-linear-gradient'
+import { LinearGradient } from 'expo-linear-gradient';
 import { PosterContext } from '../../context/PosterContext';
-import { ServiceRequestContext } from '../../context/ServiceRequestContext';
-import { AuthContext } from "../../context/AuthContext";
-import { navigate } from '../../services/navigationService'
-import Header from "../../component/tasker/Header";
+import { AuthContext } from '../../context/AuthContext';
+import { navigate } from '../../services/navigationService';
+import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
-import StatsOverview from '../../component/client/StatsOverView';
 import TaskFilters from '../../component/client/TaskFilters';
 import TaskList from '../../component/client/TaskList';
 import TaskActionModal from '../../component/client/TaskActionModal';
 
-const { height, width } = Dimensions.get('window')
-const guidelineBaseWidth = 375;
-const scale = (size) => (width / guidelineBaseWidth) * size;
+const { width } = Dimensions.get('window');
+const scale = (size) => (width / 375) * size;
 
-const TABS = {
-  POSTED: 'posted',
-  REQUESTED: 'requested'
+// ─── Theme: Pacific Indigo & Warm Gold ──────────────────────────────────────
+const C = {
+  bg:           '#F9FAFC',
+  surface:      '#FFFFFF',
+  border:       '#E4E8EE',
+  primary:      '#1E3A6E',
+  primaryDark:  '#152C4F',
+  primaryGlow:  '#EBF5FF',
+  gold:         '#D49B3F',
+  green:        '#0F766E',
+  red:          '#DC2626',
+  textPrimary:  '#0F172A',
+  textSecondary:'#475569',
+  textMuted:    '#94A3B8',
+  white:        '#FFFFFF',
 };
 
 export default function AllTasksScreen() {
   const { user } = useContext(AuthContext);
-  const { postedTasks, loading: postedLoading, loadPostedTasks, deleteTask } = useContext(PosterContext);
-  const { serviceRequests, loading: requestsLoading, loadServiceRequests, deleteServiceRequest } = useContext(ServiceRequestContext);
-  
-  const [activeTab, setActiveTab] = useState(TABS.POSTED);
+  const { postedTasks, loading, loadPostedTasks, deleteTask } = useContext(PosterContext);
+
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,187 +60,76 @@ export default function AllTasksScreen() {
   const [deletingTasks, setDeletingTasks] = useState({});
   const [deletionError, setDeletionError] = useState(null);
 
-  const loading = activeTab === TABS.POSTED ? postedLoading : requestsLoading;
-  const currentTasks = activeTab === TABS.POSTED ? postedTasks : serviceRequests;
-
   useEffect(() => {
-    loadData();
+    loadPostedTasks();
   }, []);
-
-  const loadData = async () => {
-    await loadPostedTasks();
-    await loadServiceRequests();
-  };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await loadPostedTasks();
     setRefreshing(false);
   };
 
+  // ── Stats (only posted tasks) ────────────────────────────────────────────
   const calculateStats = () => {
-    const postedTasksData = postedTasks || [];
-    const requestedTasksData = serviceRequests || [];
-    
-    const totalPosted = postedTasksData.length;
-    const totalRequested = requestedTasksData.length;
-    const total = totalPosted + totalRequested;
-    
-    const completedPosted = postedTasksData.filter(task => 
-      ['Completed', 'Closed'].includes(task.status)
-    ).length;
-    
-    const completedRequested = requestedTasksData.filter(task => 
-      ['Completed', 'Closed'].includes(task.status)
-    ).length;
-    
-    const completed = completedPosted + completedRequested;
-    
-    const inProgressPosted = postedTasksData.filter(task => 
-      ['In-progress', 'Assigned', 'Review'].includes(task.status)
-    ).length;
-    
-    const inProgressRequested = requestedTasksData.filter(task => 
-      ['In-progress', 'Assigned', 'Review', 'Booked'].includes(task.status)
-    ).length;
-    
-    const inProgress = inProgressPosted + inProgressRequested;
-
-    const openPosted = postedTasksData.filter(task => 
-      ['Open', 'Pending'].includes(task.status)
-    ).length;
-    
-    const openRequested = requestedTasksData.filter(task => 
-      ['Pending', 'Quoted'].includes(task.status)
-    ).length;
-    
-    const open = openPosted + openRequested;
-
-    // Calculate total applicants/offers
-    const postedApplicants = postedTasksData.reduce((sum, task) => {
-      const applicantsCount = task.applicants?.length || 0;
-      const bidsCount = task.bids?.length || 0;
-      return sum + Math.max(applicantsCount, bidsCount);
-    }, 0);
-
-    const requestedOffers = requestedTasksData.reduce((sum, task) => {
-      return sum + (task.offers?.length || 0);
-    }, 0);
-
-    const totalApplicants = postedApplicants + requestedOffers;
+    const tasks = postedTasks || [];
+    const total = tasks.length;
+    const completed = tasks.filter(t => ['Completed', 'Closed'].includes(t.status)).length;
+    const inProgress = tasks.filter(t => ['In-progress', 'Assigned', 'Review'].includes(t.status)).length;
+    const open = tasks.filter(t => ['Open', 'Pending'].includes(t.status)).length;
+    const totalApplicants = tasks.reduce((sum, t) => sum + Math.max(t.applicants?.length || 0, t.bids?.length || 0), 0);
     const applicantsPerTask = total > 0 ? (totalApplicants / total).toFixed(1) : 0;
 
-    return { 
-      total, 
-      completed, 
-      inProgress, 
-      open,
-      applicants: totalApplicants,
-      applicantsPerTask: parseFloat(applicantsPerTask),
-      posted: totalPosted,
-      requested: totalRequested
-    };
+    return { total, completed, inProgress, open, applicants: totalApplicants, applicantsPerTask: parseFloat(applicantsPerTask) };
   };
 
   const stats = calculateStats();
 
-  const deleteATask = async (taskId, taskTitle, isRequested = false) => {
+  // ── Delete task ──────────────────────────────────────────────────────────
+  const deleteATask = (taskId, taskTitle) => {
     setDeletingTasks(prev => ({ ...prev, [taskId]: true }));
-    setDeletionError(null);
-
-    return new Promise((resolve) => {
-      Alert.alert(
-        "Delete Task",
-        `Are you sure you want to delete "${taskTitle}"? This action cannot be undone.`,
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => {
+    Alert.alert(
+      'Delete Task',
+      `Are you sure you want to delete "${taskTitle}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => setDeletingTasks(prev => ({ ...prev, [taskId]: false })) },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTask(taskId);
+              Alert.alert('Success', 'Task deleted.');
+              onRefresh();
+            } catch (error) {
+              const msg = error.response?.data?.message || error.message || 'Failed to delete task.';
+              Alert.alert('Delete Failed', msg);
+            } finally {
               setDeletingTasks(prev => ({ ...prev, [taskId]: false }));
-              resolve({ success: false, cancelled: true });
             }
           },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                let res;
-                if (isRequested) {
-                  res = await deleteServiceRequest(taskId);
-                } else {
-                  res = await deleteTask(taskId);
-                }
-                
-                if (res.status === 200) {
-                  Alert.alert("Success", "Task deleted successfully!", [{ text: "OK" }]);
-                  resolve({ success: true, data: res.data });
-                  await loadData();
-                } else {
-                  throw new Error(res.data?.message || 'Failed to delete task');
-                }
-              } catch (error) {
-                const errorMessage = error.response?.data?.message ||
-                                   error.response?.data?.error ||
-                                   error.message ||
-                                   "An unexpected error occurred while deleting the task.";
-                
-                setDeletionError(errorMessage);
-                Alert.alert("Delete Failed", errorMessage, [{ text: "OK" }]);
-                resolve({ success: false, error: errorMessage });
-              } finally {
-                setDeletingTasks(prev => ({ ...prev, [taskId]: false }));
-              }
-            }
-          }
-        ]
-      );
-    });
+        },
+      ],
+    );
   };
 
-  const handleActionPress = (task, isRequested = false) => {
-    setSelectedTask({ ...task, isRequested });
+  const handleActionPress = (task) => {
+    setSelectedTask(task);
     setActionModalVisible(true);
   };
 
-  const handleActionSelect = async (action) => {
+  const handleActionSelect = (action) => {
     if (!selectedTask) return;
-    
-    const { isRequested, ...task } = selectedTask;
-    
+    const task = selectedTask;
     if (action === 'View Details') {
-      if (isRequested) {
-        navigate('ServiceRequestDetail', { requestId: task._id });
-      } else {
-        navigate('ClientTaskDetail', { taskId: task._id });
-      }
+      navigate('ClientTaskDetail', { taskId: task._id });
     } else if (action === 'Edit') {
-      if (isRequested) {
-        navigate('EditServiceRequest', { requestId: task._id, request: task });
-      } else {
-        navigate('EditTask', { taskId: task._id, task: task });
-      }
-    } else if (action === 'View Applicants') {
-      if (isRequested) {
-        navigate('ServiceRequestOffers', {
-              requestId: task._id,
-              offers: task.offers || [],
-              request: task
-            });
-      } else {
-        navigate('TaskApplicants', { 
-          taskId: task._id,
-          applicants: task.applicants || []
-        });
-      }
+      navigate('EditTask', { taskId: task._id, task });
+    } else if (action === 'View Bids') {
+      navigate('TaskApplicants', { taskId: task._id, applicants: task.applicants || [] });
     } else if (action === 'Delete') {
-      const result = await deleteATask(task._id, task.title || task.description, isRequested);
-      if (result.success) {
-        loadData();
-      }
+      deleteATask(task._id, task.title || task.description);
     }
-    
     setActionModalVisible(false);
   };
 
@@ -237,7 +145,7 @@ export default function AllTasksScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title="My Tasks" />
-        <LoadingIndicator text='Loading your Tasks...'/>
+        <LoadingIndicator text="Loading your tasks..." />
       </SafeAreaView>
     );
   }
@@ -245,120 +153,63 @@ export default function AllTasksScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <Header title="My Tasks" />
-      
-      {/* Main Content */}
-      <ScrollView 
+
+      <ScrollView
         style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[C.primary]} tintColor={C.primary} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Hero Section */}
+        {/* ── Hero Section with rounded top corners ── */}
         <View style={styles.heroSection}>
-        <LinearGradient
-          colors={['#1A1A1B', '#1A1A1B']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroBackground}
-        >
-          {/* Tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === TABS.POSTED && styles.activeTab]}
-              onPress={() => setActiveTab(TABS.POSTED)}
-            >
-              <View style={styles.tabContent}>
-                {/*<Ionicons 
-                  name="document-text" 
-                  size={scale(18)} 
-                  color={activeTab === TABS.POSTED ? '#FFFFFF' : '#E0E7FF'} 
-                />*/}
-                <Text style={[styles.tabText, activeTab === TABS.POSTED && styles.activeTabText]}>
-                  Posted Tasks
-                </Text>
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{stats.posted}</Text>
+          <LinearGradient
+            colors={[C.primary, C.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            <View style={styles.tabContainer}>
+              <View style={styles.tab}>
+                <View style={styles.tabContent}>
+                  <Text style={styles.activeTabText}>Posted Tasks</Text>
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{stats.total}</Text>
+                  </View>
                 </View>
               </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === TABS.REQUESTED && styles.activeTab]}
-              onPress={() => setActiveTab(TABS.REQUESTED)}
-            >
-              <View style={styles.tabContent}>
-                {/*<Ionicons 
-                  name="briefcase" 
-                  size={scale(18)} 
-                  color={activeTab === TABS.REQUESTED ? '#FFFFFF' : '#E0E7FF'} 
-                />*/}
-                <Text style={[styles.tabText, activeTab === TABS.REQUESTED && styles.activeTabText]}>
-                  Service Requests
-                </Text>
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{stats.requested}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <View style={styles.searchInputContainer}>
-              <Ionicons name="search" size={scale(20)} color="#FFFFFF" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={`Search ${activeTab === TABS.POSTED ? 'posted tasks' : 'service requests'}...`}
-                placeholderTextColor="rgba(255, 255, 255, 0.7)"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                returnKeyType="search"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {searchQuery ? (
-                <TouchableOpacity 
-                  onPress={() => setSearchQuery('')}
-                  style={styles.clearSearchButton}
-                >
-                  <Ionicons name="close-circle" size={scale(18)} color="#FFFFFF" />
-                </TouchableOpacity>
-              ) : null}
             </View>
 
-            <TouchableOpacity 
-              style={[
-                styles.filterButton,
-                showFilters && styles.filterButtonActive,
-                hasActiveFilters && styles.filterButtonHasFilters
-              ]}
-              onPress={() => setShowFilters(!showFilters)}
-            >
-              <Ionicons 
-                name="options" 
-                size={scale(20)} 
-                color={showFilters ? '#6366F1' : '#FFFFFF'} 
-              />
-              {hasActiveFilters && (
-                <View style={styles.filterIndicator}>
-                  <Text style={styles.filterIndicatorText}>
-                    {hasActiveFilters ? '•' : ''}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
+            <View style={styles.searchContainer}>
+              <View style={styles.searchInputContainer}>
+                <Ionicons name="search" size={scale(20)} color={C.white} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search tasks..."
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  returnKeyType="search"
+                  autoCapitalize="none"
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearchButton}>
+                    <Ionicons name="close-circle" size={scale(18)} color={C.white} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
-        {/* Statistics Overview 
-        <View style={styles.statsSection}>
-          <StatsOverview stats={stats} />
-        </View>*/}
+              <TouchableOpacity
+                style={[styles.filterButton, showFilters && styles.filterButtonActive, hasActiveFilters && styles.filterButtonHasFilters]}
+                onPress={() => setShowFilters(!showFilters)}
+              >
+                <Ionicons name="options" size={scale(20)} color={showFilters ? C.primary : C.white} />
+                {hasActiveFilters && <View style={styles.filterDot} />}
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
 
-        {/* Filters Section */}
+        {/* ── Filters ───────────────────────────────────────────────────── */}
         {showFilters && (
           <View style={styles.filtersSection}>
             <TaskFilters
@@ -368,102 +219,62 @@ export default function AllTasksScreen() {
               setSelectedCategory={setSelectedCategory}
               hasActiveFilters={hasActiveFilters}
               clearFilters={clearFilters}
-              taskType={activeTab}
+              taskType="posted"
             />
           </View>
         )}
 
-        {/* Task List */}
+        {/* ── Task List ─────────────────────────────────────────────────── */}
         <View style={styles.taskListSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              {activeTab === TABS.POSTED ? 'Posted Tasks' : 'Service Requests'}
-              <Text style={styles.taskCount}> • {currentTasks?.length || 0} tasks</Text>
+              Posted Tasks <Text style={styles.taskCount}>• {postedTasks?.length || 0} tasks</Text>
             </Text>
             {hasActiveFilters && (
-              <TouchableOpacity 
-                style={styles.clearAllButton}
-                onPress={clearFilters}
-              >
+              <TouchableOpacity style={styles.clearAllButton} onPress={clearFilters}>
                 <Text style={styles.clearAllText}>Clear All</Text>
-                <Ionicons name="close" size={scale(14)} color="#EF4444" />
+                <Ionicons name="close" size={scale(14)} color={C.red} />
               </TouchableOpacity>
             )}
           </View>
-          
+
           <TaskList
-            tasks={currentTasks}
-            activeTab={activeTab}
+            tasks={postedTasks}
+            activeTab="posted"
             selectedFilter={selectedFilter}
             selectedCategory={selectedCategory}
             searchQuery={searchQuery}
             deletingTasks={deletingTasks}
-            onTaskPress={(task) => {
-              if (activeTab === TABS.POSTED) {
-                navigate('ClientTaskDetail', { taskId: task._id });
-              } else {
-                navigate('ServiceRequestDetail', { requestId: task._id });
-              }
-            }}
-            onActionPress={(task) => handleActionPress(task, activeTab === TABS.REQUESTED)}
-            onRefresh={loadData}
+            onTaskPress={(task) => navigate('ClientTaskDetail', { taskId: task._id })}
+            onActionPress={handleActionPress}
+            onRefresh={onRefresh}
           />
         </View>
 
-        {/* Empty State if needed */}
-        {(!currentTasks || currentTasks.length === 0) && !loading && (
+        {/* ── Empty State ───────────────────────────────────────────────── */}
+        {(!postedTasks || postedTasks.length === 0) && !loading && (
           <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={scale(80)} color="#CBD5E1" />
-            <Text style={styles.emptyTitle}>
-              No {activeTab === TABS.POSTED ? 'Posted Tasks' : 'Service Requests'}
-            </Text>
+            <Ionicons name="document-text-outline" size={scale(80)} color={C.textMuted} />
+            <Text style={styles.emptyTitle}>No Tasks Posted</Text>
             <Text style={styles.emptyDescription}>
-              {activeTab === TABS.POSTED 
-                ? 'Start by posting your first task to find skilled taskers.'
-                : 'Create a service request to get quotes from professionals.'
-              }
+              Start by posting your first task to find skilled taskers.
             </Text>
-            <TouchableOpacity 
-              style={styles.emptyActionButton}
-              onPress={() => {
-                if (activeTab === TABS.POSTED) {
-                  navigate('CreateTask');
-                } else {
-                  navigate('Taskers');
-                }
-              }}
-            >
-              <Ionicons name="add" size={scale(18)} color="#FFFFFF" />
-              <Text style={styles.emptyActionText}>
-                {activeTab === TABS.POSTED ? 'Post First Task' : 'Create Request'}
-              </Text>
+            <TouchableOpacity style={styles.emptyActionButton} onPress={() => navigate('CreateTask')}>
+              <Ionicons name="add" size={scale(18)} color={C.white} />
+              <Text style={styles.emptyActionText}>Post First Task</Text>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-      
-      {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => {
-          if (activeTab === TABS.POSTED) {
-            navigate('CreateTask');
-          } else {
-            navigate('Taskers');
-          }
-        }}
-      >
-        <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <Entypo name="plus" size={scale(24)} color="#FFFFFF" />
+
+      {/* ── FAB ─────────────────────────────────────────────────────────── */}
+      <TouchableOpacity style={styles.fab} onPress={() => navigate('CreateTask')}>
+        <LinearGradient colors={[C.primary, C.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabGradient}>
+          <Entypo name="plus" size={scale(24)} color={C.white} />
         </LinearGradient>
       </TouchableOpacity>
-      
-      {/* Action Modal */}
+
+      {/* ── Action Modal ────────────────────────────────────────────────── */}
       <TaskActionModal
         visible={actionModalVisible}
         onClose={() => setActionModalVisible(false)}
@@ -477,73 +288,66 @@ export default function AllTasksScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
+  safe: { flex: 1, backgroundColor: C.bg },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingBottom: 100 },
+
+  // Hero with rounded top corners, flat bottom
   heroSection: {
-    shadowColor: '#000',
+    marginHorizontal: 0,
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
-    zIndex: 10,
-   // marginHorizontal:12,
   },
-  heroBackground: {
-    borderRadius:24,
+  heroGradient: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     paddingHorizontal: scale(20),
-    paddingTop: scale(16),
-    paddingBottom: scale(24),
+    paddingTop: scale(20),
+    paddingBottom: scale(28),
   },
+
+  // Single tab (only Posted Tasks)
   tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: scale(16),
-    padding: scale(4),
     marginBottom: scale(20),
   },
   tab: {
-    flex: 1,
-    borderRadius: scale(12),
+    backgroundColor: C.white,
+    borderRadius: scale(14),
     paddingVertical: scale(12),
-  },
-  activeTab: {
-    backgroundColor: '#FFFFFF' ,
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
   },
   tabContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: scale(8),
-  },
-  tabText: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: '#E0E7FF',
+    paddingHorizontal: scale(16),
   },
   activeTabText: {
-    color: '#4F46E5',
+    fontSize: scale(16),
     fontWeight: '700',
+    color: C.primary,
   },
   tabBadge: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: scale(8),
-    paddingVertical: scale(2),
+    backgroundColor: C.primary,
+    paddingHorizontal: scale(10),
+    paddingVertical: scale(3),
     borderRadius: scale(12),
-    minWidth: scale(24),
+    minWidth: scale(28),
     alignItems: 'center',
   },
   tabBadgeText: {
-    fontSize: scale(12),
+    fontSize: scale(13),
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.white,
   },
+
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,117 +357,70 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: scale(16),
     paddingHorizontal: scale(16),
-    borderWidth: scale(1),
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    height: scale(52),
   },
-  searchIcon: {
-    marginRight: scale(12),
-  },
+  searchIcon: { marginRight: scale(10) },
   searchInput: {
     flex: 1,
-    paddingVertical: scale(14),
     fontSize: scale(16),
-    color: '#FFFFFF',
+    color: C.white,
     fontWeight: '500',
   },
-  clearSearchButton: {
-    padding: scale(4),
-  },
+  clearSearchButton: { padding: scale(4) },
   filterButton: {
     width: scale(52),
     height: scale(52),
     borderRadius: scale(16),
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: scale(1),
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
   },
-  filterButtonActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  filterButtonHasFilters: {
-    borderColor: '#F59E0B',
-  },
-  filterIndicator: {
+  filterButtonActive: { backgroundColor: C.white, borderColor: C.white },
+  filterButtonHasFilters: { borderColor: C.gold },
+  filterDot: {
     position: 'absolute',
-    top: scale(10),
-    right: scale(10),
-    width: scale(6),
-    height: scale(6),
-    borderRadius: scale(3),
-    backgroundColor: '#F59E0B',
+    top: scale(8),
+    right: scale(8),
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
+    backgroundColor: C.gold,
   },
-  filterIndicatorText: {
-    fontSize: scale(12),
-    color: '#F59E0B',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: scale(20),
-    paddingBottom: scale(100),
-  },
-  statsSection: {
-    marginTop: scale(20),
-    marginBottom: scale(16),
-  },
-  filtersSection: {
-    marginBottom: scale(20),
-  },
-  taskListSection: {
-    marginTop: scale(8),
-  },
+
+  filtersSection: { marginTop: scale(16), marginBottom: scale(8) },
+  taskListSection: { marginTop: scale(20) },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: scale(16),
+    paddingHorizontal: scale(4),
   },
-  sectionTitle: {
-    fontSize: scale(18),
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  taskCount: {
-    color: '#6366F1',
-    fontWeight: '600',
-  },
+  sectionTitle: { fontSize: scale(18), fontWeight: '700', color: C.textPrimary },
+  taskCount: { color: C.primary, fontWeight: '600' },
   clearAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
     paddingHorizontal: scale(12),
     paddingVertical: scale(6),
     borderRadius: scale(20),
     gap: scale(4),
   },
-  clearAllText: {
-    fontSize: scale(12),
-    fontWeight: '600',
-    color: '#EF4444',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: scale(60),
-    paddingHorizontal: scale(40),
-  },
-  emptyTitle: {
-    fontSize: scale(20),
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: scale(20),
-    marginBottom: scale(8),
-  },
+  clearAllText: { fontSize: scale(12), fontWeight: '600', color: C.red },
+
+  emptyState: { alignItems: 'center', paddingVertical: scale(60), paddingHorizontal: scale(40) },
+  emptyTitle: { fontSize: scale(20), fontWeight: '700', color: C.textPrimary, marginTop: scale(20), marginBottom: scale(8) },
   emptyDescription: {
     fontSize: scale(15),
-    color: '#64748B',
+    color: C.textSecondary,
     textAlign: 'center',
     lineHeight: scale(22),
     marginBottom: scale(24),
@@ -671,27 +428,23 @@ const styles = StyleSheet.create({
   emptyActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: C.primary,
     paddingHorizontal: scale(24),
     paddingVertical: scale(14),
     borderRadius: scale(16),
     gap: scale(8),
   },
-  emptyActionText: {
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  emptyActionText: { fontSize: scale(16), fontWeight: '600', color: C.white },
+
   fab: {
     position: 'absolute',
     bottom: scale(24),
     right: scale(24),
-    shadowColor: '#6366F1',
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: scale(8),
     elevation: 8,
-    zIndex: 20,
   },
   fabGradient: {
     width: scale(60),

@@ -3,56 +3,44 @@ import { usePaystack } from "react-native-paystack-webview";
 import { Alert } from "react-native";
 import { initializeTaskPayment } from "../api/paymentApi";
 import { verifyTaskPayment } from "../api/paymentApi";
+import { setPaymentCallbacks, clearPaymentCallbacks } from './paymentCallbacks';
 
-
-export const triggerPayment = async ({ popup, email,phone, amount, taskId, beneficiary }) => {
-  try {
-    const initRes = await initializeTaskPayment();
-    const { reference } = initRes.data;
-
-    return new Promise((resolve) => {
-      popup.newTransaction({
-        email,
-        phone,
-        amount: amount,
-        reference,
-        onSuccess: async (res) => {
-        console.log("Payment Success!");
-
-          try {
-          const verifyRes = await verifyTaskPayment(reference,{
-           taskId,
-           beneficiary,
-           amount: amount ,
-           });
-           
-            if (verifyRes.status === 200) {
-              Alert.alert("Payment Successful", "Funds secured in escrow.");
-              resolve(true);
-            } else {
-              Alert.alert("Verification Failed", "We couldn’t verify this payment.");
-              resolve(false);
-            }
-          } catch (err) {
-            console.error("Verification Error:", err);
-            Alert.alert("Error", "Payment verification failed.");
-            resolve(false);
-          }
-        },
-        onCancel: () => {
-          Alert.alert("Payment Cancelled", "No funds were charged.");
-          resolve(false);
-        },
-        onError: (err) => {
-          console.error("Paystack Error:", err);
-          Alert.alert("Payment Error", "An issue occurred during payment.");
-          resolve(false);
-        },
-      });
-    });
-  } catch (err) {
-    console.error("Error starting payment:", err);
-    Alert.alert("Error", "Could not start payment.");
-    return false;
-  }
+export const triggerPayment = async ({ navigation,popup, email,phone, amount, taskId, beneficiary }) => {
+  return new Promise(async (resolve) => {
+     try {
+       const initRes = await initializeTaskPayment({ email, phone, amount });
+       const { authorization_url, reference } = initRes.data; 
+ 
+       const callbackId = reference; 
+ 
+      
+       setPaymentCallbacks(callbackId, {
+         onSuccess: (result) => {
+           clearPaymentCallbacks(callbackId);
+           resolve({ success: true, reference, ...result });
+         },
+         onCancel: () => {
+           clearPaymentCallbacks(callbackId);
+           resolve({ success: false, cancelled: true });
+         },
+         onError: () => {
+           clearPaymentCallbacks(callbackId);
+           resolve({ success: false });
+         },
+       });
+ 
+       navigation.navigate('PurchaseCredit', {
+         authorization_url,
+         reference,
+         callbackId,
+         callback_url: 'https://workaflow.vercel.app/order-success',
+         cancel_url:   'https://workaflow.vercel.app/',
+       });
+ 
+     } catch (err) {
+       console.error('Payment init error:', err);
+       Alert.alert('Error', 'Could not start payment.');
+       resolve({ success: false });
+     }
+   });
 };

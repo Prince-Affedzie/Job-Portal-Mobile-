@@ -24,6 +24,7 @@ import ServiceRequestOffersScreen from "../screens/poster/ServiceRequestOffersSc
 import EditServiceRequestScreen from "../screens/poster/EditServiceRequestScreen"
 import MyBookingsScreen from "../screens/poster/MyBookings"
 import BookingDetailScreen from "../screens/poster/BookingDetailScreen"
+import PurchaseScreen from '../screens/tasker/CreditPurchaseScreen'
 import { Ionicons } from "@expo/vector-icons";
 
 
@@ -54,6 +55,7 @@ function PosterStackNavigator() {
       <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
       <Stack.Screen name="ServiceRequestOffers" component={ServiceRequestOffersScreen} />
       <Stack.Screen name="EditServiceRequest" component={EditServiceRequestScreen} />
+      <Stack.Screen name="PurchaseCredit" component={PurchaseScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}

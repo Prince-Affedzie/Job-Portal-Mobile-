@@ -10,6 +10,7 @@ import { Video, ResizeMode } from 'expo-av';
 import moment from 'moment';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTaskerProfile } from '../../api/clientApi';
+import { navigate } from '../../services/navigationService';   // already imported
 
 const { width, height } = Dimensions.get('window');
 const BANNER_H = 240;
@@ -18,7 +19,7 @@ const AVATAR_OFFSET = AVATAR_SIZE / 2;
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  bg:        '#F7F5F0',      // warm parchment
+  bg:        '#F7F5F0',
   surface:   '#FFFFFF',
   card:      '#FEFEFE',
   charcoal:  '#1A1A2E',
@@ -225,6 +226,15 @@ export default function ApplicantProfileScreen({ route, navigation }) {
     { id: 'portfolio',  label: 'Portfolio', icon: 'images-outline' },
     { id: 'reviews',    label: 'Reviews',   icon: 'star-outline' },
   ];
+
+  // ── Book Now action ──────────────────────────────────────────────────────
+  const handleBookNow = () => {
+    // Navigate to search screen with this tasker pre‑selected
+    navigate('Booking', {
+          selectedTasker:profile
+         
+        });
+  };
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
@@ -456,7 +466,7 @@ export default function ApplicantProfileScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 120 }}   // extra space for the fixed button
       >
         {/* ── Banner + Avatar ──────────────────────────────────────────── */}
         <View style={ss.bannerWrap}>
@@ -470,12 +480,10 @@ export default function ApplicantProfileScreen({ route, navigation }) {
               />
             )
           }
-          {/* dark vignette at bottom so avatar lifts off it */}
           <LinearGradient
             colors={['transparent', 'rgba(10,10,20,0.55)']}
             style={ss.bannerVignette}
           />
-          {/* provider type tag */}
           <View style={ss.providerTag}>
             <Text style={ss.providerTagText}>
               {profile?.providerType === 'business' ? '🏢 Business' : '👤 Individual'}
@@ -571,6 +579,25 @@ export default function ApplicantProfileScreen({ route, navigation }) {
           {activeTab === 'reviews'   && <ReviewsTab />}
         </View>
       </Animated.ScrollView>
+
+      {/* ── Fixed Book Now button ─────────────────────────────────────── */}
+      <View style={ss.bookNowContainer}>
+        <TouchableOpacity
+          style={ss.bookNowButton}
+          onPress={handleBookNow}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={[C.inkMid, C.charcoal]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={ss.bookNowGradient}
+          >
+            <Ionicons name="calendar-outline" size={20} color={C.white} />
+            <Text style={ss.bookNowText}>Book This Tasker</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
       {/* ═══════════════════════════════════════════════════════════════
           MEDIA VIEWER MODAL
@@ -750,7 +777,7 @@ const ss = StyleSheet.create({
 
   // Tab bar
   tabBar: {
-    marginHorizontal: 16, marginTop: 20, marginBottom: 4,
+    marginHorizontal: 8, marginTop: 20, marginBottom: 4,
     backgroundColor: C.surface,
     borderRadius: 14,
     borderWidth: 1, borderColor: C.hairline,
@@ -758,7 +785,7 @@ const ss = StyleSheet.create({
     shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
     overflow: 'hidden',
   },
-  tabBarInner: { paddingHorizontal: 6, paddingVertical: 6, gap: 4, flexDirection: 'row' },
+  tabBarInner: {  paddingVertical: 6, gap:1, flexDirection: 'row' },
   tabBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 9,
@@ -847,7 +874,7 @@ const ss = StyleSheet.create({
     paddingBottom: 14,
   },
   portfolioThumb: {
-    width: (width - 42) / 2, // 2 columns with padding
+    width: (width - 42) / 2,
     aspectRatio: 0.85,
     borderRadius: 16, overflow: 'hidden',
     backgroundColor: C.hairline,
@@ -920,5 +947,39 @@ const ss = StyleSheet.create({
   },
   viewerDotActive: {
     width: 18, backgroundColor: C.white,
+  },
+
+  // Book Now button
+  bookNowContainer: {
+    position: 'absolute',
+    bottom: 18,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+    paddingTop: 12,
+    backgroundColor: '#ffff',
+  },
+  bookNowButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  bookNowGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  bookNowText: {
+    color: C.white,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

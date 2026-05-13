@@ -17,6 +17,7 @@ import Header from "../../component/tasker/Header";
 import { navigate } from "../../services/navigationService";
 import { bookingDetails, cancelBooking, markBookingCompleted } from "../../api/bookingApi";
 import { startOrGetChatRoom } from "../../api/chatApi";
+import RatingModal from '../../component/common/RatingModal';
 
 const { width } = Dimensions.get("window");
 const scale = (size) => (width / 375) * size;
@@ -139,6 +140,7 @@ const BookingDetailScreen = ({ route }) => {
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -209,13 +211,21 @@ const BookingDetailScreen = ({ route }) => {
         Alert.alert(
           "Success",
           `Completion initiated. Share this PIN with your tasker: ${pin}`,
-          [{ text: "OK", onPress: () => fetchBooking() }]
+          [{
+            text: "OK",
+            onPress: () => {
+              fetchBooking();                                    // refresh data
+              setTimeout(() => setRatingModalVisible(true), 800); // then show rating modal
+            }
+          }]
         );
+      
       } else {
         Alert.alert("Success", res.data?.message || "Operation completed.");
         fetchBooking();
       }
     } catch (error) {
+      console.log(error)
       Alert.alert("Error", error.response?.data?.message || "Failed to confirm completion.");
     } finally {
       setActionLoading(false);
@@ -407,6 +417,14 @@ const BookingDetailScreen = ({ route }) => {
             </View>
           </View>
         )}
+
+        <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => setRatingModalVisible(false)}
+        userId={booking.tasker.userId._id || booking.tasker.userId}
+        userName={ booking.tasker.businessName || booking.tasker.userId?.name }
+        userRole="tasker"
+       />
       </ScrollView>
 
       {/* ── Sticky Action Bar ── */}
@@ -456,8 +474,11 @@ const BookingDetailScreen = ({ route }) => {
               <Text style={styles.cancelBtnText}>Cancel Booking</Text>
             </TouchableOpacity>
           )}
+
+        
         </SafeAreaView>
       )}
+      
     </SafeAreaView>
   );
 };

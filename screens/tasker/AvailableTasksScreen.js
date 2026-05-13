@@ -327,7 +327,7 @@ const AvailableTasksScreen = () => {
           styles.tabText,
           activeTab === TAB_TYPES.AVAILABLE && styles.activeTabText
         ]}>
-          Available Tasks
+          Available Gigs
         </Text>
       </TouchableOpacity>
       
@@ -346,7 +346,7 @@ const AvailableTasksScreen = () => {
           styles.tabText,
           activeTab === TAB_TYPES.NEARBY && styles.activeTabText
         ]}>
-          Nearby Tasks
+          Nearby Gigs
         </Text>
       </TouchableOpacity>
       
@@ -455,13 +455,13 @@ const AvailableTasksScreen = () => {
             <Ionicons name="document-text-outline" size={64} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>
               {activeTab === TAB_TYPES.AVAILABLE 
-                ? "No tasks available" 
+                ? "No opportunities available" 
                 : "No nearby tasks"}
             </Text>
             <Text style={styles.emptyText}>
               {activeTab === TAB_TYPES.AVAILABLE
                 ? "Check back later for new opportunities"
-                : "No tasks found in your area"}
+                : "No opportunities found in your area"}
             </Text>
             {activeTab === TAB_TYPES.NEARBY && (
               <TouchableOpacity
@@ -483,8 +483,8 @@ const AvailableTasksScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.container}>
-          <Header title="Available Tasks" />
-          <LoadingIndicator text='Loading Tasks...' logoStyle="glow" />
+          <Header title="Opportunities For You" />
+          <LoadingIndicator text='Fetching Services that matches your skills...' logoStyle="glow" />
         </View>
       </SafeAreaView>
     );
@@ -493,7 +493,7 @@ const AvailableTasksScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-      <Header title="Available Tasks" />
+      <Header title="Opportunities For You" />
       
       <FlatList
         data={currentTasks}

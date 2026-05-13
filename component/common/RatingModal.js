@@ -1,5 +1,5 @@
 // components/RatingModal.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,81 +16,98 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { addRating } from '../../api/ratingApi'; 
+import { addRating } from '../../api/ratingApi';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ─── Theme (Pacific Indigo & Warm Gold) ──────────────────────────────────────
+const C = {
+  bg:           '#F8FAFF',
+  surface:      '#FFFFFF',
+  border:       '#E4E8EE',
+  primary:      '#1E3A6E',
+  primaryDark:  '#152C4F',
+  primaryGlow:  '#EBF5FF',
+  gold:         '#D49B3F',
+  goldLight:    '#FCF3E1',
+  green:        '#0F766E',
+  greenLight:   '#D1FAE5',
+  red:          '#DC2626',
+  redLight:     '#FEE2E2',
+  amber:        '#F59E0B',
+  textPrimary:  '#0F172A',
+  textSecondary:'#475569',
+  textMuted:    '#94A3B8',
+  white:        '#FFFFFF',
+};
 
 const RatingModal = ({
   visible,
   onClose,
   userId,
   userName,
-  userRole, // 'client' or 'tasker'
+  userRole,
   onRatingSuccess,
 }) => {
   const [selectedRating, setSelectedRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [animation] = useState(new Animated.Value(0));
+  const [starAnim] = useState(new Animated.Value(1));
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const scrollViewRef = useRef(null);
 
-  const starLabels = [
-    'Poor',
-    'Fair',
-    'Good',
-    'Very Good',
-    'Excellent'
-  ];
+  const starLabels = ['Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
 
-  const roleSpecificTitles = {
-    tasker: `Rate ${userName}`,
-    client: `Rate ${userName}`,
-    default: `Rate ${userName}`
-  };
-
-  const roleSpecificPlaceholders = {
-    tasker: 'Share your experience...',
-    client: 'Share your experience...',
-    default: 'Share your experience...'
-  };
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 55,
+        friction: 12,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      slideAnim.setValue(SCREEN_HEIGHT);
+    }
+  }, [visible]);
 
   const handleStarPress = (rating) => {
     setSelectedRating(rating);
-    Animated.spring(animation, {
-      toValue: 1,
-      tension: 100,
+    Animated.spring(starAnim, {
+      toValue: 1.1,
       friction: 3,
+      tension: 100,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      Animated.spring(starAnim, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }).start();
+    });
   };
 
   const handleSubmit = async () => {
     if (selectedRating === 0) {
-      Alert.alert('Rating Required', 'Please select a rating before submitting.');
+      Alert.alert('Rating Required', 'Please tap a star before submitting.');
       return;
     }
-
     setIsSubmitting(true);
     try {
       const response = await addRating(
         { rating: selectedRating, feedback: feedback.trim() },
         userId
       );
-
       if (response.status === 201) {
-        Alert.alert(
-          'Thanks!',
-          'Your rating has been submitted.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Thanks! 💛', 'Your rating has been submitted.');
         resetForm();
         onClose();
         if (onRatingSuccess) onRatingSuccess();
       }
     } catch (error) {
-      console.error('Rating submission error:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to submit rating. Please try again.';
-      Alert.alert('Error', errorMessage);
+      const msg = error.response?.data?.message || 'Failed to submit rating.';
+      Alert.alert('Error', msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,178 +117,176 @@ const RatingModal = ({
     setSelectedRating(0);
     setHoverRating(0);
     setFeedback('');
-    animation.setValue(0);
   };
 
   const handleClose = () => {
     if (selectedRating > 0 || feedback.trim()) {
-      Alert.alert(
-        'Discard Rating?',
-        'You have unsaved changes. Are you sure you want to close?',
-        [
-          { text: 'Keep Editing', style: 'cancel' },
-          { 
-            text: 'Discard', 
-            style: 'destructive',
-            onPress: () => {
-              resetForm();
-              onClose();
-            }
-          }
-        ]
-      );
+      Alert.alert('Discard Rating?', 'You have unsaved changes. Are you sure?', [
+        { text: 'Keep Editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: () => { resetForm(); onClose(); } },
+      ]);
     } else {
       onClose();
     }
   };
 
-  const scaleAnimation = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.1],
-  });
+  // Loading spinner
+  const spinValue = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000,
+        easing: require('react-native').Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+  const spin = spinValue.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="formSheet"
-      onRequestClose={handleClose}
-    >
-      <KeyboardAvoidingView 
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
-        {/* Header - Always visible */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.closeButton} 
-            onPress={handleClose}
-            disabled={isSubmitting}
-          >
-            <Ionicons name="close" size={22} color="#6B7280" />
-          </TouchableOpacity>
-          <Text style={styles.title}>
-            {roleSpecificTitles[userRole] || roleSpecificTitles.default}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
+      <View style={styles.overlay}>
+        {/* Backdrop to close modal */}
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleClose} />
+        
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={styles.keyboardView}
         >
-          {/* Rating Section */}
-          <View style={styles.ratingSection}>
-            <Animated.View style={[styles.starsContainer, { transform: [{ scale: scaleAnimation }] }]}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => handleStarPress(star)}
-                  onPressIn={() => setHoverRating(star)}
-                  onPressOut={() => setHoverRating(0)}
-                  disabled={isSubmitting}
-                  style={styles.starButton}
-                >
-                  <Ionicons
-                    name={
-                      star <= (hoverRating || selectedRating)
-                        ? 'star'
-                        : 'star-outline'
-                    }
-                    size={36}
-                    color={
-                      star <= (hoverRating || selectedRating)
-                        ? '#F59E0B'
-                        : '#D1D5DB'
-                    }
-                  />
-                </TouchableOpacity>
-              ))}
-            </Animated.View>
+          <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity style={styles.closeBtn} onPress={handleClose} disabled={isSubmitting}>
+                <Ionicons name="close" size={22} color={C.textSecondary} />
+              </TouchableOpacity>
+              <Text style={styles.title}>Rate {userName}</Text>
+              <View style={{ width: 32 }} />
+            </View>
 
-            {/* Rating Label */}
-            {selectedRating > 0 && (
-              <Text style={styles.ratingLabel}>
-                {starLabels[selectedRating - 1]}
-              </Text>
-            )}
-          </View>
-
-          {/* Feedback Section */}
-          <View style={styles.feedbackSection}>
-            <Text style={styles.feedbackLabel}>
-              Your feedback {selectedRating > 0 && `(${selectedRating}/5)`}
-            </Text>
-            <TextInput
-              style={[
-                styles.feedbackInput,
-                feedback.length > 0 && styles.feedbackInputFocused
-              ]}
-              value={feedback}
-              onChangeText={setFeedback}
-              placeholder={roleSpecificPlaceholders[userRole] || roleSpecificPlaceholders.default}
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              maxLength={300}
-              editable={!isSubmitting}
-              returnKeyType="done"
-            />
-            <Text style={styles.charCount}>
-              {feedback.length}/300
-            </Text>
-          </View>
-
-          {/* Quick Tips */}
-          <View style={styles.tipsSection}>
-            <Text style={styles.tipsTitle}>💡 Quick Tips</Text>
-            <Text style={styles.tipsText}>
-              • Be specific and constructive{'\n'}
-              • Focus on the work quality{'\n'}
-              • Help improve our community
-            </Text>
-          </View>
-        </ScrollView>
-
-        {/* Submit Button - Always visible and accessible */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (selectedRating === 0 || isSubmitting) && styles.submitButtonDisabled
-            ]}
-            onPress={handleSubmit}
-            disabled={selectedRating === 0 || isSubmitting}
-          >
-            {isSubmitting ? (
-              <View style={styles.loadingContainer}>
-                <Ionicons name="refresh" size={18} color="#FFFFFF" />
-                <Text style={styles.submitText}>Submitting...</Text>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+            >
+              {/* Star Rating */}
+              <View style={styles.ratingSection}>
+                <Text style={styles.promptText}>How was your experience?</Text>
+                <Animated.View style={[styles.starsRow, { transform: [{ scale: starAnim }] }]}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleStarPress(star)}
+                      onPressIn={() => setHoverRating(star)}
+                      onPressOut={() => setHoverRating(0)}
+                      disabled={isSubmitting}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={star <= (hoverRating || selectedRating) ? 'star' : 'star-outline'}
+                        size={44}
+                        color={star <= (hoverRating || selectedRating) ? C.gold : C.border}
+                        style={{ marginHorizontal: 6 }}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </Animated.View>
+                {selectedRating > 0 && (
+                  <Text style={styles.ratingLabel}>{starLabels[selectedRating - 1]}</Text>
+                )}
               </View>
-            ) : (
-              <>
-                <Ionicons name="star" size={18} color="#FFFFFF" />
-                <Text style={styles.submitText}>
-                  Submit {selectedRating > 0 && `${selectedRating}/5`}
+
+              {/* Feedback Input */}
+              <View style={styles.feedbackSection}>
+                <Text style={styles.feedbackLabel}>Share your thoughts (optional)</Text>
+                <TextInput
+                  style={styles.feedbackInput}
+                  value={feedback}
+                  onChangeText={setFeedback}
+                  placeholder="Tell us what went well, or what could be better…"
+                  placeholderTextColor={C.textMuted}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  maxLength={300}
+                  editable={!isSubmitting}
+                  returnKeyType="done"
+                />
+                <Text style={styles.charCount}>{feedback.length}/300</Text>
+              </View>
+
+              {/* Tips */}
+              <View style={styles.tipsCard}>
+                <View style={styles.tipsRow}>
+                  <Ionicons name="bulb-outline" size={16} color={C.gold} />
+                  <Text style={styles.tipsTitle}>Quick Tips</Text>
+                </View>
+                <Text style={styles.tipText}>
+                  • Be honest and constructive{'\n'}
+                  • Focus on the quality of work{'\n'}
+                  • Help build a trusted community
                 </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+              </View>
+
+              {/* Submit Button - now inside the scroll view */}
+              <TouchableOpacity
+                style={[styles.submitBtn, (selectedRating === 0 || isSubmitting) && styles.submitBtnDisabled]}
+                onPress={handleSubmit}
+                disabled={selectedRating === 0 || isSubmitting}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={selectedRating > 0 && !isSubmitting ? [C.primary, C.primaryDark] : [C.border, C.border]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitGradient}
+                >
+                  {isSubmitting ? (
+                    <View style={styles.submitContent}>
+                      <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                        <Ionicons name="sync-outline" size={18} color={C.white} />
+                      </Animated.View>
+                      <Text style={styles.submitText}>Submitting…</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.submitContent}>
+                      <Ionicons name="star" size={18} color={C.white} />
+                      <Text style={styles.submitText}>
+                        {selectedRating > 0 ? `Submit ${selectedRating}/5` : 'Submit Rating'}
+                      </Text>
+                    </View>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </ScrollView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    maxHeight: SCREEN_HEIGHT * 0.85, // Limit maximum height
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  keyboardView: {
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: C.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: SCREEN_HEIGHT * 0.85,   // ensures it never overflows screen
   },
   header: {
     flexDirection: 'row',
@@ -279,132 +294,129 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
+    backgroundColor: C.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: C.border,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
   },
-  closeButton: {
+  closeBtn: {
     padding: 4,
-    borderRadius: 6,
-  },
-  headerSpacer: {
-    width: 32,
+    borderRadius: 10,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
+    color: C.textPrimary,
   },
   scrollView: {
-    flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.75,   // leaves room for header
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 10,
+    padding: 24,
+    paddingBottom: 30,                 // extra space for the button
   },
   ratingSection: {
     alignItems: 'center',
-    marginBottom: 24,
-    paddingVertical: 8,
+    marginBottom: 32,
   },
-  starsContainer: {
+  promptText: {
+    fontSize: 16,
+    color: C.textSecondary,
+    marginBottom: 20,
+    fontWeight: '500',
+  },
+  starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  starButton: {
-    padding: 6,
-    marginHorizontal: 2,
-  },
   ratingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#F59E0B',
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.gold,
+    marginTop: 4,
   },
   feedbackSection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   feedbackLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
+    color: C.textPrimary,
+    marginBottom: 10,
   },
   feedbackInput: {
+    backgroundColor: C.surface,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderColor: C.border,
+    borderRadius: 14,
     padding: 14,
     fontSize: 15,
-    color: '#1F2937',
-    backgroundColor: '#F9FAFB',
+    color: C.textPrimary,
     minHeight: 100,
-    maxHeight: 120,
     textAlignVertical: 'top',
-  },
-  feedbackInputFocused: {
-    borderColor: '#6366F1',
-    backgroundColor: '#FFFFFF',
   },
   charCount: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: C.textMuted,
     textAlign: 'right',
     marginTop: 6,
   },
-  tipsSection: {
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#E2E8F0',
+  tipsCard: {
+    backgroundColor: C.goldLight,
+    borderRadius: 14,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: C.gold,
+    marginBottom: 24,                  // space before button
+  },
+  tipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
   },
   tipsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.primary,
+  },
+  tipText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 6,
+    color: C.textSecondary,
+    lineHeight: 20,
   },
-  tipsText: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
-  },
-  footer: {
-    padding: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#6366F1',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#6366F1',
+  submitBtn: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
+    bottom:18,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+  submitBtnDisabled: {
     shadowOpacity: 0,
     elevation: 0,
   },
-  loadingContainer: {
+  submitGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   submitText: {
-    color: '#FFFFFF',
+    color: C.white,
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
 

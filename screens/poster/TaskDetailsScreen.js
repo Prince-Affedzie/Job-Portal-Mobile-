@@ -11,7 +11,6 @@ import {
   SafeAreaView,
   Dimensions,
 } from 'react-native';
-//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from "../../component/tasker/Header";
@@ -26,6 +25,27 @@ import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
 import ClientRefundNoticeCard from '../../component/client/ClientRefundNoticeCard';
 
 const { width } = Dimensions.get('window');
+
+// ─── Theme: Pacific Indigo & Warm Gold ──────────────────────────────────────
+const C = {
+  bg:           '#F8FAFF',
+  surface:      '#FFFFFF',
+  border:       '#E4E8EE',
+  primary:      '#1E3A6E',
+  primaryDark:  '#152C4F',
+  primaryGlow:  '#EBF5FF',
+  gold:         '#D49B3F',
+  green:        '#0F766E',
+  greenLight:   '#D1FAE5',
+  red:          '#DC2626',
+  redLight:     '#FEE2E2',
+  purple:       '#7E3AF2',
+  purpleLight:  '#EDE9FE',
+  textPrimary:  '#0F172A',
+  textSecondary:'#475569',
+  textMuted:    '#94A3B8',
+  white:        '#FFFFFF',
+};
 
 const ClientTaskDetailScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
@@ -99,20 +119,20 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   };
 
   const handleEditTask = () => navigate('EditTask', { taskId, task });
-  const handleViewApplicants = () => navigation.navigate('TaskApplicants', { taskId: task._id, task, assignedTo: task.assignedTo });
+  const handleViewBids = () => navigation.navigate('TaskApplicants', { taskId: task._id, task, assignedTo: task.assignedTo });
   const handleViewSubmissions = () => navigation.navigate('TaskSubmissions', { taskId: task._id, taskTitle: task.title });
 
   const getStatusColor = (status) => {
     const map = {
-      open: '#10B981',
-      pending: '#F59E0B',
-      assigned: '#3B82F6',
-      'in-progress': '#F59E0B',
-      review: '#8B5CF6',
-      completed: '#10B981',
-      closed: '#6B7280',
+      open:      C.green,
+      pending:   C.gold,
+      assigned:  C.primary,
+      'in-progress': C.gold,
+      review:    C.purple,
+      completed: C.green,
+      closed:    C.textMuted,
     };
-    return map[status?.toLowerCase()] || '#6B7280';
+    return map[status?.toLowerCase()] || C.textMuted;
   };
 
   const formatDate = (date) => moment(date).format("MMM D, YYYY");
@@ -123,7 +143,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const canMarkAsDone = isInProgressPhase && !isCompleted && !task?.markedDoneByEmployer;
   const canMessage = isAssigned && !isCompleted;
   const canViewSubmissions = isAssigned;
-  const canEditTask = ['Open', 'Pending'].includes(task?.status); // NEW: Check if task can be edited
+  const canEditTask = ['Open', 'Pending'].includes(task?.status);
 
   if (loading && !refreshing) {
     return (
@@ -139,7 +159,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
       <SafeAreaView style={styles.container}>
         <Header title="Task Details" showBackButton />
         <View style={styles.emptyState}>
-          <Ionicons name="briefcase-outline" size={80} color="#CBD5E1" />
+          <Ionicons name="briefcase-outline" size={80} color={C.textMuted} />
           <Text style={styles.emptyTitle}>Task Not Found</Text>
           <Text style={styles.emptySubtitle}>This task may have been deleted or is no longer available.</Text>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -155,7 +175,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
       <Header title={task.title} showBackButton />
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[C.primary]} />}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Hero Section */}
@@ -169,13 +189,13 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Quick Info Grid - Fixed layout with proper spacing */}
+        {/* Quick Info Grid */}
         <View style={styles.infoGridContainer}>
           <Text style={styles.sectionHeader}>Task Details</Text>
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
-                <Ionicons name="cash-outline" size={20} color="#10B981" />
+                <Ionicons name="cash-outline" size={20} color={C.green} />
                 <Text style={styles.infoLabel}>Budget</Text>
               </View>
               <Text style={styles.infoValue}>₵{task.budget}</Text>
@@ -184,7 +204,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
-                <Ionicons name="calendar-outline" size={20} color="#F59E0B" />
+                <Ionicons name="calendar-outline" size={20} color={C.gold} />
                 <Text style={styles.infoLabel}>Deadline</Text>
               </View>
               <Text style={styles.infoValue}>{formatDate(task.deadline)}</Text>
@@ -193,7 +213,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
-                <Ionicons name="location-outline" size={20} color="#6366F1" />
+                <Ionicons name="location-outline" size={20} color={C.primary} />
                 <Text style={styles.infoLabel}>Location</Text>
               </View>
               <Text style={styles.infoValue}>
@@ -210,15 +230,14 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               )}
             </View>
 
-            {/* Applicants Count Card - NEW */}
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
-                <Ionicons name="people-outline" size={20} color="#8B5CF6" />
-                <Text style={styles.infoLabel}>Applicants</Text>
+                <Ionicons name="people-outline" size={20} color={C.purple} />
+                <Text style={styles.infoLabel}>Bids</Text>
               </View>
               <Text style={styles.infoValue}>{task.applicants?.length || 0}</Text>
               <Text style={styles.infoSubtext}>
-                {task.applicants?.length > 0 ? `${task.applicants.length} applied` : 'No applicants yet'}
+                {task.applicants?.length > 0 ? `${task.applicants.length} bids` : 'No bids yet'}
               </Text>
             </View>
           </View>
@@ -239,7 +258,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           >
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Assigned Tasker</Text>
-              <Ionicons name="chevron-forward" size={24} color="#94A3B8" />
+              <Ionicons name="chevron-forward" size={24} color={C.textMuted} />
             </View>
             <View style={styles.taskerRow}>
               <View style={styles.avatar}>
@@ -251,14 +270,14 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               </View>
               <View style={styles.taskerDetails}>
                 <Text style={styles.taskerName}>{task.assignedTo.name}</Text>
-                <Text style={styles.taskerName}>{task.assignedTo.phone}</Text>
+                <Text style={styles.taskerPhone}>{task.assignedTo.phone}</Text>
                 <View style={styles.taskerStats}>
                   <View style={styles.taskerStat}>
-                    <Ionicons name="star" size={16} color="#F59E0B" />
+                    <Ionicons name="star" size={16} color={C.gold} />
                     <Text style={styles.taskerStatText}>{task.assignedTo.rating?.toFixed(1) || 'New'}</Text>
                   </View>
                   <View style={styles.taskerStat}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Ionicons name="checkmark-circle" size={16} color={C.green} />
                     <Text style={styles.taskerStatText}>{task.assignedTo.completedTasks || '0'} completed</Text>
                   </View>
                 </View>
@@ -273,7 +292,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           {(task.requirements || []).length > 0 ? (
             task.requirements.map((req, i) => (
               <View key={i} style={styles.requirementItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={20} color={C.green} />
                 <Text style={styles.requirementText}>{req}</Text>
               </View>
             ))
@@ -295,52 +314,52 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Applicants Preview - Enhanced with more info */}
+        {/* Bids Preview (renamed from Applicants) */}
         {task.applicants?.length > 0 && !isCompleted && (
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
               <View>
-                <Text style={styles.sectionTitle}>Applicants</Text>
-                <Text style={styles.sectionSubtitle}>{task.applicants.length} people applied</Text>
+                <Text style={styles.sectionTitle}>Bids</Text>
+                <Text style={styles.sectionSubtitle}>{task.applicants.length} bid{task.applicants.length !== 1 ? 's' : ''} received</Text>
               </View>
-              <TouchableOpacity style={styles.viewAllButton} onPress={handleViewApplicants}>
+              <TouchableOpacity style={styles.viewAllButton} onPress={handleViewBids}>
                 <Text style={styles.linkText}>View all</Text>
-                <Ionicons name="chevron-forward" size={18} color="#6366F1" />
+                <Ionicons name="chevron-forward" size={18} color={C.primary} />
               </TouchableOpacity>
             </View>
             <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false} 
               style={{ marginTop: 16 }}
-              contentContainerStyle={styles.applicantsScrollContent}
+              contentContainerStyle={styles.bidsScrollContent}
             >
-              {task.applicants.slice(0, 6).map((applicant, i) => (
-                <View key={i} style={styles.applicantCard}>
-                  <View style={styles.applicantAvatar}>
-                    <Text style={styles.applicantInitial}>
-                      {applicant.name?.[0]?.toUpperCase() || 'A'}
+              {task.applicants.slice(0, 6).map((bidder, i) => (
+                <View key={i} style={styles.bidderCard}>
+                  <View style={styles.bidderAvatar}>
+                    <Text style={styles.bidderInitial}>
+                      {bidder.name?.[0]?.toUpperCase() || 'A'}
                     </Text>
                   </View>
-                  <Text style={styles.applicantName} numberOfLines={1}>
-                    {applicant.name || 'Applicant'}
+                  <Text style={styles.bidderName} numberOfLines={1}>
+                    {bidder.name || 'Bidder'}
                   </Text>
-                  {applicant.appliedDate && (
-                    <Text style={styles.applicantDate}>
-                      {moment(applicant.appliedDate).fromNow()}
+                  {bidder.appliedDate && (
+                    <Text style={styles.bidderDate}>
+                      {moment(bidder.appliedDate).fromNow()}
                     </Text>
                   )}
                 </View>
               ))}
               {task.applicants.length > 6 && (
-                <TouchableOpacity style={styles.moreApplicantsCard} onPress={handleViewApplicants}>
-                  <Text style={styles.moreApplicantsText}>+{task.applicants.length - 6} more</Text>
+                <TouchableOpacity style={styles.moreBiddersCard} onPress={handleViewBids}>
+                  <Text style={styles.moreBiddersText}>+{task.applicants.length - 6} more</Text>
                 </TouchableOpacity>
               )}
             </ScrollView>
           </View>
         )}
 
-        {/* Completion Progress (if assigned) */}
+        {/* Completion Progress */}
         {isInProgressPhase && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Completion Progress</Text>
@@ -351,7 +370,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   task.markedDoneByEmployer && styles.progressDotCompleted
                 ]}>
                   {task.markedDoneByEmployer && (
-                    <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                    <Ionicons name="checkmark" size={12} color={C.white} />
                   )}
                 </View>
                 <View style={styles.progressContent}>
@@ -377,7 +396,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
                   task.markedDoneByTasker && styles.progressDotCompleted
                 ]}>
                   {task.markedDoneByTasker && (
-                    <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                    <Ionicons name="checkmark" size={12} color={C.white} />
                   )}
                 </View>
                 <View style={styles.progressContent}>
@@ -398,7 +417,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             
             {task.markedDoneByEmployer && task.markedDoneByTasker && (
               <View style={styles.completionSuccess}>
-                <Ionicons name="checkmark-done" size={20} color="#10B981" />
+                <Ionicons name="checkmark-done" size={20} color={C.green} />
                 <Text style={styles.completionSuccessText}>
                   Task completed successfully!
                 </Text>
@@ -406,61 +425,57 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             )}
           </View>
         )}
-
-        
       </ScrollView>
+
       <ClientRefundNoticeCard task={task} isTaskOwner={true} />
 
-      {/* Bottom Action Bar - Clean & Professional */}
+      {/* Bottom Action Bar */}
       <View style={styles.bottomActionBar}>
-        {/* Primary Actions - Full Width */}
         <View style={styles.primaryActions}>
           {canMessage && (
             <TouchableOpacity style={styles.primaryButton} onPress={handleMessageTasker}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
+              <Ionicons name="chatbubble-ellipses" size={20} color={C.white} />
               <Text style={styles.primaryButtonText}>Message Tasker</Text>
             </TouchableOpacity>
           )}
 
           {canMarkAsDone && (
             <TouchableOpacity style={[styles.primaryButton, styles.completeButton]} onPress={handleMarkAsDone}>
-              <Ionicons name="checkmark-done" size={20} color="#FFF" />
+              <Ionicons name="checkmark-done" size={20} color={C.white} />
               <Text style={styles.primaryButtonText}>Mark as Completed</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Secondary Actions - Compact Icons */}
         <View style={styles.secondaryActions}>
-          {/* Edit Button - Only shows when task is Open or Pending */}
           {canEditTask && (
             <TouchableOpacity style={styles.actionItem} onPress={handleEditTask}>
-              <Ionicons name="create-outline" size={24} color="#6366F1" />
+              <Ionicons name="create-outline" size={24} color={C.primary} />
               <Text style={styles.actionLabel}>Edit</Text>
             </TouchableOpacity>
           )}
 
           {task.applicants?.length > 0 && !isCompleted && (
-            <TouchableOpacity style={styles.actionItem} onPress={handleViewApplicants}>
-              <View style={styles.applicantBadge}>
-                <Text style={styles.applicantBadgeText}>{task.applicants.length}</Text>
+            <TouchableOpacity style={styles.actionItem} onPress={handleViewBids}>
+              <View style={styles.bidBadge}>
+                <Text style={styles.bidBadgeText}>{task.applicants.length}</Text>
               </View>
-              <Ionicons name="people-outline" size={24} color="#6366F1" />
-              <Text style={styles.actionLabel}>Applicants</Text>
+              <Ionicons name="people-outline" size={24} color={C.primary} />
+              <Text style={styles.actionLabel}>Bids</Text>
             </TouchableOpacity>
           )}
 
           {canViewSubmissions && (
             <TouchableOpacity style={styles.actionItem} onPress={handleViewSubmissions}>
-              <Ionicons name="document-attach-outline" size={24} color="#6366F1" />
+              <Ionicons name="document-attach-outline" size={24} color={C.primary} />
               <Text style={styles.actionLabel}>Submissions</Text>
             </TouchableOpacity>
           )}
 
           {isInProgressPhase && (
             <TouchableOpacity style={styles.actionItem} onPress={() => setShowReportModal(true)}>
-              <Ionicons name="flag-outline" size={24} color="#EF4444" />
-              <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Report</Text>
+              <Ionicons name="flag-outline" size={24} color={C.red} />
+              <Text style={[styles.actionLabel, { color: C.red }]}>Report</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -485,28 +500,33 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  container: { flex: 1, backgroundColor: C.bg },
   scrollContent: { paddingBottom: 160 },
 
   // Hero
   heroCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     margin: 16,
     padding: 20,
     borderRadius: 20,
-    shadowColor: '#000',
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 6,
   },
-  title: { fontSize: 21, fontWeight: '800', color: '#1E293B', marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: '800', color: C.textPrimary, marginBottom: 10 },
   statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
-  statusText: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
-  metaText: { fontSize: 14, color: '#64748B' },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.textPrimary,
+    textTransform: 'capitalize',
+  },
+  metaText: { fontSize: 14, color: C.textSecondary },
 
-  // Info Grid - Fixed to prevent overlapping
+  // Info Grid
   infoGridContainer: {
     paddingHorizontal: 16,
     marginBottom: 20,
@@ -514,9 +534,8 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E293B',
+    color: C.textPrimary,
     marginBottom: 12,
-    marginLeft: 4,
   },
   infoGrid: {
     flexDirection: 'row',
@@ -524,13 +543,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   infoItem: {
-    width: (width - 44) / 2, // 16*2 padding + 12 gap = 44, divided by 2 columns
-    backgroundColor: '#FFFFFF',
+    width: (width - 44) / 2,
+    backgroundColor: C.surface,
     padding: 16,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 3,
     marginBottom: 12,
@@ -543,7 +564,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: { 
     fontSize: 12, 
-    color: '#64748B', 
+    color: C.textSecondary, 
     fontWeight: '600', 
     textTransform: 'uppercase',
     flex: 1,
@@ -551,39 +572,40 @@ const styles = StyleSheet.create({
   infoValue: { 
     fontSize: 22, 
     fontWeight: '800', 
-    color: '#1E293B', 
+    color: C.textPrimary, 
     marginBottom: 4,
   },
   infoSubtext: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: C.textMuted,
     lineHeight: 16,
     marginTop: 2,
   },
 
   // Section Cards
   sectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 20,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 4,
   },
-  sectionTitle: { fontSize: 19, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  sectionTitle: { fontSize: 19, fontWeight: '700', color: C.textPrimary, marginBottom: 8 },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: C.textSecondary,
     marginTop: 2,
   },
-  description: { fontSize: 15.5, color: '#475569', lineHeight: 24, marginBottom: 16 },
-  placeholderText: { fontSize: 15, color: '#94A3B8', fontStyle: 'italic' },
+  description: { fontSize: 15.5, color: C.textSecondary, lineHeight: 24, marginBottom: 16 },
+  placeholderText: { fontSize: 15, color: C.textMuted, fontStyle: 'italic' },
 
-  // Section Header Row
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -595,7 +617,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  linkText: { fontSize: 15, color: '#6366F1', fontWeight: '600' },
+  linkText: { fontSize: 15, color: C.primary, fontWeight: '600' },
 
   // Requirements
   requirementItem: { 
@@ -607,7 +629,7 @@ const styles = StyleSheet.create({
   requirementText: { 
     flex: 1, 
     fontSize: 15, 
-    color: '#475569', 
+    color: C.textSecondary, 
     lineHeight: 22 
   },
   skillsContainer: { 
@@ -617,16 +639,16 @@ const styles = StyleSheet.create({
     marginTop: 8 
   },
   skillPill: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: C.primaryGlow,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: C.primary + '30',
   },
   skillText: { 
     fontSize: 13, 
-    color: '#6366F1', 
+    color: C.primary, 
     fontWeight: '600' 
   },
 
@@ -640,7 +662,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#6366F1',
+    backgroundColor: C.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -650,7 +672,7 @@ const styles = StyleSheet.create({
     borderRadius: 32 
   },
   avatarInitial: { 
-    color: '#FFF', 
+    color: C.white, 
     fontSize: 26, 
     fontWeight: '700' 
   },
@@ -660,7 +682,12 @@ const styles = StyleSheet.create({
   taskerName: { 
     fontSize: 18, 
     fontWeight: '700', 
-    color: '#1E293B',
+    color: C.textPrimary,
+    marginBottom: 4,
+  },
+  taskerPhone: {
+    fontSize: 14,
+    color: C.textSecondary,
     marginBottom: 8,
   },
   taskerStats: {
@@ -674,59 +701,59 @@ const styles = StyleSheet.create({
   },
   taskerStatText: {
     fontSize: 14,
-    color: '#64748B',
+    color: C.textSecondary,
   },
 
-  // Applicants Preview - Enhanced
-  applicantsScrollContent: {
+  // Bids Preview (renamed)
+  bidsScrollContent: {
     paddingRight: 16,
   },
-  applicantCard: {
+  bidderCard: {
     alignItems: 'center',
     marginRight: 16,
     width: 80,
   },
-  applicantAvatar: {
+  bidderAvatar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#C7D2FE',
+    backgroundColor: C.primaryGlow,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
-  applicantInitial: { 
-    color: '#4F46E5', 
+  bidderInitial: { 
+    color: C.primary, 
     fontSize: 18, 
     fontWeight: '700' 
   },
-  applicantName: {
+  bidderName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569',
+    color: C.textSecondary,
     textAlign: 'center',
     marginBottom: 2,
   },
-  applicantDate: {
+  bidderDate: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: C.textMuted,
     textAlign: 'center',
   },
-  moreApplicantsCard: {
+  moreBiddersCard: {
     width: 80,
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: C.bg,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: C.border,
     borderStyle: 'dashed',
     marginTop: 8,
   },
-  moreApplicantsText: {
+  moreBiddersText: {
     fontSize: 13,
-    color: '#64748B',
+    color: C.textSecondary,
     fontWeight: '600',
   },
 
@@ -743,13 +770,13 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: C.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 2,
   },
   progressDotCompleted: {
-    backgroundColor: '#10B981',
+    backgroundColor: C.green,
   },
   progressContent: {
     flex: 1,
@@ -757,27 +784,27 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#64748B',
+    color: C.textSecondary,
     marginBottom: 2,
   },
   progressLabelCompleted: {
-    color: '#10B981',
+    color: C.green,
   },
   progressDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: C.textMuted,
   },
   progressLine: {
     width: 2,
     height: 20,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: C.border,
     marginLeft: 11,
   },
   completionSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: C.greenLight,
     padding: 12,
     borderRadius: 12,
     marginTop: 16,
@@ -785,7 +812,7 @@ const styles = StyleSheet.create({
   completionSuccessText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#065F46',
+    color: C.green,
   },
 
   // Bottom Action Bar
@@ -794,12 +821,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.surface,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 44,
     borderTopWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: C.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -812,24 +839,24 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#3B82F6',
+    backgroundColor: C.primary,
     paddingVertical: 16,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 10,
-    shadowColor: '#3B82F6',
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   completeButton: { 
-    backgroundColor: '#10B981', 
-    shadowColor: '#10B981' 
+    backgroundColor: C.green, 
+    shadowColor: C.green 
   },
   primaryButtonText: { 
-    color: '#FFFFFF', 
+    color: C.white, 
     fontSize: 16.5, 
     fontWeight: '700' 
   },
@@ -844,11 +871,11 @@ const styles = StyleSheet.create({
     gap: 6,
     position: 'relative',
   },
-  applicantBadge: {
+  bidBadge: {
     position: 'absolute',
     top: -8,
     right: -2,
-    backgroundColor: '#EF4444',
+    backgroundColor: C.red,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -857,14 +884,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex: 1,
   },
-  applicantBadgeText: {
+  bidBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: C.white,
   },
   actionLabel: { 
     fontSize: 12, 
-    color: '#475569', 
+    color: C.textSecondary, 
     fontWeight: '600' 
   },
 
@@ -878,23 +905,23 @@ const styles = StyleSheet.create({
   emptyTitle: { 
     fontSize: 22, 
     fontWeight: '700', 
-    color: '#1E293B', 
+    color: C.textPrimary, 
     marginTop: 20 
   },
   emptySubtitle: { 
     fontSize: 16, 
-    color: '#64748B', 
+    color: C.textSecondary, 
     textAlign: 'center', 
     marginVertical: 12 
   },
   backBtn: { 
-    backgroundColor: '#6366F1', 
+    backgroundColor: C.primary, 
     paddingHorizontal: 28, 
     paddingVertical: 14, 
     borderRadius: 14 
   },
   backBtnText: { 
-    color: '#FFF', 
+    color: C.white, 
     fontSize: 16, 
     fontWeight: '600' 
   },

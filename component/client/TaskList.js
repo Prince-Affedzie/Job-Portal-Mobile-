@@ -330,7 +330,7 @@ const TaskList = ({
             <View style={styles.detailItem}>
               <Ionicons name="people-outline" size={16} color="#666" />
               <Text style={styles.detailText}>
-                {isRequested ? `${responseCount} offer(s)` : `${responseCount} applicant(s)`}
+                {isRequested ? `${responseCount} offer(s)` : `${responseCount} Bid(s) received`}
               </Text>
             </View>
           </View>
@@ -397,14 +397,7 @@ const TaskList = ({
 
   return (
     <View style={styles.tasksSection}>
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>
-          {filteredTasks.length} {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Found
-        </Text>
-        <Text style={styles.resultsSubtitle}>
-          {activeTab === 'posted' ? 'Public Posted Tasks' : 'Private Service Requests'}
-        </Text>
-      </View>
+      
 
       {filteredTasks.length > 0 ? (
         <FlatList

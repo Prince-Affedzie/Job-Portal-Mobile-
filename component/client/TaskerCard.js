@@ -160,7 +160,7 @@ const TaskerCard = ({ tasker, isSelected, onSelect, onViewProfile }) => {
             ) : (
               <>
                 <Ionicons name="calendar-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.selectBtnText}>Book Now</Text>
+                <Text style={styles.selectBtnText}>Select</Text>
               </>
             )}
           </TouchableOpacity>
