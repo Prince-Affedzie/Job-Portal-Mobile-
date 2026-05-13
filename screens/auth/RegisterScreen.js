@@ -26,7 +26,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 
-const WorkaFlowLogo = require('../../assets/Logominimal(2).png');
+const WorkaFlowLogo = require('../../assets/workaflow_icon.png');
 const GoogleLogo    = require('../../assets/Google-logo.png');
 
 const { width } = Dimensions.get('window');
@@ -622,11 +622,12 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
   },
-  logo:     { width: 48, height: 48 },
+  logo:     { width: 68, height: 68 },
   logoGlow: {
     position: 'absolute', width: 72, height: 72, borderRadius: 20,
     backgroundColor: C.primaryGlow,
     top: 0, left: 0,
+    zIndex: -1,
   },
   headline: { fontSize: 28, fontWeight: '800', color: C.textPrimary, letterSpacing: -0.6, marginBottom: 6 },
   tagline:  { fontSize: 14, color: C.textSecondary, textAlign: 'center' },

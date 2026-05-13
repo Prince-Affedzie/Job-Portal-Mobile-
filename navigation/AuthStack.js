@@ -4,7 +4,6 @@ import LoginScreen from "../screens/auth/LoginScreen";
 import RegisterScreen from "../screens/auth/RegisterScreen";
 import ClientOnboarding from '../screens/auth/ClientOnboarding'
 import TaskerOnboarding from '../screens/auth/TaskerOnboarding'
-import TaskerOnboardingStack from './TaskerOnboardingStack'
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen'
 import VerifyResetScreen from '../screens/auth/VerifyResetScreen'
 import TaskerStack from "./TaskerStack";

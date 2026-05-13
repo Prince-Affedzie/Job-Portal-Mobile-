@@ -77,7 +77,7 @@ const HeroSection = ({
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top -12 }]}>
       <LinearGradient
-        colors={['#1A1F3B', '#2D1B69', '#4A4F8C']}
+        colors={['#1A1F3B', '#1A2744', '#243458']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.cardContainer}

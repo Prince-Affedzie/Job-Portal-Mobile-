@@ -18,7 +18,7 @@ import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import LoginScreen from "../screens/auth/LoginScreen";
 
 
-import TaskerOnboardingStack from './TaskerOnboardingStack'
+
 import TaskPosterOnboarding from "../screens/auth/ClientOnboarding";
 import { AuthContext } from "../context/AuthContext";
 import { navigationRef } from '../services/navigationService';
@@ -69,7 +69,7 @@ export default function RootNavigator() {
 
         {/* Shared/global routes */}
          <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="TaskerOnboarding" component={TaskerOnboardingStack} />
+        
         <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
         <Stack.Screen 
            name="ChatWindow" 

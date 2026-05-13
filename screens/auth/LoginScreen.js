@@ -23,7 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
-const WorkaFlowLogo = require('../../assets/Logominimal(2).png');
+const WorkaFlowLogo = require('../../assets/workaflow_icon.png');
 const GoogleLogo    = require('../../assets/Google-logo.png');
 const { width }     = Dimensions.get('window');
 

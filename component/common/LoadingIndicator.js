@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const WorkaFlowLogo = require('../../assets/Logominimal(2).png');
+const WorkaFlowLogo = require('../../assets/workaflow_icon.png');
 const { width, height } = Dimensions.get('window');
 
 const LoadingIndicator = ({
