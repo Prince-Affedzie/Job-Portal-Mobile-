@@ -25,6 +25,10 @@ import {
 import { startOrGetChatRoom } from '../../api/chatApi';
 import { TaskerContext } from '../../context/TaskerContext';
 import { AuthContext } from '../../context/AuthContext';
+import {triggerCreditPurchase} from '../../services/creditPurchaseService'
+import {CreditSheet} from '../../component/tasker/CreditPackages'
+import { verifyCreditPurchase} from '../../api/paymentApi';
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 const scale = (size) => (width / 375) * size;
@@ -67,6 +71,9 @@ export default function TaskerBookingDetailScreen({ route }) {
   const { bookingId } = route.params;
   const { tasker, fetchTasker } = useContext(TaskerContext);
   const { user } = useContext(AuthContext);
+  const navigation = useNavigation(); 
+  const [showCreditSheet, setShowCreditSheet] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -110,16 +117,48 @@ export default function TaskerBookingDetailScreen({ route }) {
 
   const chatAllowed = canChat();
 
+
+
+  const handleCreditPurchase = async (pkg) => {
+    if (purchasing) return;
+    setPurchasing(true);
+    try {
+      const result = await triggerCreditPurchase({
+        navigation,
+        email: user.email,
+        phone: user.phone,
+        amount: pkg.price,
+      });
+
+      if (result.success) {
+        // Verify the payment on backend
+        const verifyRes = await verifyCreditPurchase(result.reference);
+        if (verifyRes.status === 200) {
+          setShowCreditSheet(false);
+          Alert.alert('Success', `${pkg.credits} credits added to your account!`);
+          await fetchTasker(); // refresh credits
+        } else {
+          Alert.alert('Error', verifyRes.message || 'Verification failed. Please contact support.');
+        }
+      } else if (result.cancelled) {
+        // user cancelled – do nothing, bottom sheet stays open
+      } else {
+        Alert.alert('Error', 'Payment failed. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', error.message || 'Something went wrong.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleUnlock = () => {
     if (!tasker || tasker.credits < 3) {
-      Alert.alert(
-        'Insufficient Credits',
-        `You need 3 credits to unlock this booking. Your current balance is ${tasker?.credits || 0}.`,
-        [{ text: 'OK' }]
-      );
+      setShowCreditSheet(true);
       return;
     }
+
     Alert.alert(
       'Unlock Booking',
       'This will use 3 credits and allow you to see client details and accept the booking.',
@@ -524,6 +563,13 @@ export default function TaskerBookingDetailScreen({ route }) {
           )}
         </SafeAreaView>
       )}
+
+      <CreditSheet
+        visible={showCreditSheet}
+        onClose={() => setShowCreditSheet(false)}
+        onSelect={handleCreditPurchase}
+        purchasing={purchasing}
+      />
     </SafeAreaView>
   );
 }

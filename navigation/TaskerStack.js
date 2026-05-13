@@ -22,6 +22,7 @@ import BidDetailsScreen from "../screens/tasker/BidDetailsScreen";
 import TaskerProfileDetailScreen from '../screens/tasker/TaskerProfileDetails'
 import TaskerBookingsScreen from '../screens/tasker/TaskerBookingScreen'
 import TaskerBookingDetailScreen from '../screens/tasker/BookingDetailScreen'
+import PurchaseScreen from '../screens/tasker/CreditPurchaseScreen'
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -49,6 +50,7 @@ function TaskerStackNavigator() {
       <Stack.Screen name="ServiceRequestDetail" component={ServiceRequestDetailScreen} />
       <Stack.Screen name="TaskerProfileDetail" component={TaskerProfileDetailScreen} />
       <Stack.Screen name="BookingDetail" component={TaskerBookingDetailScreen} />
+      <Stack.Screen name="PurchaseCredit" component={PurchaseScreen} />
       
       {/* Chat should be in stack since it's already in tabs */}
       {/* <Stack.Screen name="Chat" component={ChatScreen} /> */}
@@ -87,10 +89,10 @@ function TaskerTabs() {
           name="AvailableTasks"
           component={AvailableTasksScreen}
           options={{
-            tabBarLabel: 'Available',
+            tabBarLabel: 'For You',
             tabBarIcon: ({ color, size, focused }) => (
               <Ionicons
-                name={focused ? "list" : "list-outline"}
+                name={focused ? "compass" : "compass-outline"}
                 color={color}
                 size={size}
               />
