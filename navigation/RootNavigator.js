@@ -42,10 +42,7 @@ export default function RootNavigator() {
     return () => clearTimeout(timer);
   }, [loading]);
 
-  if (isSplashVisible) {
-    return <SplashScreen onAnimationComplete={() => {}} />
-  }
-
+  
  return (
    <SafeAreaProvider>
     <NotificationProvider>

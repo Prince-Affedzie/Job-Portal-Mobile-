@@ -14,7 +14,11 @@ export const taskerProfileUpdate =(data)=>
 export const taskerGetMyProfile = ()=>
     API.get('/api/tasker/my_profile')
 
-export const uploadPortfolioFiles = (data) => API.post("/api/user/upload_portfolio", data);
+export const uploadPortfolioFiles = (data) => 
+  API.post("/api/user/upload_portfolio", data,{
+     headers: { "Content-Type": "multipart/form-data" },
+  });
+  
 export const addWorkSampleToProfile = (data)=>API.post('/api/h1/v2/add_work_sample_to_profile',data)
 export const removeWorkSampleFromProfile = (sampleId)=>API.delete(`/api/h1/v2/remove_work_sample_from_profile/${sampleId}`)
 

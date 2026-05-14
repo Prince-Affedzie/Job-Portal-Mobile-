@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
 
   // Hero with rounded top corners, flat bottom
   heroSection: {
-    marginHorizontal: 0,
+    marginHorizontal: 8,
     shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

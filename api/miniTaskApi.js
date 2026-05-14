@@ -5,6 +5,9 @@ export const postMiniTask = (data) => API.post("/api/h1/v2/post_mini_task", data
 export const getMiniTasks = (filters) =>
   API.get("/api/h1/v2/get/mini_tasks", { params: filters });
 
+export const getPublicTasks =(filters)=>
+  API.get("/api/h1/v2/get/public_tasks", { params: filters });
+
 export const getMiniTaskInfo = (id) => API.get(`/api/h1/v2/get_min_task_info/${id}`);
 
 export const getMiniTasksPosted = () =>

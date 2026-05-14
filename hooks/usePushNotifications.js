@@ -108,8 +108,7 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
 
-    if (finalStatus !== "granted") {
-      Alert.alert("Permission required", "Enable push notifications in settings.");
+    if (finalStatus !== "granted") {  
       return null;
     }
 

@@ -483,8 +483,8 @@ const AvailableTasksScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.container}>
-          <Header title="Opportunities For You" />
-          <LoadingIndicator text='Fetching Services that matches your skills...' logoStyle="glow" />
+          <Header title="Gigs For You" />
+          <LoadingIndicator text='Fetching Gigs that matches your skills...' logoStyle="glow" />
         </View>
       </SafeAreaView>
     );
@@ -493,7 +493,7 @@ const AvailableTasksScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
-      <Header title="Opportunities For You" />
+      <Header title="Gigs For You" />
       
       <FlatList
         data={currentTasks}

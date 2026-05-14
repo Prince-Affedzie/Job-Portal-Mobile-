@@ -487,6 +487,26 @@ export default function TaskerProfileScreen({ navigation }) {
           delay={300}
           onPress={handleSwitch}
         />
+
+        <NavCard
+          icon="albums-outline"
+          label="Work Samples"
+          sublabel="Manage your work samples"
+          accent={T.accentTeal}
+          delay={340}
+          onPress={() => navigate('TaskerPortfolio')}
+        />
+       
+
+        <NavCard
+          icon="construct-outline"
+          label="Services"
+          sublabel="Manage the services you offer"
+          accent={T.accentTeal}
+          delay={340}
+          onPress={() => navigate('TaskerServices')}
+        />
+       
         <NavCard
           icon="cash-outline"
           label="Earnings"
