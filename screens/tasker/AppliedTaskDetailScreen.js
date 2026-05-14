@@ -212,7 +212,7 @@ const formatFullAddress = (address) => {
 
   const formatDate = (date) => moment(date).format("MMM D, YYYY");
 
-  const isAssignedToUser = task?.assignedTo && String(task.assignedTo) === String(user?._id);
+  const isAssignedToUser = task?.assignedTo && String(task.assignedTo.userId) === String(user?._id);
   const isAssignmentPending = isAssignedToUser && task?.assignmentAccepted === false;
   const isTaskCompleted = task?.status?.toLowerCase() === 'completed';
   const canSubmitWork = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;

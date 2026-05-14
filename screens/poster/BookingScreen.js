@@ -407,7 +407,7 @@ export default function BookingScreen({ route }) {
       }
 
       const payload = {
-        tasker:        taskerProfile.userId?._id || taskerProfile._id,
+        tasker:         taskerProfile._id,
         service:       selectedService.serviceId || selectedService._id,
         description:   description.trim(),
         address:       routeLocation || { suburb: address, city: address, region: address },
