@@ -225,7 +225,7 @@ const EditTaskScreen = ({ route, navigation }) => {
       };
 
       const result = await editMiniTask(taskId, taskData);
-      
+      console.log(result)
       if (result.status === 200) {
         Alert.alert('Success', 'Task updated successfully!', [
           { text: 'OK', onPress: () => navigation.goBack() }
@@ -610,7 +610,7 @@ const EditTaskScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2D325D',
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,

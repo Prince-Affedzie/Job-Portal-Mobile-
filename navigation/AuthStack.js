@@ -10,6 +10,8 @@ import TaskerStack from "./TaskerStack";
 import PosterStack from "./PosterStack";
 import TaskerOnboardingScreen from '../screens/auth/TaskerOnboarding'
 import  GuestScreen from '../screens/auth/GuestScreen'
+import PrivacyPolicyScreen from '../screens/auth/PrivacyPolicyScreen'
+import TermsOfServiceScreen from '../screens/auth/ServiceTermsScreen'
 
 
 const Stack = createNativeStackNavigator();
@@ -25,6 +27,8 @@ export default function AuthStack() {
        <Stack.Screen name="TaskerStack" component={TaskerStack} />
        <Stack.Screen name="PosterStack" component={PosterStack} />
        <Stack.Screen name="OnboardTasker" component={TaskerOnboardingScreen}/>
+       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen}/>
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen}/>
     </Stack.Navigator>
   );
 }

@@ -71,8 +71,8 @@ export const PosterProvider = ({ children }) => {
   const editMiniTask = async(taskId, data)=>{
     try{
       const response = await updateMiniTask(taskId,data)
+      console.log(response)
       return response
-
     }catch(err){
         console.log(err)
     }

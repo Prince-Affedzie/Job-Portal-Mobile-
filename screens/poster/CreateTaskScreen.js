@@ -885,7 +885,7 @@ const handleSuburbChange = useCallback((text) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2D325D',
+    backgroundColor: '#F8FAFC',
   },
   scrollView: {
     flex: 1,
