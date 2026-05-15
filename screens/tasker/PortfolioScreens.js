@@ -13,6 +13,7 @@ import {
   addWorkSampleToProfile,
   removeWorkSampleFromProfile,
 } from '../../api/taskerApi';
+import { sendFileToS3 } from '../../api/commonApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 16 * 2 - 12) / 2; // 2-col grid with gaps
@@ -48,7 +49,7 @@ const DOC_EXTS   = ['doc', 'docx'];
 const SHEET_EXTS = ['xls', 'xlsx', 'csv'];
 
 function getFileType(url = '') {
-  console.log(url)
+ 
   const ext = (url.split('?')[0].split('.').pop() || '').toLowerCase();
   if (IMAGE_EXTS.includes(ext)) return 'image';
   if (VIDEO_EXTS.includes(ext)) return 'video';
@@ -484,6 +485,7 @@ export default function TaskerPortfolioScreen({ navigation }) {
     try {
       const res = await taskerGetMyProfile();
       const p = res.data?.taskerProfile || res.data;
+      console.log(p.workPortfolio)
       setPortfolio(p?.workPortfolio || []);
     } catch (err) {
       console.log(err);
@@ -496,45 +498,89 @@ export default function TaskerPortfolioScreen({ navigation }) {
   useEffect(() => { fetchPortfolio(); }, []);
 
   const handleSaveWork = async (form) => {
-    if (!form.title.trim()) {
-      Alert.alert('Required', 'Please enter a project title.');
-      return;
-    }
-    setSaving(true);
-    try {
-      let uploadedUrls = [];
-      if (form.files.length > 0) {
-        const formData = new FormData();
-        form.files.forEach((file) => {
-          const filename = file.name || file.uri.split('/').pop();
-          const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
-          const type = file.mimeType || `image/${ext}`;
-          formData.append('files', { uri: file.uri, name: filename, type });
+  if (!form.title.trim()) {
+    Alert.alert('Required', 'Please enter a project title.');
+    return;
+  }
+  setSaving(true);
+  try {
+    let uploadedUrls = [];               // ← declared here so it's available later
+
+    if (form.files.length > 0) {
+      // ✅ Build FormData object (was missing)
+      const formData = new FormData();
+      form.files.forEach((file) => {
+        let filename = file.name;
+            if (!filename) {
+            // Fallback to URI segment and decode it
+            filename = file.uri.split('/').pop() || 'file';
+            try {
+                filename = decodeURIComponent(filename);
+            } catch (_) {
+                // ignore, keep as is
+            }
+            }
+        const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
+        formData.append('files', {
+          uri: file.uri,
+          name: filename,
+          type: file.mimeType || `image/${ext}`,
         });
-        const uploadRes = await uploadPortfolioFiles(formData);
-        uploadedUrls = uploadRes.data?.urls || uploadRes.data?.fileUrls || [];
+      });
+
+      // 1. Ask backend for upload URLs
+      const uploadRes = await uploadPortfolioFiles(formData);
+      
+      const { uploadUrls, publicUrls } = uploadRes.data;
+
+      if (!uploadUrls || uploadUrls.length === 0) {
+        throw new Error('No upload URLs returned');
       }
-      const payload = {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        files: uploadedUrls,
-        completedAt: new Date().toISOString(),
-      };
-      const res = await addWorkSampleToProfile(payload);
-      if (res.status === 200 || res.status === 201) {
-        const newSample = res.data?.workSample || payload;
-        setPortfolio(prev => [newSample, ...prev]);
-        setShowAdd(false);
-        fetchPortfolio();
-        Alert.alert('Added ✓', 'Work sample added to your portfolio.');
-      } else throw new Error();
-    } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Could not upload work sample. Please try again.');
-    } finally {
-      setSaving(false);
+
+      // 2. Upload each file to its matching upload URL
+      for (let i = 0; i < form.files.length; i++) {
+        const file = form.files[i];
+        const uploadUrl = uploadUrls[i];
+        if (!uploadUrl) continue;
+       console.log("uploadUrl",uploadUrl)
+       console.log("file",file)
+       try{
+          await sendFileToS3(uploadUrl,file);
+       }catch(err){
+        console.log(err)
+       }
+      
+       
+      }
+
+      uploadedUrls = publicUrls || [];
     }
-  };
+
+    // 3. Save the work sample
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      files: uploadedUrls,
+      completedAt: new Date().toISOString(),
+    };
+
+    const res = await addWorkSampleToProfile(payload);
+    if (res.status === 200 || res.status === 201) {
+      const newSample = res.data?.workSample || payload;
+      setPortfolio(prev => [newSample, ...prev]);
+      setShowAdd(false);
+      fetchPortfolio();
+      Alert.alert('Added ', 'Work sample added to your portfolio.');
+    } else {
+      throw new Error();
+    }
+  } catch (err) {
+    console.error(err);
+    Alert.alert('Error', 'Could not upload work sample. Please try again.');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const handleRemove = (item) => {
     const id = item._id || item.id;
