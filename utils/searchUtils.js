@@ -26,7 +26,7 @@ export const searchLocations = async (query) => {
 export const filterServiceSuggestions = (query, suggestions, limit = 8) => {
   if (!query.trim()) return [];
   
-  const queryLower = query.toLowerCase();
+  const queryLower = query.trim().toLowerCase();
   return suggestions
     .filter(service => 
       service.toLowerCase().includes(queryLower) ||

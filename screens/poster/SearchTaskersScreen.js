@@ -123,6 +123,7 @@ const SearchTaskersScreen = ({ navigation }) => {
 
   const handleServiceSelect = (serviceName) => {
     setSearchQuery(serviceName);
+    setIsServiceInputFocused(false);
     setShowServiceSuggestions(false);
     setHasSearched(false);
   };

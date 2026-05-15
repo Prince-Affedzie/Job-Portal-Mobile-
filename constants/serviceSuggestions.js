@@ -1,5 +1,5 @@
 export const SERVICE_SUGGESTIONS = [
-  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning Services','Errands',
+  'Plumbing', 'Electrical Repairs', 'Carpentry', 'Painting', 'Cleaning','Errands',
   'Graphic Design', 'Video Editing', 'Photo Editing', 'Digital Marketing',
   'Video Production', 'Interior Design',
   'Web Development', 'Animation', 'Motion Graphics',
