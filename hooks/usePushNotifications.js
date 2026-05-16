@@ -99,18 +99,18 @@ async function registerForPushNotificationsAsync() {
   }
 
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    console.log("Permission status:", finalStatus);
+   const { status: existingStatus } = await Notifications.getPermissionsAsync();
+   let finalStatus = existingStatus;
+   console.log("Permission status:", finalStatus);
 
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
+  if (existingStatus === 'undetermined') {
+   const { status } = await Notifications.requestPermissionsAsync();
+   finalStatus = status;
+  }
 
-    if (finalStatus !== "granted") {  
-      return null;
-    }
+  if (finalStatus !== 'granted') {
+  return null;
+ }
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     console.log("Project ID:", projectId);

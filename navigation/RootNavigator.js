@@ -1,84 +1,83 @@
-import React, { useContext,useState,useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { NotificationProvider } from "../context/NotificationContext";
-import NotificationPopup from "../component/common/NotificationPopUp";
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as NativeSplash from 'expo-splash-screen';
 
 import AuthStack from "./AuthStack";
 import TaskerStack from "./TaskerStack";
 import PosterStack from "./PosterStack";
-import TaskerProfileScreen from "../screens/tasker/ProfileScreen";
-import AvailableTasksScreen from "../screens/tasker/AvailableTasksScreen";
-import MyApplicationsScreen from "../screens/tasker/MyTasksScreen";
-import TaskDetailsScreen from "../screens/tasker/TaskDetails";
 import SplashScreen from "../screens/SplashScreen";
-import  ChatWindowScreen from "../screens/Messaging/ChatWindowScreen"
+import ChatWindowScreen from "../screens/Messaging/ChatWindowScreen";
 import NotificationsScreen from "../screens/tasker/NotificationsScreen";
 import LoginScreen from "../screens/auth/LoginScreen";
-
-
-
 import TaskPosterOnboarding from "../screens/auth/ClientOnboarding";
 import { AuthContext } from "../context/AuthContext";
 import { navigationRef } from '../services/navigationService';
+import usePushNotifications from "../hooks/usePushNotifications";   
+import NotificationPermissionBanner from "../component/common/NotificationPermissionBanner"
 
+// Keep the native splash until we manually hide it
+NativeSplash.preventAutoHideAsync();
 
 const Stack = createNativeStackNavigator();
 
+// Component that triggers push notifications AFTER the app is ready
+function PushNotificationSetup() {
+  usePushNotifications();
+  return null;
+}
+
 export default function RootNavigator() {
   const { user, loading } = useContext(AuthContext);
-   const [isSplashVisible, setIsSplashVisible] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
+  const [appReady, setAppReady] = useState(false);
 
-    useEffect(() => {
-    // Hide splash screen when auth check is complete AND minimum time has passed
-    const minSplashTime = 3000; // Minimum 2 seconds
-    const timer = setTimeout(() => {
-      if (!loading) {
-        setIsSplashVisible(false);
-      }
-    }, minSplashTime);
+  // Hide native splash as soon as the custom splash mounts
+  useEffect(() => {
+    NativeSplash.hideAsync();
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [loading]);
+  const handleSplashComplete = useCallback(() => {
+    setSplashDone(true);
+  }, []);
 
-    if (isSplashVisible || loading) {
-    return <SplashScreen />;
+  useEffect(() => {
+    if (splashDone && !loading) {
+      setAppReady(true);
+    }
+  }, [splashDone, loading]);
+
+  // Show the custom splash until everything is ready
+  if (!appReady) {
+    return <SplashScreen onAnimationComplete={handleSplashComplete} />;
   }
- return (
-   <SafeAreaProvider>
-    <NotificationProvider>
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
-          //  Auth flow
-          <Stack.Screen name="AuthStack" component={AuthStack} />
-        ) : user.role === "tasker" ? (
-          //  Tasker flow
-         
-           
-          <Stack.Screen name="TaskerStack" component={TaskerStack} />
-         
-        ) : (
-          //  Poster flow
-          
-          <Stack.Screen name="PosterStack" component={PosterStack} />
-          
-        )}
 
-        {/* Shared/global routes */}
-         <Stack.Screen name="Login" component={LoginScreen} />
-        
-        <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
-        <Stack.Screen 
-           name="ChatWindow" 
-           component={ChatWindowScreen}
-           options={{ headerShown: false }}
-         />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
-    </NotificationProvider>
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        {/* 👇 Push notifications are set up only now — after splash is hidden */}
+        <PushNotificationSetup />
+        <NotificationPermissionBanner /> 
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {!user ? (
+            <Stack.Screen name="AuthStack" component={AuthStack} />
+          ) : user.role === "tasker" ? (
+            <Stack.Screen name="TaskerStack" component={TaskerStack} />
+          ) : (
+            <Stack.Screen name="PosterStack" component={PosterStack} />
+          )}
+
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="ClientOnboarding" component={TaskPosterOnboarding} />
+          <Stack.Screen
+            name="ChatWindow"
+            component={ChatWindowScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 }

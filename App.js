@@ -18,10 +18,10 @@ const PayStack_Public_Key = Constants.expoConfig.extra?.EXPO_PayStack_publicKey;
 import VerificationBanner from "./component/common/VerificationBanner";
 
 
-function PushNotificationInitializer() {
+{/*function PushNotificationInitializer() {
   usePushNotifications();
   return null;
-}
+}*/}
 
 export default function App() {
 
@@ -63,7 +63,7 @@ export default function App() {
            currency="GHS"
            defaultChannels={['card','mobile_money','bank']}
            >
-          <PushNotificationInitializer />
+          {/*<PushNotificationInitializer />*/}
            <NotificationPopup/>
            <VerificationBanner position="top" autoHideDuration={10000} />
            <SafeAreaView style={{ flex: 1, backgroundColor: '#1E3A6E' }} edges={['top']}>
