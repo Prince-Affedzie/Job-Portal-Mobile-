@@ -119,6 +119,104 @@ function getInitials(name = '') {
 }
 const PRICE_LABEL = { fixed:'Fixed', hourly:'/hr', starts_at:'From', negotiable:'Negotiable' };
 
+// ─── Brand palette (deterministic from name) ───────────────────────────────────
+const BRAND_PALETTES = [
+  { from:'#0F1E3D', to:'#1A3461', accent:'#C9891A' }, // navy + gold
+  { from:'#0F766E', to:'#134E4A', accent:'#34D399' }, // teal + mint
+  { from:'#1E1B4B', to:'#3730A3', accent:'#818CF8' }, // indigo + lavender
+  { from:'#7C2D12', to:'#9A3412', accent:'#FB923C' }, // burnt orange
+  { from:'#14532D', to:'#166534', accent:'#4ADE80' }, // forest green
+  { from:'#4A044E', to:'#701A75', accent:'#E879F9' }, // plum + pink
+  { from:'#0C4A6E', to:'#075985', accent:'#38BDF8' }, // ocean blue
+  { from:'#1C1917', to:'#292524', accent:'#D4A76A' }, // charcoal + tan
+];
+function getBrandPalette(name = '') {
+  const idx = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % BRAND_PALETTES.length;
+  return BRAND_PALETTES[idx];
+}
+function splitBannerName(name = '') {
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return [words[0]];
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+}
+
+// ─── Branded fallback banner ────────────────────────────────────────────────────
+function ProfileBrandedBanner({ name, services = [], palette }) {
+  const lines    = splitBannerName(name);
+  const initials = getInitials(name);
+  // show up to 3 service names as pills across the banner bottom area
+  const topServices = services.slice(0, 3);
+
+  return (
+    <LinearGradient
+      colors={[palette.from, palette.to]}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={StyleSheet.absoluteFill}
+    >
+      {/* Decorative rings */}
+      <View style={[pbb.ring, pbb.ring1, { borderColor: palette.accent + '20' }]} />
+      <View style={[pbb.ring, pbb.ring2, { borderColor: palette.accent + '12' }]} />
+      <View style={[pbb.ring, pbb.ring3, { borderColor: palette.accent + '0A' }]} />
+
+      {/* Workaflow watermark */}
+      <View style={pbb.watermark}>
+        <Text style={pbb.watermarkText}>Workaflow</Text>
+      </View>
+
+      {/* Centred name block */}
+      <View style={pbb.centerBlock}>
+        {/* Giant translucent initials — purely decorative */}
+        <Text style={[pbb.bgInitials, { color: palette.accent + '15' }]}>{initials}</Text>
+
+        <View style={[pbb.rule, { backgroundColor: palette.accent }]} />
+
+        {lines.map((line, i) => (
+          <Text key={i} style={[pbb.nameLine, i === 0 && pbb.nameLineFirst]} numberOfLines={1}>
+            {line}
+          </Text>
+        ))}
+
+        <Text style={[pbb.subtitle, { color: palette.accent }]}>Professional Tasker</Text>
+      </View>
+
+      {/* Service pills along the bottom */}
+      {topServices.length > 0 && (
+        <View style={pbb.servicePills}>
+          {topServices.map((svc, i) => (
+            <View key={i} style={[pbb.servicePill, { borderColor: palette.accent + '50' }]}>
+              <Text style={[pbb.servicePillText, { color: palette.accent }]} numberOfLines={1}>
+                {svc.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </LinearGradient>
+  );
+}
+
+const pbb = StyleSheet.create({
+  ring:  { position:'absolute', borderRadius:999, borderWidth:1 },
+  ring1: { width:260, height:260, top:-100, right:-80 },
+  ring2: { width:180, height:180, top:-60,  right:-40 },
+  ring3: { width:300, height:300, bottom:-120, left:-80 },
+
+  watermark: { position:'absolute', top:12, right:14 },
+  watermarkText: { fontSize:9, fontWeight:'800', letterSpacing:1.5, color:'rgba(255,255,255,0.22)', textTransform:'uppercase' },
+
+  centerBlock: { flex:1, alignItems:'center', justifyContent:'center', paddingHorizontal:24, paddingBottom:32 },
+  bgInitials: { position:'absolute', fontSize:130, fontWeight:'900', letterSpacing:-6 },
+  rule: { width:32, height:2, borderRadius:1, marginBottom:10, opacity:0.85 },
+  nameLine: { fontSize:20, fontWeight:'800', color:'rgba(255,255,255,0.92)', textAlign:'center', lineHeight:24, letterSpacing:-0.3, textShadowColor:'rgba(0,0,0,0.3)', textShadowOffset:{width:0,height:1}, textShadowRadius:6 },
+  nameLineFirst: { fontSize:24, fontWeight:'900' },
+  subtitle: { fontSize:10, fontWeight:'700', letterSpacing:1.4, textTransform:'uppercase', marginTop:8 },
+
+  servicePills: { position:'absolute', bottom:14, left:14, right:14, flexDirection:'row', flexWrap:'wrap', gap:6 },
+  servicePill:  { backgroundColor:'rgba(255,255,255,0.1)', borderWidth:1, paddingHorizontal:10, paddingVertical:4, borderRadius:20 },
+  servicePillText: { fontSize:11, fontWeight:'700' },
+});
+
 // ─── Animated entrance ─────────────────────────────────────────────────────────
 function FadeUp({ delay=0, children, style }) {
   const op = useRef(new Animated.Value(0)).current;
@@ -503,6 +601,7 @@ export default function ApplicantProfileScreen({ route, navigation }) {
   const location   = [profile?.location?.city, profile?.location?.region].filter(Boolean).join(', ');
   const portfolio  = profile?.workPortfolio || [];
   const services   = profile?.servicesOffered || [];
+  const palette    = getBrandPalette(userName);
 
   // ── Scroll-driven header ──────────────────────────────────────────────────
   const headerBgOp = scrollY.interpolate({
@@ -720,10 +819,13 @@ export default function ApplicantProfileScreen({ route, navigation }) {
       >
         {/* Banner */}
         <View style={ss.bannerWrap}>
-          {bannerImg
-            ? <Image source={{uri:bannerImg}} style={ss.bannerImg} resizeMode="cover"/>
-            : <LinearGradient colors={[C.charcoal,C.inkMid,'#2D3A6B']} start={{x:0,y:0}} end={{x:1,y:1}} style={ss.bannerImg}/>
-          }
+          {bannerImg ? (
+            <Image source={{uri:bannerImg}} style={ss.bannerImg} resizeMode="cover"/>
+          ) : (
+            <View style={ss.bannerImg}>
+              <ProfileBrandedBanner name={userName} services={services} palette={palette}/>
+            </View>
+          )}
           <LinearGradient colors={['transparent','rgba(8,12,28,0.6)']} style={ss.bannerVignette}/>
           <View style={ss.providerTag}>
             <Text style={ss.providerTagTxt}>
@@ -737,7 +839,7 @@ export default function ApplicantProfileScreen({ route, navigation }) {
           <View style={ss.avatarRing}>
             {userImage
               ? <Image source={{uri:userImage}} style={ss.avatar}/>
-              : <LinearGradient colors={[C.inkMid,C.charcoal]} style={ss.avatar}>
+              : <LinearGradient colors={[palette.accent, palette.from]} start={{x:0,y:0}} end={{x:1,y:1}} style={ss.avatar}>
                   <Text style={ss.avatarInit}>{getInitials(userName)}</Text>
                 </LinearGradient>
             }

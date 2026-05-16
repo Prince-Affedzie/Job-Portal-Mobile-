@@ -65,9 +65,9 @@ const BookNowFAB = ({ tasker, onPress, isVisible }) => {
         activeOpacity={0.88}
       >
         {/* Tasker mini-avatar */}
-        {tasker?.brandBanner ? (
+        {tasker?.brandBanner ||tasker?.profileImage ? (
           <Image
-            source={{ uri:  tasker.brandBanner ||tasker.profileImage }}
+            source={{ uri:  tasker.brandBanner || tasker.profileImage }}
             style={styles.taskerAvatar}
           />
         ) : (
@@ -79,7 +79,7 @@ const BookNowFAB = ({ tasker, onPress, isVisible }) => {
         <View style={styles.labelGroup}>
           <Text style={styles.fabLabel}>Book Now</Text>
           <Text style={styles.fabSubLabel} numberOfLines={1}>
-            {tasker?.name || 'Selected Tasker'}
+            {tasker?.businessName || 'Selected Tasker'}
           </Text>
         </View>
 

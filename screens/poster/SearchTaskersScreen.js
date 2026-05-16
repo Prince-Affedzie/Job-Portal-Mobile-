@@ -37,6 +37,10 @@ import { useLocationSearch } from '../../hooks/useLocationSearch';
 
 const { height } = Dimensions.get('window');
 
+// The 'resultsHeader' item is always at index 1 when results exist:
+// [search(0), resultsHeader(1), tasker(2)…]
+const RESULTS_SCROLL_INDEX = 1;
+
 const TASKER_AVATARS = [
   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132141/casual-young-african-man-smiling-isolated-white_pjfa64.jpg',
   'https://res.cloudinary.com/duv3qvvjz/image/upload/f_auto,q_auto/w_200,h_200,c_fill,g_face,r_max/v1767132132/african-teenage-girl-portrait-happy-smiling-face_iqapqm.jpg',
@@ -59,10 +63,11 @@ const SearchTaskersScreen = ({ navigation }) => {
   const [serviceSuggestions, setServiceSuggestions] = useState([]);
   const [showServiceSuggestions, setShowServiceSuggestions] = useState(false);
   const [isServiceInputFocused, setIsServiceInputFocused] = useState(false);
-  const [selectedTasker, setSelectedTasker] = useState(null); // single selection
+  const [selectedTasker, setSelectedTasker] = useState(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const locationSearch = useLocationSearch();
+  const flatListRef = useRef(null);          // ← ref for programmatic scroll
   const slideAnim = useRef(new Animated.Value(height)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
 
@@ -103,6 +108,25 @@ const SearchTaskersScreen = ({ navigation }) => {
   useEffect(() => {
     locationSearch.debouncedSearch(locationSearch.locationQuery);
   }, [locationSearch.locationQuery]);
+
+  // ── Auto-scroll to results header once results are ready ─────────────────
+  // We watch `hasSearched` + `loading` together: scroll triggers the moment
+  // loading finishes and we either have results or an empty/error state.
+  useEffect(() => {
+    if (!hasSearched || loading) return;
+
+    // Small timeout lets the FlatList finish rendering the new sections
+    // before we ask it to scroll, avoiding "index out of range" errors.
+    const timer = setTimeout(() => {
+      flatListRef.current?.scrollToIndex({
+        index: RESULTS_SCROLL_INDEX,
+        animated: true,
+        viewPosition: 0,   // 0 = align to top of visible area
+      });
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [hasSearched, loading]);
 
   const resetSearchState = () => {
     setHasSearched(false);
@@ -173,16 +197,13 @@ const SearchTaskersScreen = ({ navigation }) => {
     setShowLocationModal(false);
   };
 
-  // Single-select toggle: tapping the same tasker deselects
   const handleSelectTasker = (tasker) => {
     const taskerId = tasker._id || tasker.id;
-
-  setSelectedTasker((prev) => {
-    const prevId = prev?._id || prev?.id;
-    // If the same tasker is already selected, deselect – otherwise select
-    if (prevId && taskerId && prevId === taskerId) return null;
-    return tasker;
-  });
+    setSelectedTasker((prev) => {
+      const prevId = prev?._id || prev?.id;
+      if (prevId && taskerId && prevId === taskerId) return null;
+      return tasker;
+    });
   };
 
   const handleBookNow = () => {
@@ -246,6 +267,7 @@ const SearchTaskersScreen = ({ navigation }) => {
     }
   }, [searchQuery, location, locationDetails]);
 
+  // ── Section data ────────────────────────────────────────────────────────────
   const getSections = () => {
     const sections = [{ type: 'search', key: 'search' }];
 
@@ -271,6 +293,7 @@ const SearchTaskersScreen = ({ navigation }) => {
     return sections;
   };
 
+  // ── Render items ────────────────────────────────────────────────────────────
   const renderSection = ({ item }) => {
     switch (item.type) {
       case 'search':
@@ -401,8 +424,8 @@ const SearchTaskersScreen = ({ navigation }) => {
             <View style={styles.tipsContainer}>
               <Text style={styles.tipsTitle}>How it works</Text>
               {[
-                { icon: 'search-outline', color: '#1A56DB', bg: '#EBF5FF', text: 'Search for any service and enter your location' },
-                { icon: 'person-outline', color: '#0E9F6E', bg: '#E3FCEC', text: 'Browse profiles and select your preferred tasker' },
+                { icon: 'search-outline',   color: '#1A56DB', bg: '#EBF5FF', text: 'Search for any service and enter your location' },
+                { icon: 'person-outline',   color: '#0E9F6E', bg: '#E3FCEC', text: 'Browse profiles and select your preferred tasker' },
                 { icon: 'calendar-outline', color: '#7E3AF2', bg: '#F3F0FF', text: 'Confirm your booking and get it done' },
               ].map((tip, i) => (
                 <View key={i} style={styles.tipItem}>
@@ -421,6 +444,23 @@ const SearchTaskersScreen = ({ navigation }) => {
     }
   };
 
+  // ── onScrollToIndexFailed fallback ──────────────────────────────────────────
+  // Required by FlatList: if the target index isn't yet laid out, scroll to
+  // the nearest available offset so the user still gets close to results.
+  const handleScrollToIndexFailed = useCallback((info) => {
+    const offset = info.averageItemLength * info.index;
+    flatListRef.current?.scrollToOffset({ offset, animated: true });
+
+    // Retry once layout catches up
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 0,
+      });
+    }, 200);
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -432,12 +472,14 @@ const SearchTaskersScreen = ({ navigation }) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <FlatList
+          ref={flatListRef}
           data={getSections()}
           renderItem={renderSection}
           keyExtractor={(item) => item.key}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
         />
       </KeyboardAvoidingView>
 
