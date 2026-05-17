@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '../../component/tasker/Header';          // your updated header
 import { viewBookings } from '../../api/taskerApi';        // adjust path
 import { navigate } from '../../services/navigationService';
+import TaskerPaymentSafetyBanner from '../../component/tasker/PaymentSafetyTasker'
 
 const { width } = Dimensions.get('window');
 const scale = (size) => (width / 375) * size;
@@ -285,6 +286,7 @@ export default function TaskerBookingsScreen({ navigation }) {
           }
         />
       )}
+      <TaskerPaymentSafetyBanner/>
     </SafeAreaView>
   );
 }

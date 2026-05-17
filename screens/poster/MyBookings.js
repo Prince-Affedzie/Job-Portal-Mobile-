@@ -15,6 +15,7 @@ import {
   Platform,
 } from "react-native";
 import { getMyBookings } from "../../api/bookingApi"; // adjust path as needed
+import PaymentSafetyBanner from "../../component/common/PaymentSafetyBanner"
 
 const { width } = Dimensions.get("window");
 
@@ -355,6 +356,7 @@ export default function MyBookingsScreen({ navigation }) {
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+       
 
       {/* Header */}
       <Animated.View style={[styles.header, { opacity: headerAnim }]}>
@@ -437,6 +439,7 @@ export default function MyBookingsScreen({ navigation }) {
           }
         />
       )}
+      <PaymentSafetyBanner />
     </View>
   );
 }

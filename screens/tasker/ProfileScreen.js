@@ -407,8 +407,8 @@ export default function TaskerProfileScreen({ navigation }) {
                     <Ionicons name="storefront-outline" size={26} color={T.accentTeal} />
                   </View>
                   <View style={styles.ctaTextBlock}>
-                    <Text style={styles.ctaTitle}>Tasker Profile</Text>
-                    <Text style={styles.ctaSub}>Services · Portfolio · Bio · Ratings</Text>
+                    <Text style={styles.ctaTitle}>Manage your Professional Profile</Text>
+                    <Text style={styles.ctaSub}>BusinessName· Bio · Ratings</Text>
                   </View>
                 </View>
                 <View style={styles.ctaArrowWrap}>
@@ -479,19 +479,11 @@ export default function TaskerProfileScreen({ navigation }) {
           </Text>
         </FadeSlide>
 
-        <NavCard
-          icon="swap-horizontal-outline"
-          label="Switch to Client Mode"
-          sublabel="Browse and post tasks as a client"
-          accent={T.accentBlue}
-          delay={300}
-          onPress={handleSwitch}
-        />
-
+        
         <NavCard
           icon="albums-outline"
           label="Work Samples"
-          sublabel="Manage your work samples"
+          sublabel="Showcase and manage your best works"
           accent={T.accentTeal}
           delay={340}
           onPress={() => navigate('TaskerPortfolio')}
@@ -523,6 +515,16 @@ export default function TaskerProfileScreen({ navigation }) {
           delay={380}
           onPress={() => navigate('PaymentMethodScreen')}
         />
+
+        <NavCard
+          icon="swap-horizontal-outline"
+          label="Switch to Client Mode"
+          sublabel="Browse and post tasks as a client"
+          accent={T.accentBlue}
+          delay={300}
+          onPress={handleSwitch}
+        />
+
         <NavCard
           icon="help-circle-outline"
           label="Help & Support"
@@ -531,6 +533,8 @@ export default function TaskerProfileScreen({ navigation }) {
           delay={420}
           onPress={() => navigate('SupportScreen')}
         />
+
+
 
         {/* ── Danger Zone ──────────────────────────────────────────────── */}
         <FadeSlide delay={480}>

@@ -265,7 +265,7 @@ function MediaThumb({ item, onRemove }) {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
-export default function BookingScreen({ route }) {
+export default function BookingScreen({ route,navigation  }) {
   const insets = useSafeAreaInsets();
 
   // ── Route params ─────────────────────────────────────────────────────────
@@ -454,7 +454,7 @@ export default function BookingScreen({ route }) {
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <View style={ss.topBar}>
-        <TouchableOpacity onPress={() => navigate(-1)} style={ss.backBtn}>
+        <TouchableOpacity onPress={() =>  navigation.goBack()} style={ss.backBtn}>
           <Ionicons name="chevron-back" size={20} color={C.textPri} />
         </TouchableOpacity>
         <View style={ss.topBarCenter}>
