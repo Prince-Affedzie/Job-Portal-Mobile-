@@ -507,40 +507,43 @@ export default function TaskerProfileDetailScreen({ navigation }) {
         </SectionCard>
 
         {/* Branding */}
-        <SectionCard title="Branding & Identity" icon="sparkles-outline" delay={140}>
-          {providerType === 'business' && (
-            <>
-              <FieldLabel text="Business Name" />
-              <Field value={businessName} onChangeText={setBusinessName} placeholder="e.g. Kwame & Sons Electrical" editable={editing} />
-            </>
-          )}
+        
+      <SectionCard title="Branding & Identity" icon="sparkles-outline" delay={140}>
+        {/* Business Name — shown for BOTH types */}
+        <FieldLabel text={providerType === 'business' ? 'Business Name' : 'How would you like to name your brand or service?'} />
+        <Field
+          value={businessName}
+          onChangeText={setBusinessName}
+          placeholder={providerType === 'business' ? 'e.g. Kwame & Sons Electrical' : 'e.g. Kofi’s Handyman Services'}
+          editable={editing}
+        />
 
-          <FieldLabel text="Tagline" optional />
-          <Field
-            value={tagline}
-            onChangeText={setTagline}
-            placeholder="e.g. Accra's most reliable handyman"
-            maxLength={100}
-            editable={editing}
-          />
-          <Text style={styles.charCount}>{tagline.length}/100</Text>
+        <FieldLabel text="Tagline" optional />
+        <Field
+          value={tagline}
+          onChangeText={setTagline}
+          placeholder="e.g. Accra's most reliable handyman"
+          maxLength={100}
+          editable={editing}
+        />
+        <Text style={styles.charCount}>{tagline.length}/100</Text>
 
-          <FieldLabel text="Bio / About You" optional />
-          <Field
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Describe your skills, years of experience, specialities, and why clients should choose you…"
-            multiline
-            editable={editing}
-          />
+        <FieldLabel text="Bio / About You" optional />
+        <Field
+          value={bio}
+          onChangeText={setBio}
+          placeholder="Describe your skills, years of experience, specialities, and why clients should choose you…"
+          multiline
+          editable={editing}
+        />
 
-          {providerType === 'business' && (
-            <>
-              <FieldLabel text="Business Registration No." optional />
-              <Field value={businessRegNo} onChangeText={setBusinessRegNo} placeholder="e.g. CS-12345" editable={editing} />
-            </>
-          )}
-        </SectionCard>
+        {providerType === 'business' && (
+          <>
+            <FieldLabel text="Business Registration No." optional />
+            <Field value={businessRegNo} onChangeText={setBusinessRegNo} placeholder="e.g. CS-12345" editable={editing} />
+          </>
+        )}
+      </SectionCard>
 
         {/* Location */}
         <SectionCard title="Location" icon="location-outline" delay={180}>
