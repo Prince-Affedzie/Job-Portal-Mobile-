@@ -200,68 +200,68 @@ export default function GuestScreen() {
         {/* ══════════════════════════════════════════════════════════════
             HERO SECTION
         ═══════════════════════════════════════════════════════════════ */}
-        <FadeSlide delay={0}>
-          <View style={s.heroWrap}>
-            <LinearGradient
-              colors={[C.navy, C.navyMid, C.navyLight]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.heroCard}
-            >
-              {/* decorative rings */}
-              <View style={s.ring1} />
-              <View style={s.ring2} />
-              <View style={s.ring3} />
+        {/* ══════════════════════════════════════════════════════════════
+    HERO SECTION
+══════════════════════════════════════════════════════════════ */}
+<FadeSlide delay={0}>
+  <View style={s.heroWrap}>
+    <LinearGradient
+      colors={[C.navy, C.navyMid, C.navyLight]}
+      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+      style={s.heroCard}
+    >
+      {/* decorative rings */}
+      <View style={s.ring1} />
+      <View style={s.ring2} />
 
-              {/* top bar: guest badge + sign in */}
-              <View style={s.heroTopBar}>
-                <View style={s.guestChip}>
-                  <Ionicons name="eye-outline" size={11} color={C.gold} />
-                  <Text style={s.guestChipText}>Browsing as Guest</Text>
-                </View>
-                <TouchableOpacity onPress={() => navigate('Login')} style={s.signInLink} activeOpacity={0.8}>
-                  <Text style={s.signInLinkText}>Sign In</Text>
-                  <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
-                </TouchableOpacity>
-              </View>
+      {/* top bar: guest badge + sign in */}
+      <View style={s.heroTopBar}>
+        <View style={s.guestChip}>
+          <Ionicons name="eye-outline" size={11} color={C.gold} />
+          <Text style={s.guestChipText}>Browsing as Guest</Text>
+        </View>
+        <TouchableOpacity onPress={() => navigate('Login')} style={s.signInLink} activeOpacity={0.8}>
+          <Text style={s.signInLinkText}>Sign In</Text>
+          <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
+      </View>
 
-              {/* headline */}
-              <View style={s.heroHeadWrap}>
-                <Text style={s.heroEyebrow}>Ghana's Gig Marketplace</Text>
-                <Text style={s.heroTitle}>Find Your{'\n'}<Text style={s.heroTitleAccent}>Next Gig.</Text></Text>
-                <Text style={s.heroSub}>
-                  Browse live tasks from clients near you.{'\n'}No account required.
-                </Text>
-              </View>
+      {/* headline */}
+      <View style={s.heroHeadWrap}>
+        <Text style={s.heroEyebrow}>Ghana's Gig Marketplace</Text>
+        <Text style={s.heroTitle}>Find Your{'\n'}<Text style={s.heroTitleAccent}>Next Gig.</Text></Text>
+        <Text style={s.heroSub}>
+          Browse live tasks from clients near you. No account required.
+        </Text>
+      </View>
 
-             
+      {/* CTA button */}
+      <TouchableOpacity
+        style={s.heroCta}
+        onPress={() => navigate('GuestBrowseTaskers')}
+        activeOpacity={0.88}
+      >
+        <LinearGradient
+          colors={[C.blue, '#1040B8']}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          style={s.heroCtaGrad}
+        >
+          <Ionicons name="people-outline" size={18} color={C.white} />
+          <Text style={s.heroCtaText}>Browse Taskers</Text>
+          <Ionicons name="arrow-forward" size={16} color={C.white} />
+        </LinearGradient>
+      </TouchableOpacity>
 
-              {/* CTA button */}
-              <TouchableOpacity
-                style={s.heroCta}
-                onPress={() => navigate('GuestBrowseTaskers')}
-                activeOpacity={0.88}
-              >
-                <LinearGradient
-                  colors={[C.blue, '#1040B8']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={s.heroCtaGrad}
-                >
-                  <Ionicons name="people-outline" size={18} color={C.white} />
-                  <Text style={s.heroCtaText}>Browse Taskers</Text>
-                  <Ionicons name="arrow-forward" size={16} color={C.white} />
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* register link */}
-              <View style={s.heroFooterRow}>
-                <Text style={s.heroFooterText}>New here?</Text>
-                <TouchableOpacity onPress={() => navigate('Register')} activeOpacity={0.8}>
-                  <Text style={s.heroFooterLink}>Create a free account →</Text>
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-          </View>
-        </FadeSlide>
+      {/* register link */}
+      <View style={s.heroFooterRow}>
+        <Text style={s.heroFooterText}>New here?</Text>
+        <TouchableOpacity onPress={() => navigate('Register')} activeOpacity={0.8}>
+          <Text style={s.heroFooterLink}>Create a free account →</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  </View>
+</FadeSlide>
 
         {/* ══════════════════════════════════════════════════════════════
             GIGS SECTION
@@ -396,13 +396,13 @@ const s = StyleSheet.create({
 
   // ── Hero ─────────────────────────────────────────────────────────────────
   heroWrap: {
-    marginHorizontal: 8, marginTop: 14,
+    marginHorizontal: 4, marginTop: 14,
     overflow: 'hidden',
     shadowColor: C.navy,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.3, shadowRadius: 24, elevation: 14,
     borderTopLeftRadius:26,
-     borderTopRighttRadius:26,
+     borderTopRightRadius:26,
   },
   heroCard: { position: 'relative', overflow: 'hidden', padding: 22 },
 
