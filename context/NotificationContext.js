@@ -121,35 +121,79 @@ export const NotificationProvider = ({ children }) => {
 
 
 
-  useEffect(()=>{
-    if(user){
-       const newSocket  = io(BackendURL,{
-        auth: {
-            token: token 
-        },
-      
-    })
-    setSocket(newSocket)
-    newSocket.on('connections',()=>{
-    console.log('Socket connected',socket.id)
-    })
-  
-   newSocket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message);
-    });
-  
-    newSocket.on('notification',(notification)=>{
-      setNotifications((prevNotifications)=>[
-        notification,
-        ...prevNotifications
-      ])
-    })
-  
-    return ()=>{ 
-     newSocket.off('notification')
-      newSocket.disconnect()
-  }   
-    }},[BackendURL, token])
+  // In NotificationProvider
+
+useEffect(() => {
+  if (!user || !token) return;
+
+  const newSocket = io(BackendURL, {
+    auth: { token },
+    
+    // ── Reconnection settings ──────────────────────────────────────
+    reconnection: true,
+    reconnectionAttempts: Infinity,   // keep trying forever
+    reconnectionDelay: 1000,          // start with 1 second delay
+    reconnectionDelayMax: 30000,      // max 30 seconds between attempts
+    randomizationFactor: 0.5,        // add randomness to prevent thundering herd
+    timeout: 20000,                   // connection timeout
+    
+    // ── Transport settings ─────────────────────────────────────────
+    transports: ['websocket', 'polling'],
+    upgrade: true,                    // try to upgrade to WebSocket
+  });
+
+  setSocket(newSocket);
+
+  // ── Connection events ────────────────────────────────────────────
+  newSocket.on('connect', () => {
+    console.log('🟢 Socket connected:', newSocket.id);
+  });
+
+  newSocket.on('connect_error', (err) => {
+    console.error('🔴 Socket connection error:', err.message);
+    // Socket.IO will automatically retry with the reconnection settings above
+  });
+
+  newSocket.on('reconnect', (attemptNumber) => {
+    console.log(`🔄 Socket reconnected after ${attemptNumber} attempts`);
+  });
+
+  newSocket.on('reconnect_attempt', (attemptNumber) => {
+    console.log(`🔄 Socket reconnection attempt #${attemptNumber}`);
+  });
+
+  newSocket.on('reconnect_error', (err) => {
+    console.error('🔴 Socket reconnection error:', err.message);
+  });
+
+  newSocket.on('reconnect_failed', () => {
+    console.error('🔴 Socket reconnection failed after all attempts');
+  });
+
+  newSocket.on('disconnect', (reason) => {
+    console.log('🔌 Socket disconnected:', reason);
+    // Socket.IO will auto-reconnect unless it was intentional
+  });
+
+  // ── Notification listener ────────────────────────────────────────
+  newSocket.on('notification', (notification) => {
+    setNotifications((prev) => [notification, ...prev]);
+  });
+
+  // ── Cleanup ──────────────────────────────────────────────────────
+  return () => {
+    console.log('Cleaning up socket connection');
+    newSocket.off('notification');
+    newSocket.off('connect');
+    newSocket.off('connect_error');
+    newSocket.off('reconnect');
+    newSocket.off('reconnect_attempt');
+    newSocket.off('reconnect_error');
+    newSocket.off('reconnect_failed');
+    newSocket.off('disconnect');
+    newSocket.disconnect();
+  };
+}, [BackendURL, token, user]);
   
     
 

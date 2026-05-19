@@ -308,7 +308,7 @@ export default function TaskerBookingDetailScreen({ route }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-      <Header title="Booking Details" showBackButton />
+      <Header title="Booking Details" showBackButton showNotifications={false}/>
 
       {/* ── Scrollable Content ── */}
       <ScrollView

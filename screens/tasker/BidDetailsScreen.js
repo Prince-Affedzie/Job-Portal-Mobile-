@@ -288,7 +288,7 @@ const BidDetailsScreen = ({ route, navigation }) => {
       
       {/* Custom Header like Fiverr */}
       
-      <Header title={'Bid Details'} showBackButton/>
+      <Header title={'Bid Details'} showBackButton showNotifications={false}/>
 
       <ScrollView 
         style={styles.scrollView}

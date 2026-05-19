@@ -1,3 +1,4 @@
+// screens/tasker/AppliedTaskDetailsScreen.js
 import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
@@ -11,14 +12,18 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-//import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
 import Header from '../../component/tasker/Header';
 import ReportForm from '../../component/common/reportForm';
 import WorkSubmissionModal from '../../component/tasker/WorkSubmissionModal';
 import { AuthContext } from '../../context/AuthContext';
-import { getMiniTaskInfo, acceptMiniTaskAssignment, rejectMiniTaskAssignment, markTaskAsDoneTasker } from '../../api/miniTaskApi';
+import {
+  getMiniTaskInfo,
+  acceptMiniTaskAssignment,
+  rejectMiniTaskAssignment,
+  markTaskAsDoneTasker,
+} from '../../api/miniTaskApi';
 import { startOrGetChatRoom } from '../../api/chatApi';
 import { navigate } from '../../services/navigationService';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
@@ -28,48 +33,188 @@ import FullyFundedBadge from '../../component/tasker/FullyFundedBadge';
 
 const { width } = Dimensions.get('window');
 
-const formatFullAddress = (address) => {
-  if (!address || (!address.region && !address.city && !address.suburb)) {
-    return "Remote";
-  }
-  
-  const parts = [
-    address.region,
-    address.city, 
-    address.suburb
-  ].filter(part => part && part.trim() !== '');
-  
-  return parts.join(', ');
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const C = {
+  bg:            '#F8FAFF',
+  surface:       '#FFFFFF',
+  border:        '#E4E8EE',
+  primary:       '#1E3A6E',
+  primaryMid:    '#1A56DB',
+  gold:          '#D49B3F',
+  green:         '#0E9F6E',
+  red:           '#DC2626',
+  redLight:      '#FEE2E2',
+  textPrimary:   '#0F172A',
+  textSecondary: '#475569',
+  textMuted:     '#94A3B8',
+  white:         '#FFFFFF',
+  charcoal:      '#0F1A35',
 };
 
-   const AppliedTaskDetailsScreen = ({ route, navigation }) => {
+const formatFullAddress = (address) => {
+  if (!address || (!address.region && !address.city && !address.suburb)) return 'Remote';
+  return [address.region, address.city, address.suburb]
+    .filter((p) => p && p.trim() !== '')
+    .join(', ');
+};
+
+// ─── Options Menu (dropdown) ──────────────────────────────────────────────────
+function HeaderOptionsMenu({ visible, onClose, onSubmitWork, onSubmissions, onReport }) {
+  if (!visible) return null;
+
+  return (
+    <TouchableOpacity style={hm.backdrop} activeOpacity={1} onPress={onClose}>
+      <View style={hm.menu}>
+        {/* Submit Work */}
+        <TouchableOpacity
+          style={hm.item}
+          onPress={() => { onClose(); onSubmitWork(); }}
+        >
+          <View style={[hm.iconBox, { backgroundColor: C.primary + '18' }]}>
+            <Ionicons name="cloud-upload-outline" size={18} color={C.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={hm.itemText}>Submit Work</Text>
+            <Text style={hm.itemSub}>Upload completed work</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={hm.divider} />
+
+        {/* Submissions */}
+        <TouchableOpacity
+          style={hm.item}
+          onPress={() => { onClose(); onSubmissions(); }}
+        >
+          <View style={[hm.iconBox, { backgroundColor: C.primary + '18' }]}>
+            <Ionicons name="document-attach-outline" size={18} color={C.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={hm.itemText}>Submissions</Text>
+            <Text style={hm.itemSub}>View submitted work</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={hm.divider} />
+
+        {/* Report */}
+        <TouchableOpacity
+          style={hm.item}
+          onPress={() => { onClose(); onReport(); }}
+        >
+          <View style={[hm.iconBox, { backgroundColor: C.redLight }]}>
+            <Ionicons name="flag-outline" size={18} color={C.red} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[hm.itemText, { color: C.red }]}>Report</Text>
+            <Text style={hm.itemSub}>Flag this task</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const hm = StyleSheet.create({
+  // Covers the whole screen so tapping outside the menu closes it
+  backdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 200,
+    // Push the menu down below the header (~56 px) and right-align it
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 56,
+    paddingRight: 12,
+  },
+  menu: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    paddingVertical: 6,
+    minWidth: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  iconBox: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  itemText: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
+  itemSub:  { fontSize: 11, color: C.textMuted, marginTop: 1 },
+  divider:  { height: 1, backgroundColor: C.border, marginHorizontal: 12 },
+});
+
+// ─── Ellipsis button (passed as rightComponent to Header) ─────────────────────
+// Defined outside the screen so it never re-creates on render.
+const EllipsisButton = ({ onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={eb.btn}
+    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    accessibilityLabel="More options"
+  >
+    <Ionicons name="ellipsis-vertical" size={20} color={C.charcoal} />
+  </TouchableOpacity>
+);
+
+const eb = StyleSheet.create({
+  btn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // subtle shadow so it lifts off the header bg
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+const AppliedTaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
-  const [task, setTask] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { user }   = useContext(AuthContext);
+
+  const [task,             setTask]             = useState(null);
+  const [loading,          setLoading]          = useState(true);
+  const [refreshing,       setRefreshing]       = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [showWorkModal, setShowWorkModal] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const {user} = useContext(AuthContext)
+  const [showReportModal,  setShowReportModal]  = useState(false);
+  const [showWorkModal,    setShowWorkModal]    = useState(false);
+  const [showOptionsMenu,  setShowOptionsMenu]  = useState(false);
+  const [activeTab,        setActiveTab]        = useState('overview');
 
-  useEffect(() => {
-    loadTaskDetails();
-  }, [taskId]);
-
+  // ── Data fetching ──────────────────────────────────────────────────────────
   const loadTaskDetails = async () => {
     try {
       setLoading(true);
       const response = await getMiniTaskInfo(taskId);
-      
       if (response.status === 200) {
         setTask(response.data);
       } else {
         Alert.alert('Error', 'Task not found');
         navigation.goBack();
       }
-    } catch (error) {
-      console.error('Error loading task details:', error);
+    } catch {
       Alert.alert('Error', 'Failed to load task details');
     } finally {
       setLoading(false);
@@ -77,151 +222,116 @@ const formatFullAddress = (address) => {
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadTaskDetails();
-  };
+  useEffect(() => { loadTaskDetails(); }, [taskId]);
 
+  const onRefresh = () => { setRefreshing(true); loadTaskDetails(); };
+
+  // ── Derived flags ──────────────────────────────────────────────────────────
+  const isAssignedToUser  = task?.assignedTo && String(task.assignedTo.userId) === String(user?._id);
+  const isAssignmentPending  = isAssignedToUser && task?.assignmentAccepted === false;
+  const isTaskCompleted   = task?.status?.toLowerCase() === 'completed';
+  const canSubmitWork     = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;
+  const hasTaskerMarkedDone = task?.markedDoneByTasker === true;
+  const canMarkAsDone     = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted && !hasTaskerMarkedDone;
+  const canMessageClient  = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;
+  const isInProgressPhase = ['Assigned', 'In-progress', 'Review'].includes(task?.status);
+  const canViewSubmissions = isInProgressPhase && isAssignedToUser && task?.assignmentAccepted;
+
+  // ── Action handlers ────────────────────────────────────────────────────────
   const handleMessageClient = async () => {
     if (!task?.employer?._id) return;
     try {
-      const res = await startOrGetChatRoom({ 
-        userId2: task.employer._id, 
-        jobId: task._id 
-      });
-      
-      if (res.status === 200) {
-        navigate('ChatWindow', { roomId: res.data._id });
-      }
-    } catch (error) {
+      const res = await startOrGetChatRoom({ userId2: task.employer._id, jobId: task._id });
+      if (res.status === 200) navigate('ChatWindow', { roomId: res.data._id });
+    } catch {
       Alert.alert('Error', 'Failed to start chat with client');
     }
   };
 
-  const handleAcceptAssignment = async () => {
-    try {
-      Alert.alert(
-        "Accept Assignment",
-        "Are you sure you want to accept this task?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Accept", 
-            style: "default",
-            onPress: async () => {
-              const res = await acceptMiniTaskAssignment(taskId);
-              if(res.status === 200){
-                Alert.alert("Success", "Task accepted successfully!");
-                loadTaskDetails();
-              }
-            }
+  const handleAcceptAssignment = () => {
+    Alert.alert('Accept Assignment', 'Are you sure you want to accept this task?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Accept',
+        onPress: async () => {
+          try {
+            const res = await acceptMiniTaskAssignment(taskId);
+            if (res.status === 200) { Alert.alert('Success', 'Task accepted!'); loadTaskDetails(); }
+          } catch (err) {
+            Alert.alert('Error', err.response?.data?.message || 'Error accepting assignment');
           }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-          error.response?.data?.error || 'Error accepting task assignment';
-      Alert.alert(errorMessage);
-    }
+        },
+      },
+    ]);
   };
 
-  const handleDeclineAssignment = async () => {
-    try {
-      Alert.alert(
-        "Decline Assignment",
-        "Are you sure you want to decline this task? This action cannot be undone.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Decline", 
-            style: "destructive",
-            onPress: async () => {
+  const handleDeclineAssignment = () => {
+    Alert.alert(
+      'Decline Assignment',
+      'Are you sure? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Decline', style: 'destructive',
+          onPress: async () => {
+            try {
               const res = await rejectMiniTaskAssignment(taskId);
-              if(res.status === 200){
-                Alert.alert("Task Declined", "You have declined this task assignment.");
-                navigation.goBack(); 
+              if (res.status === 200) {
+                Alert.alert('Declined', 'You have declined this task.');
+                navigation.goBack();
               }
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || 'Error declining assignment');
             }
-          }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-          error.response?.data?.error || 'Error declining assignment';
-      Alert.alert(errorMessage);
-    }
+          },
+        },
+      ]
+    );
   };
 
-  const handleMarkAsDone = async () => {
-    try {
-      Alert.alert(
-        "Mark as Done",
-        "Are you sure you want to mark this task as completed?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Mark as Done", 
-            style: "default",
-            onPress: async () => {
-              const res = await markTaskAsDoneTasker(taskId);
-              if (res.status === 200){
-                Alert.alert("Success", "Task marked as completed!");
-                setTimeout(() => {
-                  setRatingModalVisible(true);
-                }, 800);
-                loadTaskDetails();
-              }
+  const handleMarkAsDone = () => {
+    Alert.alert('Mark as Done', 'Confirm this task is completed?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Mark as Done',
+        onPress: async () => {
+          try {
+            const res = await markTaskAsDoneTasker(taskId);
+            if (res.status === 200) {
+              Alert.alert('Great!', 'Task marked as completed.');
+              loadTaskDetails();
+              setTimeout(() => setRatingModalVisible(true), 800);
             }
+          } catch (err) {
+            Alert.alert('Error', err.response?.data?.message || 'Error marking task as done');
           }
-        ]
-      );
-    } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-          error.response?.data?.error || 'Error marking task as done';
-      Alert.alert(errorMessage);
-    }
+        },
+      },
+    ]);
   };
 
   const handleReportPress = () => {
     if (!isAssignedToUser) {
-      Alert.alert(
-        'Not Assigned',
-        'You can only report issues for tasks assigned to you.'
-      );
+      Alert.alert('Not Assigned', 'You can only report issues for tasks assigned to you.');
       return;
     }
     setShowReportModal(true);
   };
 
-  const handleReportSubmitted = () => {
-    Alert.alert('Success', 'Your report has been submitted successfully!');
-  };
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const getStatusColor = (status) => ({
+    open:          '#10B981',
+    pending:       '#F59E0B',
+    assigned:      '#3B82F6',
+    'in-progress': '#F59E0B',
+    review:        '#8B5CF6',
+    completed:     '#10B981',
+    closed:        '#6B7280',
+  }[status?.toLowerCase()] || '#6B7280');
 
-  const getStatusColor = (status) => {
-    const map = {
-      open: '#10B981',
-      pending: '#F59E0B',
-      assigned: '#3B82F6',
-      'in-progress': '#F59E0B',
-      review: '#8B5CF6',
-      completed: '#10B981',
-      closed: '#6B7280',
-    };
-    return map[status?.toLowerCase()] || '#6B7280';
-  };
+  const formatDate = (d) => moment(d).format('MMM D, YYYY');
 
-  const formatDate = (date) => moment(date).format("MMM D, YYYY");
-
-  const isAssignedToUser = task?.assignedTo && String(task.assignedTo.userId) === String(user?._id);
-  const isAssignmentPending = isAssignedToUser && task?.assignmentAccepted === false;
-  const isTaskCompleted = task?.status?.toLowerCase() === 'completed';
-  const canSubmitWork = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;
-  const hasTaskerMarkedDone = task?.markedDoneByTasker === true;
-  const canMarkAsDone = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted && !hasTaskerMarkedDone;
-  const canMessageClient = isAssignedToUser && task?.assignmentAccepted && !isTaskCompleted;
-  const isInProgressPhase = ['Assigned', 'In-progress', 'Review'].includes(task?.status);
-  const canViewSubmissions = isInProgressPhase && isAssignedToUser && task?.assignmentAccepted;
-
+  // ── Loading / Error ────────────────────────────────────────────────────────
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -238,7 +348,9 @@ const formatFullAddress = (address) => {
         <View style={styles.emptyState}>
           <Ionicons name="briefcase-outline" size={80} color="#CBD5E1" />
           <Text style={styles.emptyTitle}>Task Not Found</Text>
-          <Text style={styles.emptySubtitle}>This task may have been deleted or is no longer available.</Text>
+          <Text style={styles.emptySubtitle}>
+            This task may have been deleted or is no longer available.
+          </Text>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.backBtnText}>Go Back</Text>
           </TouchableOpacity>
@@ -247,31 +359,69 @@ const formatFullAddress = (address) => {
     );
   }
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={task.title} showBackButton />
+      {/*
+        Pass the ellipsis button as rightComponent.
+        We use a stable callback reference so the Header doesn't re-render needlessly.
+      */}
+      <Header
+        title={task.title.substring(0,14)+"..."}
+        showBackButton
+        showNotifications={false}
+        rightComponent={
+          <EllipsisButton onPress={() => setShowOptionsMenu(true)} />
+        }
+      />
+
+      {/*
+        The dropdown menu is rendered OUTSIDE ScrollView at SafeAreaView level
+        so its zIndex sits above all scroll content and the header.
+      */}
+      <HeaderOptionsMenu
+        visible={showOptionsMenu}
+        onClose={() => setShowOptionsMenu(false)}
+        onSubmitWork={() => {
+          if (canSubmitWork) setShowWorkModal(true);
+          else Alert.alert('Not Available', 'You can only submit work after the assignment is accepted.');
+        }}
+        onSubmissions={() => {
+          if (canViewSubmissions) navigate('Submissions', { taskId: task._id, taskTitle: task.title });
+          else Alert.alert('Not Available', 'Submissions are only available after the assignment is accepted.');
+        }}
+        onReport={handleReportPress}
+      />
 
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
+        {/* Hero Card */}
         <View style={styles.heroCard}>
-          <Text style={styles.title}>{task.title}</Text>
+          <Text style={styles.heroTitle}>{task.title}</Text>
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: getStatusColor(task.status) }]} />
             <Text style={styles.statusText}>{task.status.replace('-', ' ')}</Text>
             {isAssignedToUser && task?.assignmentAccepted ? (
-              <Text style={styles.assignmentStatusBadge}>• Assigned to You</Text>
+              <View style={styles.assignedPill}>
+                <Text style={styles.assignedPillText}>Assigned to You</Text>
+              </View>
             ) : isAssignmentPending ? (
-              <Text style={styles.pendingBadge}>• Pending Acceptance</Text>
+              <View style={styles.pendingPill}>
+                <Text style={styles.pendingPillText}>Pending Acceptance</Text>
+              </View>
             ) : null}
-            <Text style={styles.metaText}>• Posted {formatDate(task.createdAt)}</Text>
-            <Text style={styles.metaText}>• Due {formatDate(task.deadline)}</Text>
+          </View>
+          <View style={styles.heroMeta}>
+            <Text style={styles.metaText}>Posted {formatDate(task.createdAt)}</Text>
+            <View style={styles.metaDot} />
+            <Text style={styles.metaText}>Due {formatDate(task.deadline)}</Text>
           </View>
         </View>
 
-        {/* Assignment Acceptance Banner */}
+        {/* Assignment Banner */}
         {isAssignmentPending && (
           <View style={styles.assignmentBanner}>
             <Ionicons name="alert-circle" size={24} color="#F59E0B" />
@@ -296,7 +446,7 @@ const formatFullAddress = (address) => {
               <Text style={styles.infoValue}>₵{task.budget}</Text>
               <Text style={styles.infoSubtext}>Fixed price</Text>
             </View>
-            
+
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
                 <Ionicons name="calendar-outline" size={20} color="#F59E0B" />
@@ -305,7 +455,7 @@ const formatFullAddress = (address) => {
               <Text style={styles.infoValue}>{formatDate(task.deadline)}</Text>
               <Text style={styles.infoSubtext}>{moment(task.deadline).fromNow()}</Text>
             </View>
-            
+
             <View style={styles.infoItem}>
               <View style={styles.infoItemHeader}>
                 <Ionicons name="location-outline" size={20} color="#6366F1" />
@@ -314,13 +464,11 @@ const formatFullAddress = (address) => {
               <Text style={styles.infoValue}>
                 {task.locationType === 'on-site' ? 'On-site' : 'Remote'}
               </Text>
-              {task.locationType === 'on-site' && task.address ? (
-                <Text style={styles.infoSubtext} numberOfLines={2}>
-                  {formatFullAddress(task.address)}
-                </Text>
-              ) : (
-                <Text style={styles.infoSubtext}>Work from anywhere</Text>
-              )}
+              <Text style={styles.infoSubtext} numberOfLines={2}>
+                {task.locationType === 'on-site' && task.address
+                  ? formatFullAddress(task.address)
+                  : 'Work from anywhere'}
+              </Text>
             </View>
 
             <View style={styles.infoItem}>
@@ -339,41 +487,25 @@ const formatFullAddress = (address) => {
 
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'overview' && styles.activeTab]}
-            onPress={() => setActiveTab('overview')}
-          >
-            <Text style={[styles.tabText, activeTab === 'overview' && styles.activeTabText]}>
-              Overview
-            </Text>
-          </TouchableOpacity>
-          
-          {isAssignedToUser && task?.assignmentAccepted && (
+          {['overview', ...(isAssignedToUser && task?.assignmentAccepted ? ['client'] : []), 'requirements'].map((tab) => (
             <TouchableOpacity
-              style={[styles.tab, activeTab === 'client' && styles.activeTab]}
-              onPress={() => setActiveTab('client')}
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.activeTab]}
+              onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabText, activeTab === 'client' && styles.activeTabText]}>
-                Client
+              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </Text>
             </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'requirements' && styles.activeTab]}
-            onPress={() => setActiveTab('requirements')}
-          >
-            <Text style={[styles.tabText, activeTab === 'requirements' && styles.activeTabText]}>
-              Requirements
-            </Text>
-          </TouchableOpacity>
+          ))}
         </View>
 
         {/* Tab Content */}
         <View style={styles.tabContent}>
+
+          {/* ── Overview ─────────────────────────────────────────────── */}
           {activeTab === 'overview' && (
             <>
-              {/* Description Card */}
               <View style={styles.sectionCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderIcon}>
@@ -385,7 +517,6 @@ const formatFullAddress = (address) => {
                 <MediaDisplay media={task.media} />
               </View>
 
-              {/* Timeline Card */}
               <View style={styles.sectionCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderIcon}>
@@ -418,6 +549,7 @@ const formatFullAddress = (address) => {
             </>
           )}
 
+          {/* ── Client ───────────────────────────────────────────────── */}
           {activeTab === 'client' && isAssignedToUser && task.employer && (
             <View style={styles.sectionCard}>
               <View style={styles.cardHeader}>
@@ -426,7 +558,7 @@ const formatFullAddress = (address) => {
                 </View>
                 <Text style={styles.cardTitle}>Client Information</Text>
               </View>
-              
+
               <View style={styles.clientProfile}>
                 <View style={styles.clientHeader}>
                   <View style={styles.clientAvatar}>
@@ -461,7 +593,7 @@ const formatFullAddress = (address) => {
                       <Text style={styles.contactValue}>{task.employer.email}</Text>
                     </View>
                   </View>
-                  
+
                   {task.employer.phone && (
                     <View style={styles.contactRow}>
                       <View style={styles.contactIcon}>
@@ -473,7 +605,7 @@ const formatFullAddress = (address) => {
                       </View>
                     </View>
                   )}
-                  
+
                   {task.employer.Bio && (
                     <View style={styles.contactRow}>
                       <View style={styles.contactIcon}>
@@ -495,18 +627,16 @@ const formatFullAddress = (address) => {
                     </View>
                     <View style={styles.ratingContent}>
                       <View style={styles.ratingStars}>
-                        {[1, 2, 3, 4, 5].map((star) => (
+                        {[1,2,3,4,5].map((star) => (
                           <Ionicons
                             key={star}
-                            name={star <= Math.floor(task.employer.rating) ? "star" : "star-outline"}
+                            name={star <= Math.floor(task.employer.rating) ? 'star' : 'star-outline'}
                             size={20}
                             color="#F59E0B"
                           />
                         ))}
                       </View>
-                      <Text style={styles.ratingValue}>
-                        {task.employer.rating?.toFixed(1)}/5.0
-                      </Text>
+                      <Text style={styles.ratingValue}>{task.employer.rating?.toFixed(1)}/5.0</Text>
                     </View>
                     <Text style={styles.ratingReviews}>
                       Based on {task.employer.numberOfRatings || 0} reviews
@@ -517,6 +647,7 @@ const formatFullAddress = (address) => {
             </View>
           )}
 
+          {/* ── Requirements ─────────────────────────────────────────── */}
           {activeTab === 'requirements' && (
             <View style={styles.sectionCard}>
               <View style={styles.cardHeader}>
@@ -526,7 +657,6 @@ const formatFullAddress = (address) => {
                 <Text style={styles.cardTitle}>Requirements</Text>
               </View>
 
-              {/* Requirements List */}
               <View style={styles.requirementsSection}>
                 <Text style={styles.subsectionTitle}>Task Requirements</Text>
                 {(task.requirements || []).length > 0 ? (
@@ -548,7 +678,6 @@ const formatFullAddress = (address) => {
                 )}
               </View>
 
-              {/* Skills Section */}
               {task.skillsRequired?.length > 0 && (
                 <View style={styles.skillsSection}>
                   <Text style={styles.subsectionTitle}>Required Skills</Text>
@@ -563,7 +692,6 @@ const formatFullAddress = (address) => {
                 </View>
               )}
 
-              {/* Verification Required */}
               {task.verificationRequired && (
                 <View style={styles.verificationCard}>
                   <View style={styles.verificationIcon}>
@@ -572,13 +700,12 @@ const formatFullAddress = (address) => {
                   <View style={styles.verificationContent}>
                     <Text style={styles.verificationTitle}>Verification Required</Text>
                     <Text style={styles.verificationText}>
-                      Task completion requires verification before payment release
+                      Task completion requires verification before payment release.
                     </Text>
                   </View>
                 </View>
               )}
 
-              {/* Special Instructions */}
               {task.specialInstructions && (
                 <View style={styles.instructionsCard}>
                   <View style={styles.instructionsHeader}>
@@ -592,75 +719,49 @@ const formatFullAddress = (address) => {
           )}
         </View>
 
-        {/* Completion Progress Card */}
+        {/* Completion Progress */}
         {isAssignedToUser && task?.assignmentAccepted && (
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, { marginHorizontal: 16 }]}>
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderIcon}>
                 <Ionicons name="trending-up" size={20} color="#3B82F6" />
               </View>
               <Text style={styles.cardTitle}>Completion Progress</Text>
             </View>
-            
+
             <View style={styles.progressContainer}>
-              <View style={styles.progressStep}>
-                <View style={[
-                  styles.progressDot,
-                  task.markedDoneByTasker && styles.progressDotCompleted
-                ]}>
-                  {task.markedDoneByTasker && (
-                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                  )}
-                </View>
-                <View style={styles.progressContent}>
-                  <Text style={[
-                    styles.progressLabel,
-                    task.markedDoneByTasker && styles.progressLabelCompleted
-                  ]}>
-                    You marked as done
-                  </Text>
-                  {task.taskerDoneAt && (
-                    <Text style={styles.progressDate}>
-                      {moment(task.taskerDoneAt).format('MMM D, h:mm A')}
-                    </Text>
-                  )}
-                </View>
-              </View>
-              
-              <View style={styles.progressLine} />
-              
-              <View style={styles.progressStep}>
-                <View style={[
-                  styles.progressDot,
-                  task.markedDoneByEmployer && styles.progressDotCompleted
-                ]}>
-                  {task.markedDoneByEmployer && (
-                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                  )}
-                </View>
-                <View style={styles.progressContent}>
-                  <Text style={[
-                    styles.progressLabel,
-                    task.markedDoneByEmployer && styles.progressLabelCompleted
-                  ]}>
-                    Client marked as done
-                  </Text>
-                  {task.employerDoneAt && (
-                    <Text style={styles.progressDate}>
-                      {moment(task.employerDoneAt).format('MMM D, h:mm A')}
-                    </Text>
-                  )}
-                </View>
-              </View>
+              {[
+                { done: task.markedDoneByTasker, label: 'You marked as done', date: task.taskerDoneAt },
+                { done: task.markedDoneByEmployer, label: 'Client marked as done', date: task.employerDoneAt },
+              ].map((step, i, arr) => (
+                <React.Fragment key={step.label}>
+                  <View style={styles.progressStep}>
+                    <View style={[styles.progressDot, step.done && styles.progressDotCompleted]}>
+                      {step.done && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+                    </View>
+                    <View style={styles.progressContent}>
+                      <Text style={[styles.progressLabel, step.done && styles.progressLabelCompleted]}>
+                        {step.label}
+                      </Text>
+                      {step.date && (
+                        <Text style={styles.progressDate}>
+                          {moment(step.date).format('MMM D, h:mm A')}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  {i < arr.length - 1 && <View style={styles.progressLine} />}
+                </React.Fragment>
+              ))}
             </View>
-            
+
             {task.markedDoneByTasker && task.markedDoneByEmployer && (
               <View style={styles.completionSuccess}>
                 <Ionicons name="checkmark-done" size={24} color="#10B981" />
                 <View style={styles.completionTextContainer}>
-                  <Text style={styles.completionSuccessTitle}>Task Completed!</Text>
+                  <Text style={styles.completionSuccessTitle}>Task Completed! 🎉</Text>
                   <Text style={styles.completionSuccessText}>
-                    Both parties have confirmed task completion
+                    Both parties have confirmed completion.
                   </Text>
                 </View>
               </View>
@@ -668,131 +769,82 @@ const formatFullAddress = (address) => {
           </View>
         )}
 
-        {/* Safety Guidelines Card */}
-        <View style={styles.sectionCard}>
+        {/* Safety Guidelines */}
+        <View style={[styles.sectionCard, { marginHorizontal: 16, marginTop: 16 }]}>
           <View style={styles.cardHeader}>
             <View style={styles.cardHeaderIcon}>
               <Ionicons name="shield-checkmark" size={20} color="#8B5CF6" />
             </View>
             <Text style={styles.cardTitle}>Safety Guidelines</Text>
           </View>
-          
+
           <View style={styles.safetyGrid}>
-            <View style={[styles.safetyCard, styles.safetyCardRed]}>
-              <View style={styles.safetyIcon}>
-                <Ionicons name="warning" size={24} color="#DC2626" />
+            {[
+              { icon: 'warning', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', title: 'Financial Safety', text: 'Never share personal financial info or pay outside the platform.' },
+              { icon: 'location', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', title: 'Physical Safety', text: 'Meet in public places for on-site work and inform someone of your whereabouts.' },
+              { icon: 'chatbubble', color: '#059669', bg: '#F0FDF4', border: '#BBF7D0', title: 'Communication', text: 'Keep all communication on the platform for security and dispute resolution.' },
+            ].map((s) => (
+              <View key={s.title} style={[styles.safetyCard, { backgroundColor: s.bg, borderColor: s.border }]}>
+                <Ionicons name={s.icon} size={22} color={s.color} style={{ marginBottom: 10 }} />
+                <Text style={styles.safetyTitle}>{s.title}</Text>
+                <Text style={styles.safetyText}>{s.text}</Text>
               </View>
-              <Text style={styles.safetyTitle}>Financial Safety</Text>
-              <Text style={styles.safetyText}>
-                Never share personal financial information or make payments outside the platform
-              </Text>
-            </View>
-            
-            <View style={[styles.safetyCard, styles.safetyCardBlue]}>
-              <View style={styles.safetyIcon}>
-                <Ionicons name="location" size={24} color="#2563EB" />
-              </View>
-              <Text style={styles.safetyTitle}>Physical Safety</Text>
-              <Text style={styles.safetyText}>
-                Meet in public places for onsite work and inform someone about your whereabouts
-              </Text>
-            </View>
-            
-            <View style={[styles.safetyCard, styles.safetyCardGreen]}>
-              <View style={styles.safetyIcon}>
-                <Ionicons name="chatbubble" size={24} color="#059669" />
-              </View>
-              <Text style={styles.safetyTitle}>Communication</Text>
-              <Text style={styles.safetyText}>
-                Keep all communication on the platform for dispute resolution and security
-              </Text>
-            </View>
+            ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomActionBar}>
-        {/* Primary Actions */}
-        <View style={styles.primaryActions}>
-          {isAssignmentPending && (
-            <>
-              <TouchableOpacity style={[styles.primaryButton, styles.acceptButton]} onPress={handleAcceptAssignment}>
-                <Ionicons name="checkmark-circle" size={22} color="#FFF" />
-                <Text style={styles.primaryButtonText}>Accept Task</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.primaryButton, styles.declineButton]} onPress={handleDeclineAssignment}>
-                <Ionicons name="close-circle" size={22} color="#FFF" />
-                <Text style={styles.primaryButtonText}>Decline Task</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
+      {/* ── Bottom Action Bar ─────────────────────────────────────────────── */}
+      {isAssignmentPending ? (
+        <View style={styles.bottomActionBar}>
+          <TouchableOpacity style={[styles.halfBtn, styles.acceptButton]} onPress={handleAcceptAssignment}>
+            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+            <Text style={styles.primaryBtnText}>Accept</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.halfBtn, styles.declineButton]} onPress={handleDeclineAssignment}>
+            <Ionicons name="close-circle" size={18} color={C.white} />
+            <Text style={styles.primaryBtnText}>Decline</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (canMessageClient || canMarkAsDone) ? (
+        <View style={styles.bottomActionBar}>
           {canMessageClient && (
-            <TouchableOpacity style={[styles.primaryButton, styles.messageButton]} onPress={handleMessageClient}>
-              <Ionicons name="chatbubble-ellipses" size={18} color="#FFF" />
-              <Text style={styles.primaryButtonText}>Message Client</Text>
-            </TouchableOpacity>
-          )}
-
-          {canMarkAsDone && (
-            <TouchableOpacity style={[styles.primaryButton, styles.completeButton]} onPress={handleMarkAsDone}>
-              <Ionicons name="checkmark-done" size={18} color="#FFF" />
-              <Text style={styles.primaryButtonText}>Mark as completed</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Secondary Actions */}
-        <View style={styles.secondaryActions}>
-          {canSubmitWork && (
-            <TouchableOpacity style={styles.actionItem} onPress={() => setShowWorkModal(true)}>
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="cloud-upload" size={24} color="#6366F1" />
-              </View>
-              <Text style={styles.actionLabel}>Submit Work</Text>
-            </TouchableOpacity>
-          )}
-
-          {canViewSubmissions && (
-            <TouchableOpacity 
-              style={styles.actionItem} 
-              onPress={() => navigate('Submissions', { taskId: task._id, taskTitle: task.title })}
+            <TouchableOpacity
+              style={[styles.halfBtn, { backgroundColor: C.primaryMid }]}
+              onPress={handleMessageClient}
             >
-              <View style={styles.actionIconContainer}>
-                <Ionicons name="document-attach-outline" size={24} color="#6366F1" />
-              </View>
-              <Text style={styles.actionLabel}>Submissions</Text>
+              <Ionicons name="chatbubble-ellipses" size={18} color={C.white} />
+              <Text style={styles.primaryBtnText}>Message</Text>
             </TouchableOpacity>
           )}
-
-          {isAssignedToUser && task?.assignmentAccepted && (
-            <TouchableOpacity style={styles.actionItem} onPress={handleReportPress}>
-              <View style={[styles.actionIconContainer, styles.reportIconContainer]}>
-                <Ionicons name="flag-outline" size={24} color="#EF4444" />
-              </View>
-              <Text style={[styles.actionLabel, styles.reportLabel]}>Report</Text>
+          {canMarkAsDone && (
+            <TouchableOpacity
+              style={[styles.halfBtn, { backgroundColor: C.gold }]}
+              onPress={handleMarkAsDone}
+            >
+              <Ionicons name="checkmark-done" size={18} color={C.white} />
+              <Text style={styles.primaryBtnText}>Mark Done</Text>
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      ) : null}
 
-      {/* Modals */}
+      {/* ── Modals ────────────────────────────────────────────────────────── */}
       <ReportForm
         isVisible={showReportModal}
         onClose={() => setShowReportModal(false)}
         reportedUserId={task.employer?._id}
         taskId={task._id}
         taskTitle={task.title?.substring(0, 40)}
-        onReportSubmitted={handleReportSubmitted}
+        onReportSubmitted={() => Alert.alert('Success', 'Report submitted successfully!')}
       />
-      
+
       <WorkSubmissionModal
         isVisible={showWorkModal}
         onClose={() => setShowWorkModal(false)}
         taskId={task._id}
         task={task}
-        type='miniTask'
+        type="miniTask"
         onSubmissionSuccess={loadTaskDetails}
       />
 
@@ -801,15 +853,16 @@ const formatFullAddress = (address) => {
         onClose={() => setRatingModalVisible(false)}
         userId={task.employer?._id}
         userName={task.employer?.name}
-        userRole='client'
+        userRole="client"
       />
     </SafeAreaView>
   );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-  scrollContent: { paddingBottom: 200 },
+  container:     { flex: 1, backgroundColor: '#F1F5F9' },
+  scrollContent: { paddingBottom: 160 },
 
   // Hero Card
   heroCard: {
@@ -825,801 +878,225 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
-  title: { 
-    fontSize: 21, 
-    fontWeight: '800', 
-    color: '#1E293B', 
-    marginBottom: 12,
-    lineHeight: 32,
+  heroTitle: { fontSize: 21, fontWeight: '800', color: '#1E293B', marginBottom: 12, lineHeight: 30 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusText: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  assignedPill: {
+    backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
-  statusRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    flexWrap: 'wrap', 
-    gap: 10 
+  assignedPillText: { fontSize: 13, color: '#3B82F6', fontWeight: '600' },
+  pendingPill: {
+    backgroundColor: '#FFFBEB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
   },
-  statusDot: { 
-    width: 12, 
-    height: 12, 
-    borderRadius: 6 
-  },
-  statusText: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#1E293B' 
-  },
-  assignmentStatusBadge: {
-    fontSize: 14,
-    color: '#3B82F6',
-    fontWeight: '600',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  pendingBadge: {
-    fontSize: 14,
-    color: '#F59E0B',
-    fontWeight: '600',
-    backgroundColor: '#FFFBEB',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  metaText: { 
-    fontSize: 14, 
-    color: '#64748B',
-    fontWeight: '500',
-  },
+  pendingPillText: { fontSize: 13, color: '#F59E0B', fontWeight: '600' },
+  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
+  metaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#CBD5E1' },
 
   // Assignment Banner
   assignmentBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FCD34D',
-    borderWidth: 2,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 20,
-    borderRadius: 18,
-    gap: 16,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFFBEB', borderColor: '#FCD34D', borderWidth: 2,
+    marginHorizontal: 16, marginBottom: 20,
+    padding: 18, borderRadius: 18, gap: 14,
   },
-  assignmentTextContainer: {
-    flex: 1,
-  },
-  assignmentTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#92400E',
-    marginBottom: 4,
-  },
-  assignmentMessage: {
-    fontSize: 14,
-    color: '#92400E',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
+  assignmentTextContainer: { flex: 1 },
+  assignmentTitle: { fontSize: 16, fontWeight: '800', color: '#92400E', marginBottom: 4 },
+  assignmentMessage: { fontSize: 14, color: '#92400E', lineHeight: 20 },
 
   // Info Grid
-  infoGridContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 16,
-    marginLeft: 4,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
+  infoGridContainer: { paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeader: { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 14, marginLeft: 2 },
+  infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   infoItem: {
-    width: (width - 48) / 2,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    width: (width - 44) / 2,
+    backgroundColor: '#FFFFFF', padding: 18, borderRadius: 18,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07, shadowRadius: 10, elevation: 4,
+    borderWidth: 1, borderColor: '#F1F5F9', marginBottom: 4,
   },
-  infoItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  infoLabel: { 
-    fontSize: 12, 
-    color: '#64748B', 
-    fontWeight: '700', 
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    flex: 1,
-  },
-  infoValue: { 
-    fontSize: 20, 
-    fontWeight: '900', 
-    color: '#1E293B', 
-    marginBottom: 4,
-  },
-  infoSubtext: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
-    marginTop: 2,
-    fontWeight: '500',
-  },
+  infoItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  infoLabel: { fontSize: 11, color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  infoValue: { fontSize: 18, fontWeight: '900', color: '#1E293B', marginBottom: 3 },
+  infoSubtext: { fontSize: 12, color: '#94A3B8', lineHeight: 17, fontWeight: '500' },
 
-  // Tab Navigation
+  // Tabs
   tabContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop:12,
-    marginBottom: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    flexDirection: 'row', paddingHorizontal: 16,
+    marginTop: 8, marginBottom: 20,
+    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
   },
-  tab: {
-    paddingBottom: 16,
-    marginRight: 32,
-  },
-  activeTab: {
-    borderBottomWidth: 3,
-    borderBottomColor: '#6366F1',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  activeTabText: {
-    color: '#6366F1',
-    fontWeight: '700',
-  },
+  tab: { paddingBottom: 14, marginRight: 28 },
+  activeTab: { borderBottomWidth: 3, borderBottomColor: '#6366F1' },
+  tabText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  activeTabText: { color: '#6366F1', fontWeight: '700' },
+  tabContent: { paddingHorizontal: 16 },
 
-  // Tab Content
-  tabContent: {
-    paddingHorizontal: 16,
-  },
-
-  // Section Card (Universal Card Style)
+  // Section Card
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    marginBottom: 24,
-    padding: 24,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF', marginBottom: 16,
+    padding: 20, borderRadius: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+    borderWidth: 1, borderColor: '#F1F5F9',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    gap: 12,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
   cardHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 38, height: 38, borderRadius: 11,
+    backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center',
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
+  cardTitle: { fontSize: 16, fontWeight: '800', color: '#1E293B' },
+  description: { fontSize: 15, color: '#475569', lineHeight: 24, marginBottom: 16, fontWeight: '500' },
 
-  // Description Card
-  description: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 24,
-    marginBottom: 20,
-    fontWeight: '500',
-  },
+  // Timeline
+  timeline: { gap: 4 },
+  timelineItem: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  timelineDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#6366F1', borderWidth: 3, borderColor: '#EEF2FF' },
+  timelineConnector: { width: 3, height: 22, backgroundColor: '#E2E8F0', marginLeft: 4.5 },
+  timelineContent: { flex: 1 },
+  timelineLabel: { fontSize: 14, fontWeight: '600', color: '#1E293B', marginBottom: 3 },
+  timelineDate: { fontSize: 13, color: '#64748B' },
 
-  // Timeline Card
-  timeline: {
-    gap: 8,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#6366F1',
-    borderWidth: 3,
-    borderColor: '#EEF2FF',
-  },
-  timelineConnector: {
-    width: 3,
-    height: 24,
-    backgroundColor: '#E2E8F0',
-    marginLeft: 4.5,
-  },
-  timelineContent: {
-    flex: 1,
-  },
-  timelineLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  timelineDate: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-
-  // Client Profile Card
-  clientProfile: {
-    gap: 20,
-  },
-  clientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  clientAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  avatarImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
+  // Client
+  clientProfile: { gap: 18 },
+  clientHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  clientAvatar: { width: 64, height: 64, borderRadius: 32 },
+  avatarImage: { width: 64, height: 64, borderRadius: 32 },
   avatarFallback: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: '#6366F1', justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
+  avatarText: { color: '#FFFFFF', fontSize: 24, fontWeight: '700' },
+  clientInfo: { flex: 1 },
+  clientName: { fontSize: 17, fontWeight: '700', color: '#1E293B', marginBottom: 6 },
   verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 10, alignSelf: 'flex-start',
   },
-  verifiedText: {
-    fontSize: 13,
-    color: '#059669',
-    fontWeight: '700',
-  },
-
-  // Contact Info
-  clientContact: {
-    gap: 16,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
+  verifiedText: { fontSize: 12, color: '#059669', fontWeight: '700' },
+  clientContact: { gap: 14 },
+  contactRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   contactIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
+    width: 38, height: 38, borderRadius: 11,
+    backgroundColor: '#EEF2FF', justifyContent: 'center', alignItems: 'center', marginTop: 2,
   },
-  contactInfo: {
-    flex: 1,
-  },
-  contactLabel: {
-    fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  contactValue: {
-    fontSize: 15,
-    color: '#475569',
-    fontWeight: '500',
-    lineHeight: 22,
-  },
+  contactInfo: { flex: 1 },
+  contactLabel: { fontSize: 11, color: '#64748B', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
+  contactValue: { fontSize: 14, color: '#475569', lineHeight: 20 },
+  ratingCard: { backgroundColor: '#FFFBEB', borderColor: '#FCD34D', borderWidth: 2, padding: 18, borderRadius: 18 },
+  ratingHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  ratingTitle: { fontSize: 16, fontWeight: '800', color: '#92400E' },
+  ratingContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  ratingStars: { flexDirection: 'row', gap: 3 },
+  ratingValue: { fontSize: 20, fontWeight: '800', color: '#92400E' },
+  ratingReviews: { fontSize: 13, color: '#92400E', fontWeight: '500' },
 
-  // Rating Card
-  ratingCard: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FCD34D',
-    borderWidth: 2,
-    padding: 20,
-    borderRadius: 20,
-  },
-  ratingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-  ratingTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#92400E',
-  },
-  ratingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  ratingStars: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  ratingValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#92400E',
-  },
-  ratingReviews: {
-    fontSize: 14,
-    color: '#92400E',
-    fontWeight: '500',
-  },
-
-  // Requirements Section
-  requirementsSection: {
-    marginBottom: 24,
-  },
-  subsectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 16,
-  },
-  requirementsList: {
-    gap: 12,
-  },
-  requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
+  // Requirements
+  requirementsSection: { marginBottom: 20 },
+  subsectionTitle: { fontSize: 16, fontWeight: '800', color: '#1E293B', marginBottom: 14 },
+  requirementsList: { gap: 10 },
+  requirementItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   requirementIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F0FDF4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center', marginTop: 2,
   },
-  requirementText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 22,
-    fontWeight: '500',
-  },
+  requirementText: { flex: 1, fontSize: 14, color: '#475569', lineHeight: 21 },
   placeholderCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    padding: 32,
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: 12,
+    backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 2,
+    borderStyle: 'dashed', padding: 28, borderRadius: 16,
+    alignItems: 'center', gap: 10,
   },
-  placeholderText: {
-    fontSize: 15,
-    color: '#94A3B8',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  // Skills Section
-  skillsSection: {
-    marginBottom: 24,
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
+  placeholderText: { fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+  skillsSection: { marginBottom: 20 },
+  skillsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   skillPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    gap: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#6366F1', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, gap: 6,
   },
-  skillText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-
-  // Verification Card
+  skillText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
   verificationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FCD34D',
-    borderWidth: 2,
-    padding: 20,
-    borderRadius: 20,
-    gap: 16,
-    marginBottom: 24,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FFFBEB', borderColor: '#FCD34D', borderWidth: 2,
+    padding: 18, borderRadius: 16, gap: 14, marginBottom: 16,
   },
   verificationIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#FEF3C7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 44, height: 44, borderRadius: 14,
+    backgroundColor: '#FEF3C7', justifyContent: 'center', alignItems: 'center',
   },
-  verificationContent: {
-    flex: 1,
-  },
-  verificationTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#92400E',
-    marginBottom: 6,
-  },
-  verificationText: {
-    fontSize: 14,
-    color: '#92400E',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
+  verificationContent: { flex: 1 },
+  verificationTitle: { fontSize: 15, fontWeight: '800', color: '#92400E', marginBottom: 4 },
+  verificationText: { fontSize: 13, color: '#92400E', lineHeight: 19 },
+  instructionsCard: { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 2, padding: 18, borderRadius: 16 },
+  instructionsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  instructionsTitle: { fontSize: 15, fontWeight: '800', color: '#1E293B' },
+  instructionsText: { fontSize: 14, color: '#475569', lineHeight: 21 },
 
-  // Instructions Card
-  instructionsCard: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    borderWidth: 2,
-    padding: 20,
-    borderRadius: 20,
-  },
-  instructionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  instructionsTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E293B',
-  },
-  instructionsText: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 22,
-    fontWeight: '500',
-  },
-
-  // Completion Progress
-  progressContainer: {
-    gap: 12,
-  },
-  progressStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 16,
-  },
+  // Progress
+  progressContainer: { gap: 4 },
+  progressStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   progressDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center',
+    borderWidth: 3, borderColor: '#FFFFFF',
   },
-  progressDotCompleted: {
-    backgroundColor: '#10B981',
-  },
-  progressContent: {
-    flex: 1,
-    paddingTop: 4,
-  },
-  progressLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#64748B',
-    marginBottom: 6,
-  },
-  progressLabelCompleted: {
-    color: '#10B981',
-  },
-  progressDate: {
-    fontSize: 13,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  progressLine: {
-    width: 3,
-    height: 28,
-    backgroundColor: '#E2E8F0',
-    marginLeft: 14.5,
-  },
+  progressDotCompleted: { backgroundColor: '#10B981' },
+  progressContent: { flex: 1, paddingTop: 3 },
+  progressLabel: { fontSize: 15, fontWeight: '700', color: '#64748B', marginBottom: 4 },
+  progressLabelCompleted: { color: '#10B981' },
+  progressDate: { fontSize: 12, color: '#94A3B8' },
+  progressLine: { width: 3, height: 24, backgroundColor: '#E2E8F0', marginLeft: 13.5 },
   completionSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    backgroundColor: '#F0FDF4',
-    borderColor: '#86EFAC',
-    borderWidth: 2,
-    padding: 20,
-    borderRadius: 20,
-    marginTop: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: '#F0FDF4', borderColor: '#86EFAC', borderWidth: 2,
+    padding: 18, borderRadius: 16, marginTop: 16,
   },
-  completionTextContainer: {
-    flex: 1,
-  },
-  completionSuccessTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#065F46',
-    marginBottom: 4,
-  },
-  completionSuccessText: {
-    fontSize: 14,
-    color: '#059669',
-    fontWeight: '500',
-    lineHeight: 20,
-  },
+  completionTextContainer: { flex: 1 },
+  completionSuccessTitle: { fontSize: 16, fontWeight: '800', color: '#065F46', marginBottom: 3 },
+  completionSuccessText: { fontSize: 13, color: '#059669' },
 
-  // Safety Guidelines
-  safetyGrid: {
-    gap: 16,
-  },
-  safetyCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 2,
-  },
-  safetyCardRed: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
-  },
-  safetyCardBlue: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-  },
-  safetyCardGreen: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
-  },
-  safetyIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  safetyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  safetyText: {
-    fontSize: 15,
-    color: '#475569',
-    lineHeight: 22,
-    fontWeight: '500',
-  },
+  // Safety
+  safetyGrid: { gap: 12 },
+  safetyCard: { padding: 18, borderRadius: 16, borderWidth: 2 },
+  safetyTitle: { fontSize: 15, fontWeight: '800', color: '#1E293B', marginBottom: 6 },
+  safetyText: { fontSize: 13, color: '#475569', lineHeight: 20 },
 
   // Bottom Action Bar
   bottomActionBar: {
-    position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-    borderTopWidth: 2,
-    borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  primaryActions: { 
-    gap: 12, 
-    marginBottom: 24 
-  },
-  primaryButton: {
+    position: 'absolute', bottom: 16, left: 0, right: 0,
+    backgroundColor: C.surface,
     flexDirection: 'row',
-    backgroundColor: '#6366F1',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
     gap: 12,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  acceptButton: { 
-    backgroundColor: '#10B981', 
-    shadowColor: '#10B981' 
-  },
-  declineButton: { 
-    backgroundColor: '#EF4444', 
-    shadowColor: '#EF4444' 
-  },
-  messageButton: { 
-    backgroundColor: '#3B82F6', 
-    shadowColor: '#3B82F6' 
-  },
-  completeButton: { 
-    backgroundColor: '#F59E0B', 
-    shadowColor: '#F59E0B' 
-  },
-  primaryButtonText: { 
-    color: '#FFFFFF', 
-    fontSize: 17, 
-    fontWeight: '800' 
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 10,
-  },
-  actionItem: { 
-    alignItems: 'center', 
-    gap: 8 
-  },
-  actionIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 34,
+    borderTopWidth: 1, borderTopColor: C.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
   },
-  reportIconContainer: {
-    backgroundColor: '#FEF2F2',
+  halfBtn: {
+    flex: 1,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 15, borderRadius: 14, gap: 8,
   },
-  actionLabel: { 
-    fontSize: 12, 
-    color: '#475569', 
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  reportLabel: { 
-    color: '#EF4444' 
-  },
+  acceptButton:  { backgroundColor: C.green },
+  declineButton: { backgroundColor: C.red },
+  primaryBtnText: { color: C.white, fontSize: 15, fontWeight: '700' },
 
   // Empty State
-  emptyState: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 40 
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  emptyTitle: { fontSize: 22, fontWeight: '800', color: '#1E293B', marginTop: 20 },
+  emptySubtitle: { fontSize: 15, color: '#64748B', textAlign: 'center', marginVertical: 10, lineHeight: 23 },
+  backBtn: {
+    backgroundColor: '#6366F1', paddingHorizontal: 28, paddingVertical: 14,
+    borderRadius: 14, marginTop: 14,
   },
-  emptyTitle: { 
-    fontSize: 24, 
-    fontWeight: '800', 
-    color: '#1E293B', 
-    marginTop: 20 
-  },
-  emptySubtitle: { 
-    fontSize: 16, 
-    color: '#64748B', 
-    textAlign: 'center', 
-    marginVertical: 12,
-    lineHeight: 24,
-    fontWeight: '500',
-  },
-  backBtn: { 
-    backgroundColor: '#6366F1', 
-    paddingHorizontal: 32, 
-    paddingVertical: 16, 
-    borderRadius: 16,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    marginTop: 16,
-  },
-  backBtnText: { 
-    color: '#FFF', 
-    fontSize: 16, 
-    fontWeight: '700' 
-  },
+  backBtnText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
 });
 
 export default AppliedTaskDetailsScreen;
