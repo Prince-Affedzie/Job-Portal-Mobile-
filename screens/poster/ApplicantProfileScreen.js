@@ -814,13 +814,27 @@ export default function ApplicantProfileScreen({ route, navigation }) {
           </TouchableOpacity>
         </Animated.View>
 
-      {/* Always-visible glass back btn */}
-      <View style={[ss.floatingHeader,{paddingTop:insets.top+8,backgroundColor:'transparent',borderBottomWidth:0,zIndex:10}]}>
-        <TouchableOpacity onPress={()=>navigation?.goBack()} style={ss.backGlass}>
-          <Ionicons name="chevron-back" size={20} color={C.white}/>
-        </TouchableOpacity>
-        <View style={{flex:1}}/>
-      </View>
+      {/* Always-visible glass back btn + Report */}
+            <View style={[ss.floatingHeader,{
+              paddingTop:insets.top+8,
+              backgroundColor:'transparent',
+              borderBottomWidth:0,
+              zIndex:10,
+            }]}>
+              <TouchableOpacity onPress={()=>navigation?.goBack()} style={ss.backGlass}>
+                <Ionicons name="chevron-back" size={20} color={C.white}/>
+              </TouchableOpacity>
+              <View style={{flex:1}}/>
+              
+              {/* ── Report button (transparent header) ── */}
+              <TouchableOpacity
+                style={ss.reportGlassBtn}
+                onPress={() => setShowReport(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flag-outline" size={18} color={C.white} />
+              </TouchableOpacity>
+            </View>
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}

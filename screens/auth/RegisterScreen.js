@@ -33,12 +33,12 @@ const { width } = Dimensions.get('window');
 
 // ─── THEME: Pacific Indigo & Warm Gold (Light) ─────────────────────────────
 const C = {
-  bg:           '#F8FAFF',        // very light blue-grey
+  bg:           '#F8FAFF',
   surface:      '#FFFFFF',
   surfaceAlt:   '#F1F4F9',
   border:       '#E4E8EE',
   borderLight:  '#E2E8F0',
-  primary:      '#1E3A6E',        // deep indigo
+  primary:      '#1E3A6E',
   primaryLight: '#DDE7F5',
   primaryDark:  '#14274A',
   primaryGlow:  '#EBF5FF',
@@ -263,6 +263,9 @@ export default function RegisterScreen({ navigation }) {
   const [showStrength,    setShowStrength]    = useState(false);
   const [errors,          setErrors]          = useState({});
 
+  // ── EULA consent ────────────────────────────────────────────────────────
+  const [eulaAccepted, setEulaAccepted] = useState(false);
+
   // ── loading states ──────────────────────────────────────────────────────
   const [loadingEmail,  setLoadingEmail]  = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -399,6 +402,10 @@ export default function RegisterScreen({ navigation }) {
     else if (!/[^A-Za-z0-9]/.test(password))e.password = 'Must include a special character';
     if (!confirmPassword)                   e.confirmPassword = 'Please confirm your password';
     else if (password !== confirmPassword)  e.confirmPassword = 'Passwords do not match';
+    
+    // ── EULA check ────────────────────────────────────────────────────────
+    if (!eulaAccepted)                      e.eula = 'You must accept the Terms of Service and Privacy Policy';
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -409,7 +416,14 @@ export default function RegisterScreen({ navigation }) {
     if (!validate()) return;
     setLoadingEmail(true);
     try {
-      const response = await register({ name: name.trim(), email: email.trim(), password, confirmPassword, role });
+      const response = await register({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        confirmPassword,
+        role,
+        eulaAccepted: true,
+      });
       if (response?.status === 200) {
         const userRole = response?.data?.role || role;
         setTimeout(() => {
@@ -551,31 +565,65 @@ export default function RegisterScreen({ navigation }) {
                 disabled={busy}
               />
 
-              {/* Terms note */}
-              <View style={s.termsRow}>
-                <Ionicons name="shield-checkmark-outline" size={14} color={C.primary} />
-                <Text style={s.termsText}>
-                  By creating an account you agree to our{' '}
-                  <Text style={s.termsLink} onPress={() => navigation.navigate('TermsOfService')}>
-                    Terms of Service
+              {/* ── EULA Consent Checkbox ──────────────────────────────── */}
+              <View style={s.eulaContainer}>
+                <TouchableOpacity
+                  style={[s.eulaCheckbox, eulaAccepted && s.eulaCheckboxActive]}
+                  onPress={() => {
+                    setEulaAccepted(v => !v);
+                    setErrors(e => ({ ...e, eula: undefined }));
+                  }}
+                  activeOpacity={0.8}
+                  disabled={busy}
+                >
+                  {eulaAccepted && (
+                    <Ionicons name="checkmark" size={14} color={C.white} />
+                  )}
+                </TouchableOpacity>
+                <View style={s.eulaTextContainer}>
+                  <Text style={s.eulaText}>
+                    I agree to the{' '}
+                    <Text
+                      style={s.eulaLink}
+                      onPress={() => navigation.navigate('TermsOfService')}
+                    >
+                      Terms of Service
+                    </Text>
+                    {' '}and{' '}
+                    <Text
+                      style={s.eulaLink}
+                      onPress={() => navigation.navigate('PrivacyPolicy')}
+                    >
+                      Privacy Policy
+                    </Text>
                   </Text>
-                  {' '}and{' '}
-                  <Text style={s.termsLink} onPress={() => navigation.navigate('PrivacyPolicy')}>
-                    Privacy Policy
-                  </Text>
-                </Text>
+                </View>
               </View>
+              {errors.eula && (
+                <View style={s.errRow}>
+                  <Ionicons name="alert-circle-outline" size={12} color={C.coral} />
+                  <Text style={s.errText}>{errors.eula}</Text>
+                </View>
+              )}
 
-              {/* Submit */}
+              {/* ── Submit Button (disabled until EULA accepted) ──────── */}
               <TouchableOpacity
-                style={[s.submitBtn, busy && s.submitBtnDisabled]}
+                style={[
+                  s.submitBtn,
+                  (busy || !eulaAccepted) && s.submitBtnDisabled,
+                ]}
                 onPress={handleEmailSignUp}
-                disabled={busy}
+                disabled={busy || !eulaAccepted}
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={busy ? [C.textMuted, C.textMuted] : [C.primary, C.primaryDark]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  colors={
+                    busy || !eulaAccepted
+                      ? [C.textMuted, C.textMuted]
+                      : [C.primary, C.primaryDark]
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={s.submitGradient}
                 >
                   {loadingEmail ? (
@@ -704,10 +752,44 @@ const s = StyleSheet.create({
   strengthCheckRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   strengthCheckText:{ fontSize: 11, color: C.textMuted },
 
-  // Terms
-  termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 20, marginTop: 4 },
-  termsText:{ flex: 1, fontSize: 13, color: C.textMuted, lineHeight: 19 },
-  termsLink:{ color: C.primary, fontWeight: '600' },
+  // ── EULA Consent ───────────────────────────────────────────────────────
+  eulaContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+    marginTop: 4,
+    paddingVertical: 4,
+  },
+  eulaCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  eulaCheckboxActive: {
+    backgroundColor: C.primary,
+    borderColor: C.primary,
+  },
+  eulaTextContainer: {
+    flex: 1,
+  },
+  eulaText: {
+    fontSize: 14,
+    color: C.textSecondary,
+    lineHeight: 20,
+  },
+  eulaLink: {
+    color: C.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 
   // Submit
   submitBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 22 },

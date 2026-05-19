@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    bottom:25,
+    bottom:30,
     gap: 10,
     paddingHorizontal: 20,
     paddingVertical: 16,

@@ -114,6 +114,150 @@ function StatTile({ icon, iconColor, iconBg, label, value, sub }) {
   );
 }
 
+// ─── Header Options Menu ──────────────────────────────────────────────────────
+function HeaderOptionsMenu({ visible, onClose, onEdit, onBids, onSubmissions, onReport, canEdit, hasBids, canViewSubs, isInProgress }) {
+  if (!visible) return null;
+
+  return (
+    <TouchableOpacity style={hm.backdrop} activeOpacity={1} onPress={onClose}>
+      <View style={hm.menu}>
+        {/* Edit — only when task is editable */}
+        {canEdit && (
+          <TouchableOpacity
+            style={hm.item}
+            onPress={() => { onClose(); onEdit(); }}
+          >
+            <View style={[hm.iconBox, { backgroundColor: C.primaryLight }]}>
+              <Ionicons name="create-outline" size={18} color={C.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={hm.itemText}>Edit</Text>
+              <Text style={hm.itemSub}>Modify task details</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Bids — visible when there are applicants */}
+        {hasBids && (
+          <TouchableOpacity
+            style={hm.item}
+            onPress={() => { onClose(); onBids(); }}
+          >
+            <View style={[hm.iconBox, { backgroundColor: C.purpleLight }]}>
+              <Ionicons name="people-outline" size={18} color={C.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={hm.itemText}>Bids</Text>
+              <Text style={hm.itemSub}>View applicants</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Submissions */}
+        {canViewSubs && (
+          <TouchableOpacity
+            style={hm.item}
+            onPress={() => { onClose(); onSubmissions(); }}
+          >
+            <View style={[hm.iconBox, { backgroundColor: C.tealLight }]}>
+              <Ionicons name="document-attach-outline" size={18} color={C.teal} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={hm.itemText}>Submissions</Text>
+              <Text style={hm.itemSub}>View submitted work</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Report — always visible when task is in progress */}
+        {isInProgress && (
+          <TouchableOpacity
+            style={hm.item}
+            onPress={() => { onClose(); onReport(); }}
+          >
+            <View style={[hm.iconBox, { backgroundColor: C.redLight }]}>
+              <Ionicons name="flag-outline" size={18} color={C.red} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[hm.itemText, { color: C.red }]}>Report</Text>
+              <Text style={hm.itemSub}>Flag this task</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const hm = StyleSheet.create({
+  backdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    zIndex: 200,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 56,
+    paddingRight: 12,
+  },
+  menu: {
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    paddingVertical: 6,
+    minWidth: 220,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  iconBox: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  itemText: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
+  itemSub:  { fontSize: 11, color: C.textMuted, marginTop: 1 },
+});
+
+// ─── Ellipsis button ──────────────────────────────────────────────────────────
+const EllipsisButton = ({ onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={eb.btn}
+    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    accessibilityLabel="More options"
+  >
+    <Ionicons name="ellipsis-vertical" size={20} color="#0D1B35" />
+  </TouchableOpacity>
+);
+
+const eb = StyleSheet.create({
+  btn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+});
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 const ClientTaskDetailScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
@@ -123,6 +267,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const [refreshing,         setRefreshing]         = useState(false);
   const [ratingModal,        setRatingModal]        = useState(false);
   const [showReport,         setShowReport]         = useState(false);
+  const [showOptionsMenu,    setShowOptionsMenu]    = useState(false);
 
   const loadTask = useCallback(async () => {
     try {
@@ -137,7 +282,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   useEffect(() => { loadTask(); }, []);
 
   const handleMessage = async () => {
-    if (!task?.assignedTo?._id) return;
+    if (!task?.assignedTo?.userId?._id) return;
     try {
       const res = await startOrGetChatRoom({ userId2: task.assignedTo.userId._id, jobId: task._id });
       if (res.status === 200) navigate('ChatWindow', { roomId: res.data._id });
@@ -166,6 +311,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   const canMessage       = isAssigned && !isCompleted;
   const canViewSubs      = isAssigned;
   const canEdit          = ['Open','Pending'].includes(task?.status);
+  const hasBids          = task?.applicants?.length > 0 && !isCompleted;
 
   const statusCfg = getStatusCfg(task?.status || '');
   const location  = task?.locationType === 'on-site'
@@ -203,7 +349,27 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={s.container}>
       <StatusBar barStyle="dark-content"/>
-      <Header title={task.title} showBackButton/>
+      <Header
+        title={task.title.substring(0, 14) + '...'}
+        showBackButton
+        rightComponent={
+          <EllipsisButton onPress={() => setShowOptionsMenu(true)} />
+        }
+      />
+
+      {/* ── Header Options Menu ────────────────────────────────────────────── */}
+      <HeaderOptionsMenu
+        visible={showOptionsMenu}
+        onClose={() => setShowOptionsMenu(false)}
+        onEdit={() => navigate('EditTask', { taskId, task })}
+        onBids={() => navigation.navigate('TaskApplicants', { taskId: task._id, task, assignedTo: task.assignedTo })}
+        onSubmissions={() => navigation.navigate('TaskSubmissions', { taskId: task._id, taskTitle: task.title })}
+        onReport={() => setShowReport(true)}
+        canEdit={canEdit}
+        hasBids={hasBids}
+        canViewSubs={canViewSubs}
+        isInProgress={isInProgress}
+      />
 
       <ScrollView
         contentContainerStyle={s.scroll}
@@ -214,7 +380,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         {/* ── Hero card ──────────────────────────────────────────────────── */}
         <FadeIn delay={0}>
           <View style={s.heroCard}>
-            {/* Status pill + dates */}
             <View style={s.heroTopRow}>
               <View style={[s.statusPill, {backgroundColor:statusCfg.bg}]}>
                 <Ionicons name={statusCfg.icon} size={13} color={statusCfg.color}/>
@@ -225,7 +390,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 
             <Text style={s.heroTitle}>{task.title}</Text>
 
-            {/* Deadline row */}
             <View style={[s.deadlineRow, isOverdue && s.deadlineRowOverdue]}>
               <Ionicons name="calendar-outline" size={14} color={isOverdue ? C.red : C.textMuted}/>
               <Text style={[s.deadlineTxt, isOverdue && {color:C.red}]}>
@@ -288,7 +452,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 
               <View style={s.taskerInfo}>
                 <Text style={s.taskerName}>{task.assignedTo.businessName}</Text>
-                {task.assignedTo.userId.phone && <Text style={s.taskerPhone}>{task.assignedTo.userId.phone}</Text>}
+                {task.assignedTo.userId?.phone && <Text style={s.taskerPhone}>{task.assignedTo.userId.phone}</Text>}
                 <View style={s.taskerStatRow}>
                   <View style={s.taskerStat}>
                     <Ionicons name="star" size={13} color={C.accent}/>
@@ -337,7 +501,7 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         </SectionCard>
 
         {/* ── Bids preview ──────────────────────────────────────────────── */}
-        {task.applicants?.length > 0 && !isCompleted && (
+        {hasBids && (
           <SectionCard
             title="Bids"
             subtitle={`${task.applicants.length} bid${task.applicants.length!==1?'s':''} received`}
@@ -374,7 +538,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
         {/* ── Completion progress ───────────────────────────────────────── */}
         {isInProgress && (
           <SectionCard title="Completion Progress" iconName="flag-outline" iconColor={C.accent} delay={170}>
-            {/* Step 1 — Client */}
             <View style={s.progressStep}>
               <View style={[s.progressDot, task.markedDoneByEmployer && s.progressDotDone]}>
                 {task.markedDoneByEmployer
@@ -396,7 +559,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               </View>
             </View>
 
-            {/* Step 2 — Tasker */}
             <View style={[s.progressStep, {marginTop:0}]}>
               <View style={[s.progressDot, task.markedDoneByTasker && s.progressDotDone]}>
                 {task.markedDoneByTasker
@@ -415,7 +577,6 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
               </View>
             </View>
 
-            {/* Both done banner */}
             {task.markedDoneByEmployer && task.markedDoneByTasker && (
               <View style={s.completedBanner}>
                 <Ionicons name="checkmark-done-circle" size={20} color={C.teal}/>
@@ -427,13 +588,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
 
         <ClientRefundNoticeCard task={task} isTaskOwner={true}/>
 
-        <View style={{height:160}}/>
+        <View style={{height:120}}/>
       </ScrollView>
 
       {/* ── Bottom action bar ──────────────────────────────────────────── */}
-      <View style={s.actionBar}>
-        {/* Primary CTA buttons */}
-        <View style={s.primaryRow}>
+      {(canMessage || canMarkDone) && (
+        <View style={s.actionBar}>
           {canMessage && (
             <TouchableOpacity style={[s.ctaBtn, s.ctaMessage]} onPress={handleMessage} activeOpacity={0.88}>
               <Ionicons name="chatbubble-ellipses" size={18} color={C.white}/>
@@ -447,51 +607,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Secondary icon actions */}
-        <View style={s.secondaryRow}>
-          {canEdit && (
-            <TouchableOpacity style={s.iconAction} onPress={()=>navigate('EditTask',{taskId,task})}>
-              <View style={[s.iconActionBox,{backgroundColor:C.primaryLight}]}>
-                <Ionicons name="create-outline" size={20} color={C.primary}/>
-              </View>
-              <Text style={s.iconActionLabel}>Edit</Text>
-            </TouchableOpacity>
-          )}
-          {task.applicants?.length > 0 && !isCompleted && (
-            <TouchableOpacity style={s.iconAction} onPress={()=>navigation.navigate('TaskApplicants',{taskId:task._id,task,assignedTo:task.assignedTo})}>
-              <View style={[s.iconActionBox,{backgroundColor:C.purpleLight}]}>
-                <Ionicons name="people-outline" size={20} color={C.purple}/>
-                {task.applicants.length > 0 && (
-                  <View style={s.iconBadge}><Text style={s.iconBadgeTxt}>{task.applicants.length}</Text></View>
-                )}
-              </View>
-              <Text style={s.iconActionLabel}>Bids</Text>
-            </TouchableOpacity>
-          )}
-          {canViewSubs && (
-            <TouchableOpacity style={s.iconAction} onPress={()=>navigation.navigate('TaskSubmissions',{taskId:task._id,taskTitle:task.title})}>
-              <View style={[s.iconActionBox,{backgroundColor:C.tealLight}]}>
-                <Ionicons name="document-attach-outline" size={20} color={C.teal}/>
-              </View>
-              <Text style={s.iconActionLabel}>Submissions</Text>
-            </TouchableOpacity>
-          )}
-          {isInProgress && (
-            <TouchableOpacity style={s.iconAction} onPress={()=>setShowReport(true)}>
-              <View style={[s.iconActionBox,{backgroundColor:C.redLight}]}>
-                <Ionicons name="flag-outline" size={20} color={C.red}/>
-              </View>
-              <Text style={[s.iconActionLabel,{color:C.red}]}>Report</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      )}
 
       <ReportForm
         isVisible={showReport}
         onClose={()=>setShowReport(false)}
-        reportedUserId={task.assignedTo._id}
+        reportedUserId={task.assignedTo?._id}
         taskId={task._id}
         taskTitle={task.title.substring(0, 40)}
         onReportSubmitted={()=>Alert.alert('Submitted','Your report has been submitted.')}
@@ -625,25 +746,18 @@ const s = StyleSheet.create({
 
   // Action bar
   actionBar: {
-    position:'absolute', bottom:30, left:0, right:0,
+    position:'absolute', bottom:35, left:0, right:0,
     backgroundColor:C.surface,
     paddingHorizontal:16, paddingTop:14,
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     borderTopWidth:1, borderTopColor:C.border,
     shadowColor:'#000', shadowOffset:{width:0,height:-4}, shadowOpacity:0.09, shadowRadius:12, elevation:12,
+    flexDirection:'row', gap:10,
   },
-  primaryRow: { gap:10, marginBottom:14 },
-  ctaBtn:     { flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, paddingVertical:15, borderRadius:14 },
+  ctaBtn:     { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:8, paddingVertical:15, borderRadius:14 },
   ctaMessage: { backgroundColor:C.primary, shadowColor:C.primary, shadowOffset:{width:0,height:4}, shadowOpacity:0.3, shadowRadius:8, elevation:5 },
   ctaDone:    { backgroundColor:C.teal, shadowColor:C.teal, shadowOffset:{width:0,height:4}, shadowOpacity:0.3, shadowRadius:8, elevation:5 },
   ctaBtnTxt:  { color:C.white, fontSize:15, fontWeight:'700' },
-
-  secondaryRow: { flexDirection:'row', justifyContent:'space-around' },
-  iconAction:   { alignItems:'center', gap:5 },
-  iconActionBox:{ width:44, height:44, borderRadius:13, alignItems:'center', justifyContent:'center', position:'relative' },
-  iconActionLabel:{ fontSize:11, fontWeight:'600', color:C.textSecondary },
-  iconBadge:    { position:'absolute', top:-5, right:-5, backgroundColor:C.red, borderRadius:9, minWidth:18, height:18, alignItems:'center', justifyContent:'center', paddingHorizontal:4, borderWidth:2, borderColor:C.white },
-  iconBadgeTxt: { fontSize:9, fontWeight:'800', color:C.white },
 });
 
 export default ClientTaskDetailScreen;
