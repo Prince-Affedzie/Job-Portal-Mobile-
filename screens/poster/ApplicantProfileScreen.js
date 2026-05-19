@@ -12,6 +12,7 @@ import moment from 'moment';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getTaskerProfile } from '../../api/clientApi';
 import { navigate } from '../../services/navigationService';
+import ReportForm from '../../component/common/reportForm';
 
 const { width: W, height: H } = Dimensions.get('window');
 const BANNER_H   = 260;
@@ -575,6 +576,8 @@ export default function ApplicantProfileScreen({ route, navigation }) {
   const [viewerItem,    setViewerItem]    = useState(null);
   const [showViewer,    setShowViewer]    = useState(false);
 
+  const [showReport,    setShowReport]    = useState(false);
+
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchProfile = useCallback(async () => {
     setLoading(true);
@@ -790,18 +793,26 @@ export default function ApplicantProfileScreen({ route, navigation }) {
       <StatusBar barStyle="light-content"/>
 
       {/* Scroll-driven solid header */}
-      <Animated.View style={[ss.floatingHeader,{
-        paddingTop: insets.top + 8,
-        backgroundColor: C.surface,
-        opacity: headerBgOp,
-        borderBottomWidth: 1, borderBottomColor: C.hairline,
-      }]}>
-        <TouchableOpacity onPress={()=>navigation?.goBack()} style={ss.backSolid}>
-          <Ionicons name="chevron-back" size={20} color={C.charcoal}/>
-        </TouchableOpacity>
-        <Text style={ss.floatingTitle} numberOfLines={1}>{userName}</Text>
-        <View style={{width:38}}/>
-      </Animated.View>
+        <Animated.View style={[ss.floatingHeader, {
+          paddingTop: insets.top + 8,
+          backgroundColor: C.surface,
+          opacity: headerBgOp,
+          borderBottomWidth: 1, borderBottomColor: C.hairline,
+        }]}>
+          <TouchableOpacity onPress={() => navigation?.goBack()} style={ss.backSolid}>
+            <Ionicons name="chevron-back" size={20} color={C.charcoal} />
+          </TouchableOpacity>
+          <Text style={ss.floatingTitle} numberOfLines={1}>{userName}</Text>
+          
+          {/* ── Report button (solid header) ── */}
+          <TouchableOpacity
+            style={ss.reportHeaderBtn}
+            onPress={() => setShowReport(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flag-outline" size={18} color={C.coral} />
+          </TouchableOpacity>
+        </Animated.View>
 
       {/* Always-visible glass back btn */}
       <View style={[ss.floatingHeader,{paddingTop:insets.top+8,backgroundColor:'transparent',borderBottomWidth:0,zIndex:10}]}>
@@ -933,6 +944,16 @@ export default function ApplicantProfileScreen({ route, navigation }) {
         visible={showViewer}
         onClose={()=>{ setShowViewer(false); setViewerItem(null); }}
       />
+      <ReportForm
+      isVisible={showReport}
+      onClose={() => setShowReport(false)}
+      reportedUserId={profile?.userId?._id}
+      taskId={null}                          // optional
+      taskTitle={profile?.businessName || userName}
+      onReportSubmitted={() => {
+        Alert.alert('Done', 'Your report has been submitted.');
+      }}
+    />
     </View>
   );
 }
@@ -1060,4 +1081,23 @@ const ss = StyleSheet.create({
   bookBtn: { borderRadius:16, overflow:'hidden', shadowColor:'#000', shadowOffset:{width:0,height:4}, shadowOpacity:0.18, shadowRadius:8, elevation:6 },
   bookGrad: { flexDirection:'row', alignItems:'center', justifyContent:'center', paddingVertical:16, gap:10 },
   bookTxt: { color:C.white, fontSize:16, fontWeight:'700', letterSpacing:0.3 },
+
+  reportHeaderBtn: {
+  width: 38,
+  height: 38,
+  borderRadius: 12,
+  backgroundColor: C.coralBg,
+  borderWidth: 1,
+  borderColor: C.coral + '40',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+reportGlassBtn: {
+  width: 38,
+  height: 38,
+  borderRadius: 19,
+  backgroundColor: 'rgba(0,0,0,0.38)',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
 });

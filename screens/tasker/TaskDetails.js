@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,106 +12,179 @@ import {
   ActivityIndicator,
   Dimensions,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  getMiniTaskInfo, 
-  applyToMiniTask, 
-  bidOnMiniTask, 
-  negotiateMiniTask 
+import {
+  getMiniTaskInfo,
+  applyToMiniTask,
+  bidOnMiniTask,
+  negotiateMiniTask,
 } from '../../api/miniTaskApi';
-import moment from 'moment';
 import { BidModal } from '../../component/tasker/BidModal';
-import { NegotiationModal } from '../../component/tasker/NegotiationModal'; 
+import { NegotiationModal } from '../../component/tasker/NegotiationModal';
 import { ScamAlertModal } from '../../component/tasker/ScamAlertModal';
-import {MediaDisplay} from '../../component/tasker/TaskMediaDisplay';
-const HANDYMAN_AVATAR = require('../../assets/HandyManAvatar.png');
+import { MediaDisplay } from '../../component/tasker/TaskMediaDisplay';
+import ReportForm from '../../component/common/reportForm';
 import Header from '../../component/tasker/Header';
 import LoadingIndicator from '../../component/common/LoadingIndicator';
 
 const { width } = Dimensions.get('window');
 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg:            '#F8FAFF',
+  surface:       '#FFFFFF',
+  border:        '#E4E8EE',
+  borderLight:   '#EEF1F6',
+  primary:       '#1E3A6E',
+  primaryMid:    '#1A56DB',
+  primaryGlow:   '#EBF5FF',
+  gold:          '#D49B3F',
+  goldLight:     '#FCF3E1',
+  green:         '#0E9F6E',
+  greenLight:    '#E3FCEC',
+  red:           '#DC2626',
+  redLight:      '#FEF2F2',
+  amber:         '#F59E0B',
+  amberLight:    '#FFFBEB',
+  textPrimary:   '#0F172A',
+  textSecondary: '#475569',
+  textMuted:     '#94A3B8',
+  white:         '#FFFFFF',
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const calculateTimeLeft = (deadline) => {
+  if (!deadline) return { label: 'No deadline', urgent: false };
+  const diff = new Date(deadline) - new Date();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  if (days <= 0)  return { label: 'Expired', urgent: true };
+  if (days === 1) return { label: '1 day left', urgent: true };
+  if (days <= 3)  return { label: `${days} days left`, urgent: true };
+  return { label: `${days} days left`, urgent: false };
+};
+
+const formatAddress = (address) => {
+  if (!address) return null;
+  return [address.suburb, address.city, address.region].filter(Boolean).join(', ');
+};
+
+const BIDDING_CONFIG = {
+  'open-bid': {
+    icon:    'pricetags-outline',
+    label:   'Open Bidding',
+    color:   C.primaryMid,
+    bg:      C.primaryGlow,
+    btnIcon: 'pricetag',
+    btnText: 'Place a Bid',
+    sentText:'Bid Sent!',
+  },
+  negotiation: {
+    icon:    'chatbubble-ellipses-outline',
+    label:   'Open to Negotiation',
+    color:   C.gold,
+    bg:      C.goldLight,
+    btnIcon: 'chatbubbles',
+    btnText: 'Start Negotiation',
+    sentText:'Offer Sent!',
+  },
+  fixed: {
+    icon:    'lock-closed-outline',
+    label:   'Fixed Budget',
+    color:   C.green,
+    bg:      C.greenLight,
+    btnIcon: 'hand-right',
+    btnText: 'Show Interest',
+    sentText:'Interest Sent!',
+  },
+};
+
+const getBiddingCfg = (type) => BIDDING_CONFIG[type] || BIDDING_CONFIG.fixed;
+
+// ─── Small sub-components ─────────────────────────────────────────────────────
+
+const PillLabel = ({ text, color = C.primaryMid }) => (
+  <View style={styles.pillRow}>
+    <View style={[styles.pillDot, { backgroundColor: color }]} />
+    <Text style={[styles.pillText, { color }]}>{text.toUpperCase()}</Text>
+  </View>
+);
+
+const SectionCard = ({ icon, title, children, accent = C.primary }) => (
+  <View style={styles.sectionCard}>
+    <View style={styles.sectionCardHeader}>
+      <View style={[styles.sectionIconWrap, { backgroundColor: C.primaryGlow }]}>
+        <Ionicons name={icon} size={17} color={accent} />
+      </View>
+      <Text style={styles.sectionCardTitle}>{title}</Text>
+    </View>
+    {children}
+  </View>
+);
+
+const InfoChip = ({ icon, text, color = C.textSecondary, bg = C.border }) => (
+  <View style={[styles.infoChip, { backgroundColor: bg }]}>
+    <Ionicons name={icon} size={13} color={color} />
+    <Text style={[styles.infoChipText, { color }]}>{text}</Text>
+  </View>
+);
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 const TaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
-  const [task, setTask] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
-  const [showScamAlert, setShowScamAlert] = useState(false);
-  const [showBidModal, setShowBidModal] = useState(false);
-  const [showNegotiationModal, setShowNegotiationModal] = useState(false); // New state
-  const [applyClicked, setApplyClicked] = useState(false);
   const insets = useSafeAreaInsets();
-  const [fadeAnim] = useState(new Animated.Value(0));
 
-  const [bidData, setBidData] = useState({
-    amount: '',
-    message: '',
-    timeline: '',
-  });
+  const [task,                setTask]                = useState(null);
+  const [loading,             setLoading]             = useState(true);
+  const [applying,            setApplying]            = useState(false);
+  const [applyClicked,        setApplyClicked]        = useState(false);
+  const [showScamAlert,       setShowScamAlert]       = useState(false);
+  const [showBidModal,        setShowBidModal]        = useState(false);
+  const [showNegotiationModal,setShowNegotiationModal]= useState(false);
+  const [showReportForm,      setShowReportForm]      = useState(false);
 
-  const [negotiationData, setNegotiationData] = useState({ // New state
-    preferred: '',
-    mid: '',
-    lowest: '',
-    message: '',
-  });
+  const [bidData, setBidData] = useState({ amount: '', message: '', timeline: '' });
+  const [negotiationData, setNegotiationData] = useState({ preferred: '', mid: '', lowest: '', message: '' });
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchTaskDetails = async () => {
+    (async () => {
       try {
-        setLoading(true);
-        const response = await getMiniTaskInfo(taskId);
-        if (response.status === 200) {
-          setTask(response.data);
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          throw new Error('Failed to fetch task details');
-        }
-      } catch (error) {
-        console.error('Error fetching task:', error);
+        const res = await getMiniTaskInfo(taskId);
+        if (res.status === 200) {
+          setTask(res.data);
+          Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+        } else throw new Error();
+      } catch {
         Alert.alert('Error', 'Failed to load task details');
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchTaskDetails();
+    })();
   }, [taskId]);
 
+  // ── Action handlers ───────────────────────────────────────────────────────
   const handleApplyOrBid = async () => {
-    if (task?.biddingType === 'open-bid') {
-      setShowBidModal(true);
-      return;
-    }
-    
-    if (task?.biddingType === 'negotiation') {
-      setShowNegotiationModal(true);
-      return;
-    }
-    
-    // Fixed bidding type
+    if (task?.biddingType === 'open-bid')    { setShowBidModal(true); return; }
+    if (task?.biddingType === 'negotiation') { setShowNegotiationModal(true); return; }
     await handleFixedApplication();
   };
 
   const handleFixedApplication = async () => {
     setApplying(true);
     try {
-      const response = await applyToMiniTask(taskId);
-      if (response.status === 200) {
+      const res = await applyToMiniTask(taskId);
+      if (res.status === 200) {
         setApplyClicked(true);
-        Alert.alert('Success', "You've shown interest in this job! Stay Tuned — the client might reach out soon.");
-      } else {
-        Alert.alert('Error', 'An error occurred. Please try again later.');
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
-      Alert.alert('Error', errorMessage);
+        Alert.alert('Interest Sent! 🎉', "Stay tuned — the client might reach out soon.");
+      } else Alert.alert('Error', 'Please try again later.');
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || 'An unexpected error occurred.');
     } finally {
       setApplying(false);
     }
@@ -119,23 +192,19 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   const submitBid = async () => {
     if (!bidData.amount || !bidData.timeline) {
-      Alert.alert('Error', 'Please provide both amount and timeline for your bid');
+      Alert.alert('Missing Info', 'Please provide both amount and timeline.');
       return;
     }
-
     setApplying(true);
     try {
-      const response = await bidOnMiniTask(taskId, bidData);
-      if (response.status === 200) {
+      const res = await bidOnMiniTask(taskId, bidData);
+      if (res.status === 200) {
         setApplyClicked(true);
         setShowBidModal(false);
-        Alert.alert('Success', 'Your bid has been submitted successfully!');
-      } else {
-        Alert.alert('Error', 'An error occurred. Please try again later.');
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
-      Alert.alert('Error', errorMessage);
+        Alert.alert('Bid Submitted! 🎉', 'The client will review your bid.');
+      } else Alert.alert('Error', 'Please try again later.');
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || 'An unexpected error occurred.');
     } finally {
       setApplying(false);
     }
@@ -143,321 +212,297 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
   const submitNegotiation = async () => {
     if (!negotiationData.preferred || !negotiationData.mid || !negotiationData.lowest) {
-      Alert.alert('Error', 'Please provide all three price points for negotiation');
+      Alert.alert('Missing Info', 'Please fill all three price points.');
       return;
     }
-
     setApplying(true);
-    
     try {
-      const response = await negotiateMiniTask(taskId, negotiationData);
-      if (response.status === 200) {
+      const res = await negotiateMiniTask(taskId, negotiationData);
+      if (res.status === 200) {
         setApplyClicked(true);
         setShowNegotiationModal(false);
-        Alert.alert('Success', 'Your negotiation offer has been submitted successfully!');
-      } else {
-        Alert.alert('Error', 'An error occurred. Please try again later.');
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'An unexpected error occurred. Please try again.';
-      Alert.alert('Error', errorMessage);
+        Alert.alert('Offer Sent! 🎉', 'The client will review your negotiation offer.');
+      } else Alert.alert('Error', 'Please try again later.');
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || 'An unexpected error occurred.');
     } finally {
       setApplying(false);
     }
   };
 
-  const getRequirements = () => {
-    if (!task || !task.requirements || task.requirements.length === 0) {
-      return ['Good communication skills', 'Reliable and punctual', 'Attention to detail', 'Quality work delivery'];
-    }
-    return task.requirements;
-  };
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const requirements = task?.requirements?.length
+    ? task.requirements
+    : ['Good communication skills', 'Reliable and punctual', 'Attention to detail'];
 
-  const getSkills = () => {
-    if (!task || !task.skillsRequired || task.skillsRequired.length === 0) {
-      const categorySkills = {
-        'Creative Tasks': ['Creativity', 'Design Sense', 'Attention to Detail'],
-        'Delivery & Errands': ['Punctuality', 'Reliability', 'Communication'],
-        'Digital Services': ['Technical Skills', 'Problem Solving', 'Efficiency'],
-        'Home Services': ['Handyman Skills', 'Reliability', 'Quality Work'],
-      };
-      return categorySkills[task?.category] || ['Reliable', 'Professional', 'Skilled'];
-    }
-    return task.skillsRequired;
-  };
+  const skills = task?.skillsRequired?.length
+    ? task.skillsRequired
+    : ['Reliable', 'Professional', 'Skilled'];
 
-  const handleContact = () => {
-    const email = task?.employer?.email || 'contact@example.com';
-    Linking.openURL(`mailto:${email}?subject=Regarding: ${task?.title}`);
-  };
+  const timeLeft  = calculateTimeLeft(task?.deadline);
+  const biddingCfg = getBiddingCfg(task?.biddingType);
 
-  const calculateTimeLeft = () => {
-    if (!task?.deadline) return 'N/A';
-    const now = new Date();
-    const deadline = new Date(task.deadline);
-    const diffTime = deadline - now;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? `${diffDays} days left` : 'Expired';
-  };
-
-  const getButtonText = () => {
-    if (applying) return 'Processing...';
-    if (applyClicked) {
-      switch (task?.biddingType) {
-        case 'open-bid': return 'Bid Sent!';
-        case 'negotiation': return 'Offer Sent!';
-        default: return 'Interest Sent!';
-      }
-    }
-    
-    switch (task?.biddingType) {
-      case 'open-bid': return 'Place a Bid';
-      case 'negotiation': return 'Start Negotiation';
-      default: return 'Show Interest';
-    }
-  };
-
-  const getBiddingTypeIcon = () => {
-    switch (task?.biddingType) {
-      case 'open-bid': return 'pricetags-outline';
-      case 'negotiation': return 'chatbubble-ellipses-outline';
-      default: return 'lock-closed-outline';
-    }
-  };
-
-  const getBiddingTypeText = () => {
-    switch (task?.biddingType) {
-      case 'open-bid': return 'Open for Bids';
-      case 'negotiation': return 'Open for Negotiation';
-      default: return 'Fixed Budget';
-    }
-  };
-
+  // ── Loading / Error states ────────────────────────────────────────────────
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="Task Details" showBackButton={true} />
+        <Header title="Task Details" showBackButton />
         <LoadingIndicator text="Loading task details..." logoStyle="glow" />
-      </SafeAreaView> 
+      </SafeAreaView>
     );
   }
 
   if (!task) {
     return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle" size={64} color="#EF4444" />
-        <Text style={styles.errorText}>Task not found</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>Go Back</Text>
+      <View style={styles.errorWrap}>
+        <View style={styles.errorIconWrap}>
+          <Ionicons name="alert-circle-outline" size={40} color={C.red} />
+        </View>
+        <Text style={styles.errorTitle}>Task Not Found</Text>
+        <Text style={styles.errorSub}>This task may have been removed or expired.</Text>
+        <TouchableOpacity style={styles.errorBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.errorBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const requirements = getRequirements();
-  const skills = getSkills();
+  const buttonDisabled = applying || applyClicked;
+  const btnLabel = applyClicked
+    ? biddingCfg.sentText
+    : applying ? 'Processing…' : biddingCfg.btnText;
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Task Details" showBackButton={true} />
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <Header title="Task Details" showBackButton />
+
       <Animated.ScrollView
         style={{ opacity: fadeAnim }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
-        <LinearGradient colors={['#1A1F3B', '#2D1B69']} style={styles.heroSection}>
-          <View style={styles.heroContent}>
-            {/*<View style={styles.avatarContainer}>
-              <Image source={HANDYMAN_AVATAR} style={styles.taskAvatar} resizeMode="contain" />
-            </View>*/}
-            <View style={styles.heroTextContainer}>
-              <Text style={styles.heroTitle}>{task.title}</Text>
-              <View style={styles.heroBadges}>
-                <View style={styles.budgetBadge}>
-                  <Ionicons name="cash" size={16} color="#FFFFFF" />
-                  <Text style={styles.budgetText}>
-                    {task.biddingType === 'negotiation' ? 'Negotiable' : `₵${task.budget}`}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.statusBadge,
-                  task.status?.toLowerCase() === 'active' ? styles.activeStatus : styles.inactiveStatus
-                ]}>
-                  <Text style={styles.statusText}>{task.status || 'Active'}</Text>
-                </View>
+        {/* ── Hero Card ─────────────────────────────────────────────── */}
+        <View style={styles.heroCard}>
+          <LinearGradient
+            colors={[C.primary, '#1A3A7A']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            {/* Decorative circle */}
+            <View style={styles.heroCircle} />
+
+            {/* Bidding type pill */}
+            <View style={[styles.biddingPill, { backgroundColor: biddingCfg.bg }]}>
+              <Ionicons name={biddingCfg.icon} size={13} color={biddingCfg.color} />
+              <Text style={[styles.biddingPillText, { color: biddingCfg.color }]}>
+                {biddingCfg.label}
+              </Text>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.heroTitle}>{task.title}</Text>
+
+            {/* Meta row */}
+            <View style={styles.heroMeta}>
+              {/* Budget */}
+              <View style={styles.heroMetaItem}>
+                <Ionicons name="cash-outline" size={15} color="rgba(255,255,255,0.75)" />
+                <Text style={styles.heroMetaLabel}>Budget</Text>
+                <Text style={styles.heroMetaValue}>
+                  {task.biddingType === 'negotiation' ? 'Negotiable' : `₵${task.budget}`}
+                </Text>
               </View>
-            </View>
-          </View>
-        </LinearGradient>
 
-        {/* Main Content */}
-        <View style={styles.content}>
-          {/* Task Meta Info */}
-          <View style={styles.metaContainer}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={18} color="#6366F1" />
-              <Text style={styles.metaText}>{calculateTimeLeft()}</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name={getBiddingTypeIcon()} size={18} color="#6366F1" />
-              <Text style={styles.metaText}>{getBiddingTypeText()}</Text>
-            </View>
-          </View>
+              <View style={styles.heroMetaDivider} />
 
-          {/* Description */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="document-text-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Description</Text>
-            </View>
-            <Text style={styles.description}>{task.description}</Text>
-          </View>
+              {/* Deadline */}
+              <View style={styles.heroMetaItem}>
+                <Ionicons
+                  name="time-outline"
+                  size={15}
+                  color={timeLeft.urgent ? '#FCD34D' : 'rgba(255,255,255,0.75)'}
+                />
+                <Text style={styles.heroMetaLabel}>Deadline</Text>
+                <Text style={[styles.heroMetaValue, timeLeft.urgent && { color: '#FCD34D' }]}>
+                  {timeLeft.label}
+                </Text>
+              </View>
 
-          {/* Media Display - NEW SECTION */}
-          <MediaDisplay media={task.media} />
+              <View style={styles.heroMetaDivider} />
 
-          {/* Requirements */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Task Requirements</Text>
-            </View>
-            <View style={styles.requirementsList}>
-              {requirements.map((req, index) => (
-                <View key={index} style={styles.requirementItem}>
-                  <View style={styles.requirementBullet}>
-                    <Ionicons name="ellipse" size={8} color="#10B981" />
-                  </View>
-                  <Text style={styles.requirementText}>{req}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Skills */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="build-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Required Skills</Text>
-            </View>
-            <View style={styles.skillsContainer}>
-              {skills.map((skill, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Location */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="location-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Location</Text>
-            </View>
-            <View style={styles.locationCard}>
-              <Ionicons name="location" size={24} color="#6366F1" style={styles.locationIcon} />
-              <View style={styles.locationInfo}>
-                <Text style={styles.locationType}>{task.locationType || 'Flexible Location'}</Text>
-                <Text style={styles.addressText}>
-                  {task.address
-                    ? `${task.address.region}, ${task.address.city}, ${task.address.suburb}`
-                    : 'Location details available after application'}
+              {/* Status */}
+              <View style={styles.heroMetaItem}>
+                <Ionicons name="radio-button-on" size={15} color={task.status?.toLowerCase() === 'active' ? C.green : C.red} />
+                <Text style={styles.heroMetaLabel}>Status</Text>
+                <Text style={[
+                  styles.heroMetaValue,
+                  { color: task.status?.toLowerCase() === 'active' ? '#6EE7B7' : '#FCA5A5' }
+                ]}>
+                  {task.status || 'Active'}
                 </Text>
               </View>
             </View>
-          </View>
+          </LinearGradient>
+        </View>
 
-          {/* Client Information */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="person-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>About the Client</Text>
+        {/* ── Content ───────────────────────────────────────────────── */}
+        <View style={styles.content}>
+
+          {/* Description */}
+          <SectionCard icon="document-text-outline" title="Description">
+            <Text style={styles.description}>{task.description}</Text>
+          </SectionCard>
+
+          {/* Media */}
+          {task.media?.length > 0 && (
+            <View style={styles.mediaSectionWrap}>
+              <PillLabel text="Attachments" color={C.primaryMid} />
+              <MediaDisplay media={task.media} />
             </View>
-            <View style={styles.clientCard}>
-              <View style={styles.clientHeader}>
-                <View style={styles.clientAvatar}>
-                  <Text style={styles.avatarText}>{task.employer?.name?.charAt(0) || 'C'}</Text>
+          )}
+
+          {/* Requirements */}
+          <SectionCard icon="checkmark-circle-outline" title="Requirements">
+            {requirements.map((req, i) => (
+              <View key={i} style={styles.reqRow}>
+                <View style={styles.reqBullet}>
+                  <Ionicons name="checkmark" size={12} color={C.white} />
                 </View>
-                <View style={styles.clientInfo}>
-                  <Text style={styles.clientName}>{task.employer?.name || 'Client'}</Text>
-                  <View style={styles.clientMeta}>
-                    <View style={styles.rating}>
-                      <Ionicons name="star" size={14} color="#F59E0B" />
-                      <Text style={styles.ratingText}>Rating: {Math.floor(task.employer.rating)}</Text>
-                    </View>
-                    {task.employer?.isVerified && (
-                      <View style={styles.verifiedBadge}>
-                        <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                        <Text style={styles.verifiedText}>Verified</Text>
-                      </View>
-                    )}
-                  </View>
+                <Text style={styles.reqText}>{req}</Text>
+              </View>
+            ))}
+          </SectionCard>
+
+          {/* Skills */}
+          <SectionCard icon="build-outline" title="Required Skills">
+            <View style={styles.skillsWrap}>
+              {skills.map((skill, i) => (
+                <View key={i} style={styles.skillChip}>
+                  <Text style={styles.skillChipText}>{skill}</Text>
                 </View>
+              ))}
+            </View>
+          </SectionCard>
+
+          {/* Location */}
+          <SectionCard icon="location-outline" title="Location" accent={C.green}>
+            <View style={styles.locationRow}>
+              <View style={[styles.locationIconWrap, { backgroundColor: C.greenLight }]}>
+                <Ionicons name="location" size={20} color={C.green} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationType}>
+                  {task.locationType || 'Flexible Location'}
+                </Text>
+                <Text style={styles.locationAddress}>
+                  {formatAddress(task.address) || 'Location details available after application'}
+                </Text>
               </View>
             </View>
-          </View>
+          </SectionCard>
 
-          {/* Safety Tips */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="shield-checkmark-outline" size={20} color="#1E293B" />
-              <Text style={styles.sectionTitle}>Safety First</Text>
-            </View>
-            <View style={styles.safetyCard}>
-              <View style={styles.safetyHeader}>
-                <Ionicons name="warning" size={24} color="#F59E0B" />
-                <View style={styles.safetyTextContainer}>
-                  <Text style={styles.safetyTitle}>Your Safety Is Our Priority</Text>
-                  <Text style={styles.safetyText}>
-                    Never pay any initial money or incentives to anyone. This platform does not require any upfront payments to secure tasks.
-                  </Text>
+          {/* Client */}
+          <SectionCard icon="person-outline" title="About the Client">
+            <View style={styles.clientRow}>
+              {/* Avatar */}
+              <View style={styles.clientAvatar}>
+                <Text style={styles.clientAvatarText}>
+                  {task.employer?.name?.charAt(0)?.toUpperCase() || 'C'}
+                </Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.clientName}>
+                  {task.employer?.name || 'Client'}
+                </Text>
+
+                <View style={styles.clientChips}>
+                  {task.employer?.rating != null && (
+                    <InfoChip
+                      icon="star"
+                      text={`${Math.floor(task.employer.rating)} rating`}
+                      color={C.gold}
+                      bg={C.goldLight}
+                    />
+                  )}
+                  {task.employer?.isVerified && (
+                    <InfoChip
+                      icon="checkmark-circle"
+                      text="Verified"
+                      color={C.green}
+                      bg={C.greenLight}
+                    />
+                  )}
                 </View>
               </View>
-              <TouchableOpacity 
-                style={styles.learnMoreButton}
-                onPress={() => setShowScamAlert(true)}
+
+              {/* Report button */}
+              <TouchableOpacity
+                style={styles.reportBtn}
+                onPress={() => setShowReportForm(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.learnMoreText}>Learn More About Safety</Text>
-                <Ionicons name="chevron-forward" size={16} color="#6366F1" />
+                <Ionicons name="flag-outline" size={16} color={C.red} />
+                <Text style={styles.reportBtnText}>Report</Text>
               </TouchableOpacity>
             </View>
+          </SectionCard>
+
+          {/* Safety */}
+          <View style={styles.safetyCard}>
+            <View style={styles.safetyTop}>
+              <View style={styles.safetyIconWrap}>
+                <Ionicons name="shield-checkmark" size={22} color={C.amber} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.safetyTitle}>Stay Safe</Text>
+                <Text style={styles.safetyText}>
+                  Never pay upfront fees or send money to secure a task. Workaflow does not require any initial payments.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.safetyLearnMore}
+              onPress={() => setShowScamAlert(true)}
+            >
+              <Text style={styles.safetyLearnMoreText}>Learn About Scam Alerts</Text>
+              <Ionicons name="chevron-forward" size={15} color={C.primaryMid} />
+            </TouchableOpacity>
           </View>
+
         </View>
       </Animated.ScrollView>
 
-      {/* Fixed Apply Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+      {/* ── Sticky Footer ─────────────────────────────────────────────── */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
-          style={[
-            styles.applyButton,
-            (applying || applyClicked) && styles.applyButtonDisabled
-          ]}
+          style={[styles.applyBtn, buttonDisabled && styles.applyBtnDisabled]}
           onPress={handleApplyOrBid}
-          disabled={applying || applyClicked}
+          disabled={buttonDisabled}
+          activeOpacity={0.88}
         >
           {applying ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={C.white} size="small" />
           ) : (
             <>
-              <Ionicons 
-                name={
-                  applyClicked ? 'checkmark-circle' : 
-                  task?.biddingType === 'open-bid' ? 'pricetag' : 
-                  task?.biddingType === 'negotiation' ? 'chatbubbles' : 'hand-right'
-                } 
-                size={22} 
-                color="#FFFFFF" 
+              <Ionicons
+                name={applyClicked ? 'checkmark-circle' : biddingCfg.btnIcon}
+                size={21}
+                color={C.white}
               />
-              <Text style={styles.applyText}>{getButtonText()}</Text>
+              <Text style={styles.applyBtnText}>{btnLabel}</Text>
             </>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Modals */}
-      <ScamAlertModal visible={showScamAlert} onClose={() => setShowScamAlert(false)} />
+      {/* ── Modals ────────────────────────────────────────────────────── */}
+      <ScamAlertModal
+        visible={showScamAlert}
+        onClose={() => setShowScamAlert(false)}
+      />
       <BidModal
         visible={showBidModal}
         onClose={() => setShowBidModal(false)}
@@ -474,406 +519,471 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         onSubmit={submitNegotiation}
         isProcessing={applying}
       />
+
+      {/* Report Form — passes all required context props */}
+      <ReportForm
+        isVisible={showReportForm}
+        onClose={() => setShowReportForm(false)}
+        onReportSubmitted={() => {
+          setShowReportForm(false);
+          Alert.alert('Thank you', 'Our team will review your report shortly.');
+        }}
+        reportedUserId={task?.employer?._id || task?.employer?.id || ''}
+        taskId={taskId}
+        taskTitle={task?.title || ''}
+      />
     </SafeAreaView>
   );
 };
 
-
-export const styles = StyleSheet.create({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: C.bg,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
-  errorContainer: {
+
+  // ── Error state ──
+  errorWrap: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    padding: 20,
+    justifyContent: 'center',
+    backgroundColor: C.bg,
+    paddingHorizontal: 32,
   },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 16,
+  errorIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: C.redLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.textPrimary,
+    marginBottom: 8,
+  },
+  errorSub: {
+    fontSize: 14,
+    color: C.textSecondary,
+    textAlign: 'center',
+    lineHeight: 21,
     marginBottom: 24,
   },
-  retryButton: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  errorBtn: {
+    backgroundColor: C.primaryMid,
+    paddingHorizontal: 28,
+    paddingVertical: 13,
     borderRadius: 12,
   },
-  retryText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
+  errorBtnText: {
+    color: C.white,
+    fontWeight: '700',
+    fontSize: 15,
   },
-  
-  // Hero Section
-  heroSection: {
-    padding: 24,
-    marginHorizontal:12,
-    borderRadius: 24,
-    
+
+  // ── Hero ──
+  heroCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 6,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  heroContent: {
+  heroGradient: {
+    padding: 22,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroCircle: {
+    position: 'absolute',
+    top: -40,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  biddingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
+    gap: 5,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 14,
   },
-  taskAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-  },
-  heroTextContainer: {
-    flex: 1,
+  biddingPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   heroTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 12,
-    lineHeight: 32,
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.white,
+    lineHeight: 30,
+    letterSpacing: -0.4,
+    marginBottom: 18,
   },
-  heroBadges: {
+  heroMeta: {
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
   },
-  budgetBadge: {
-    flexDirection: 'row',
+  heroMetaItem: {
+    flex: 1,
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    gap: 4,
+    gap: 3,
   },
-  budgetText: {
-    color: '#FFFFFF',
+  heroMetaLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.55)',
     fontWeight: '600',
-    fontSize: 14,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+  heroMetaValue: {
+    fontSize: 13,
+    color: C.white,
+    fontWeight: '700',
   },
-  activeStatus: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  inactiveStatus: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  heroMetaDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 
-  // Content
+  // ── Content ──
   content: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  metaContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+
+  // ── Section card ──
+  sectionCard: {
+    backgroundColor: C.surface,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: C.borderLight,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
   },
-  metaItem: {
-    flex: 1,
+  sectionCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderLight,
   },
-  metaText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#475569',
-  },
-
-  // Sections
-  section: {
-    marginBottom: 28,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  description: {
-    fontSize: 15,
-    color: '#64748B',
-    lineHeight: 24,
-  },
-
-  // Requirements - UPDATED STYLES
-  requirementsList: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingVertical: 4,
-  },
-  requirementBullet: {
-    width: 20,
+  sectionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
   },
-  requirementText: {
+  sectionCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.textPrimary,
+  },
+
+  // ── Pill label ──
+  pillRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  pillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  pillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.1,
+  },
+
+  // ── Description ──
+  description: {
     fontSize: 14,
-    color: '#475569',
-    flex: 1,
+    color: C.textSecondary,
+    lineHeight: 22,
+  },
+
+  // ── Media ──
+  mediaSectionWrap: {
+    marginBottom: 14,
+  },
+
+  // ── Requirements ──
+  reqRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    gap: 10,
+  },
+  reqBullet: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  reqText: {
+    fontSize: 14,
+    color: C.textSecondary,
     lineHeight: 20,
+    flex: 1,
     fontWeight: '500',
   },
 
-  // Skills
-  skillsContainer: {
+  // ── Skills ──
+  skillsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  skillTag: {
-    backgroundColor: '#E0E7FF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  skillChip: {
+    backgroundColor: C.primaryGlow,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
-  skillText: {
-    color: '#3730A3',
-    fontSize: 14,
-    fontWeight: '500',
+  skillChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.primaryMid,
   },
 
-  // Location
-  locationCard: {
+  // ── Location ──
+  locationRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    alignItems: 'flex-start',
+    gap: 12,
   },
-  locationIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  locationInfo: {
-    flex: 1,
+  locationIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationType: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginBottom: 3,
   },
-  addressText: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 20,
+  locationAddress: {
+    fontSize: 13,
+    color: C.textSecondary,
+    lineHeight: 19,
   },
 
-  // Client
-  clientCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  clientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  clientAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 20,
-  },
-  clientInfo: {
-    flex: 1,
-  },
-  clientName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 6,
-  },
-  clientMeta: {
+  // ── Client ──
+  clientRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  rating: {
+  clientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: C.primaryMid,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clientAvatarText: {
+    color: C.white,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  clientName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.textPrimary,
+    marginBottom: 6,
+  },
+  clientChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  infoChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#64748B',
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    borderRadius: 8,
   },
-  verifiedText: {
-    fontSize: 12,
+  infoChipText: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#059669',
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: C.redLight,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  reportBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.red,
   },
 
-  // Safety
+  // ── Safety ──
   safetyCard: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: C.amberLight,
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#FDE68A',
   },
-  safetyHeader: {
+  safetyTop: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 12,
   },
-  safetyTextContainer: {
-    flex: 1,
-    marginLeft: 12,
+  safetyIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   safetyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#92400E',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   safetyText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#92400E',
-    lineHeight: 20,
+    lineHeight: 19,
   },
-  learnMoreButton: {
+  safetyLearnMore: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#FDE68A',
   },
-  learnMoreText: {
-    color: '#6366F1',
-    fontWeight: '500',
-    fontSize: 14,
+  safetyLearnMoreText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.primaryMid,
   },
 
-  // Footer/Apply Button
+  // ── Footer ──
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    backgroundColor: C.surface,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: C.border,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  applyButton: {
+  applyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#6366F1',
+    backgroundColor: C.primaryMid,
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 14,
     gap: 8,
-    shadowColor: '#6366F1',
+    shadowColor: C.primaryMid,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  applyText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+  applyBtnDisabled: {
+    backgroundColor: C.textMuted,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  applyBtnText: {
+    color: C.white,
     fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  applyButtonDisabled: {
-    opacity: 0.7,
-  },
+});
+
+export default TaskDetailsScreen;
+
+// ─── Named style export ───────────────────────────────────────────────────────
+// ScamAlertModal (and any other component) does:
+//   import { styles } from '../../screens/TaskDetailsScreen'
+// We keep those keys alive here so nothing breaks.
+export const scamStyles = StyleSheet.create({
   scamAlertOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   scamAlertContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     width: '100%',
   },
   scamAlertTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#DC2626',
     marginBottom: 16,
     textAlign: 'center',
@@ -885,24 +995,26 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 12,
+    gap: 10,
   },
   scamAlertText: {
     fontSize: 14,
-    color: '#374151',
-    marginLeft: 8,
+    color: '#475569',
     flex: 1,
+    lineHeight: 20,
   },
   scamAlertButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#1A56DB',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   scamAlertButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
 
-export default TaskDetailsScreen;
+// Re-export merged so `import { styles } from './TaskDetailsScreen'` still resolves
+export { styles };

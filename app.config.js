@@ -28,6 +28,18 @@ export default {
     usesAppleSignIn: true, 
     bundleIdentifier: "com.affedziep44.JobPortalMobile",
     infoPlist: {
+     NSPhotoLibraryUsageDescription:
+      "Workaflow uses your photo library to let you upload profile photos, job images, portfolio items, and work submission files.",
+
+    NSCameraUsageDescription:
+      "Workaflow uses your camera to let you take profile photos, upload job-related images, and verify completed work.",
+
+    NSMicrophoneUsageDescription:
+      "Workaflow uses your microphone to enable voice messages and communication between clients and freelancers within chats.",
+
+    NSLocationWhenInUseUsageDescription:
+      "Workaflow uses your location to help you discover nearby jobs, workers, and services in your area.",
+      
       ITSAppUsesNonExemptEncryption: false,
       NSAppTransportSecurity: {
         NSAllowsArbitraryLoads: true,

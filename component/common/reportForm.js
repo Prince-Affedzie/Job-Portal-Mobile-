@@ -1,3 +1,5 @@
+// component/common/reportForm.js
+// component/common/reportForm.js
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -12,9 +14,8 @@ import {
   Dimensions,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  Animated,
   StatusBar,
-  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -22,19 +23,49 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { AuthContext } from '../../context/AuthContext';
 import { raiseDispute, addReportingEvidence, sendFileToS3 } from '../../api/commonApi';
 
-// Scaling function for responsiveness
 const { width, height } = Dimensions.get('window');
-const guidelineBaseWidth = 375;
-const scale = (size) => (width / guidelineBaseWidth) * size;
-const isTablet = width > scale(600);
+const scale = (size) => (width / 375) * size;
 
-const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
+// ─── Theme (Pacific Indigo & Warm Gold) ──────────────────────────────────────
+const C = {
+  bg: '#F8FAFF',
+  surface: '#FFFFFF',
+  border: '#E4E8EE',
+  primary: '#1E3A6E',
+  primaryDark: '#152C4F',
+  gold: '#D49B3F',
+  goldLight: '#FCF3E1',
+  red: '#DC2626',
+  redLight: '#FEE2E2',
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  white: '#FFFFFF',
+};
+
+/**
+ * ReportForm – reusable reporting bottom sheet
+ *
+ * Props:
+ *   isVisible          – boolean, show/hide
+ *   onClose            – function, called when dismissed
+ *   onReportSubmitted  – function, called after successful submission
+ *
+ *   Context props (all optional — fill only what's relevant):
+ *   reportedUserId     – the user being reported
+ *   taskId             – related task ID (can be null)
+ *   taskTitle          – display name of the task (can be empty)
+ */
+const ReportForm = ({
+  isVisible,
+  onClose,
+  onReportSubmitted,
+  reportedUserId,
+  taskId,
+  taskTitle,
+}) => {
   const { user } = React.useContext(AuthContext);
   const [formData, setFormData] = useState({
-    against: '',
-    taskId: '',
-    tasktitle: '',
-    reportedBy: '',
     reason: '',
     details: '',
     evidence: null,
@@ -42,82 +73,53 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
   const [uploadProgress, setUploadProgress] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  const reasonInputRef = useRef(null);
+  // Bottom sheet animation
+  const slideAnim = useRef(new Animated.Value(height)).current;
+  const backdropAnim = useRef(new Animated.Value(0)).current;
 
-  // Keyboard handling
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-      // Ensure TextInput retains focus
-      setTimeout(() => reasonInputRef.current?.focus(), 100);
-    });
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardVisible(false);
-    });
+    if (isVisible) {
+      Animated.parallel([
+        Animated.timing(backdropAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, damping: 25, stiffness: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(backdropAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: height, duration: 250, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [isVisible]);
 
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
-  }, []);
-
-  // Initialize form data when modal opens
+  // Reset form on open
   useEffect(() => {
-    if (isVisible && task && user) {
-      const againstUser = task.assignedTo || task.assignedTasker._id === user._id ? task.employer?._id || task.client : task.assignedTo || task.assignedTasker._id;
-      setFormData({
-        against: againstUser || '',
-        taskId: task._id || '',
-        tasktitle: task.title || '',
-        reportedBy: user?.name || '',
-        reason: '',
-        details: '',
-        evidence: null,
-      });
+    if (isVisible) {
+      setFormData({ reason: '', details: '', evidence: null });
       setErrors({});
       setUploadProgress({});
-      setTimeout(() => reasonInputRef.current?.focus(), 300);
     }
-  }, [isVisible, task, user]);
+  }, [isVisible]);
 
   const handleChange = useCallback((name, value) => {
     setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
-    }
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: undefined }));
   }, [errors]);
 
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'image/jpeg',
-          'image/png',
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ],
+        type: ['image/jpeg', 'image/png', 'application/pdf'],
         copyToCacheDirectory: true,
       });
-
       if (result.assets && result.assets.length > 0) {
         const file = result.assets[0];
         const fileInfo = await FileSystem.getInfoAsync(file.uri);
         const fileSizeMB = (fileInfo.size || file.size || 0) / (1024 * 1024);
-
         if (fileSizeMB > 5) {
-          setErrors(prev => ({
-            ...prev,
-            evidence: 'File size should be less than 5MB',
-          }));
-          setTimeout(() => {
-            setErrors(prev => ({ ...prev, evidence: undefined }));
-          }, 5000);
+          Alert.alert('File too large', 'Max file size is 5MB.');
           return;
         }
-
         setFormData(prev => ({
           ...prev,
           evidence: {
@@ -131,7 +133,6 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
       }
     } catch (error) {
       console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document');
     }
   };
 
@@ -150,114 +151,41 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.reason.trim()) {
-      newErrors.reason = 'Reason is required';
-    } else if (formData.reason.trim().length < 5) {
-      newErrors.reason = 'Reason should be at least 5 characters';
-    }
-    if (!formData.details.trim()) {
-      newErrors.details = 'Details are required';
-    } else if (formData.details.trim().length < 10) {
-      newErrors.details = 'Details should be at least 10 characters';
-    }
+    if (!formData.reason.trim()) newErrors.reason = 'Reason is required';
+    else if (formData.reason.trim().length < 5) newErrors.reason = 'Reason should be at least 5 characters';
+    if (!formData.details.trim()) newErrors.details = 'Details are required';
+    else if (formData.details.trim().length < 10) newErrors.details = 'Details should be at least 10 characters';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const uploadWithSendFileToS3 = async (uploadUrl, file) => {
-    return new Promise((resolve, reject) => {
-      try {
-        const fileToUpload = {
-          ...file,
-          lastModified: Date.now(),
-          webkitRelativePath: '',
-        };
-        sendFileToS3(uploadUrl, fileToUpload, {
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setUploadProgress({ 0: 30 + Math.floor(percentCompleted * 0.7) });
-          },
-        })
-          .then(() => {
-            setUploadProgress({ 0: 100 });
-            resolve();
-          })
-          .catch(error => {
-            console.error(`Upload failed for ${file.name}:`, error);
-            reject(error);
-          });
-      } catch (error) {
-        console.error('Error in upload setup:', error);
-        reject(error);
-      }
-    });
-  };
-
-  const uploadWithAlternativeMethod = async (uploadUrl, file) => {
-    try {
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
-      const progressHandler = {
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setUploadProgress({ 0: 30 + Math.floor(percentCompleted * 0.7) });
-        },
-      };
-      await sendFileToS3(uploadUrl, blob, progressHandler);
-      setUploadProgress({ 0: 100 });
-    } catch (error) {
-      console.error('Alternative upload failed:', error);
-      throw error;
-    }
-  };
-
   const handleSubmit = async () => {
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
     setIsLoading(true);
     try {
       let evidenceData = null;
       if (formData.evidence) {
         try {
-          const fileInfo = {
+          const evidenceResponse = await addReportingEvidence({
             filename: formData.evidence.name,
             contentType: formData.evidence.type,
-          };
-          const evidenceResponse = await addReportingEvidence(fileInfo);
+          });
           const { publicUrl, uploadURL } = evidenceResponse.data;
           setUploadProgress({ 0: 30 });
-          try {
-            await uploadWithSendFileToS3(uploadURL, formData.evidence);
-          } catch (s3Error) {
-            console.log('sendFileToS3 failed, trying alternative method:', s3Error);
-            await uploadWithAlternativeMethod(uploadURL, formData.evidence);
-          }
+          await sendFileToS3(uploadURL, formData.evidence);
+          setUploadProgress({ 0: 100 });
           evidenceData = publicUrl;
         } catch (uploadError) {
-          Alert.alert(
-            'Upload Error',
-            'Failed to upload file. Would you like to submit the report without the file?',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Submit Without File',
-                onPress: () => submitReport(null),
-              },
-            ]
-          );
+          Alert.alert('Upload Error', 'Failed to upload file. Submit without it?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Submit Without File', onPress: () => submitReport(null) },
+          ]);
           return;
         }
       }
       await submitReport(evidenceData);
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to submit report. Please try again.';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to submit report.');
     } finally {
       setIsLoading(false);
       setUploadProgress({});
@@ -267,587 +195,331 @@ const ReportForm = ({ isVisible, onClose, task, onReportSubmitted }) => {
   const submitReport = async (evidenceUrl) => {
     try {
       const reportPayload = {
-        against: formData.against,
-        taskId: formData.taskId,
-        tasktitle: formData.tasktitle,
-        reportedBy: formData.reportedBy,
-        reason: formData.reason,
-        details: formData.details,
+        against: reportedUserId || '',
+        taskId: taskId || '',
+        tasktitle: taskTitle || '',
+        reportedBy: user?.name || '',
+        reason: formData.reason.trim(),
+        details: formData.details.trim(),
         evidence: evidenceUrl,
       };
       const response = await raiseDispute(reportPayload);
       if (response.status === 200) {
-        Alert.alert(
-          'Report Submitted',
-          'Issue reported successfully. Our team will reach out soon.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onReportSubmitted) {
-                  onReportSubmitted();
-                }
-                onClose();
-              },
-            },
-          ]
-        );
-      } else {
-        throw new Error(`Unexpected response status: ${response.status}`);
+        Alert.alert('Report Submitted', 'Our team will review it shortly.', [
+          { text: 'OK', onPress: () => { onReportSubmitted?.(); onClose(); } },
+        ]);
       }
     } catch (error) {
-      console.error('Error submitting report:', error);
       throw error;
     }
   };
 
-  const handleClose = useCallback(() => {
-    if (!isLoading) {
-      if (formData.reason || formData.details || formData.evidence) {
-        Alert.alert(
-          'Discard Report?',
-          'You have unsaved changes. Are you sure you want to discard this report?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Discard', style: 'destructive', onPress: onClose },
-          ]
-        );
-      } else {
-        onClose();
-      }
-    }
-  }, [isLoading, formData, onClose]);
-
-  const FileCard = React.memo(({ file, index, progress, onRemove, disabled }) => (
-    <View style={styles.fileCard}>
-      <View style={styles.fileCardHeader}>
-        <Ionicons
-          name={
-            file.name.split('.').pop().toLowerCase().match(/jpg|jpeg|png|gif|webp/)
-              ? 'image-outline'
-              : file.name.split('.').pop().toLowerCase().match(/pdf|doc|docx/)
-              ? 'document-outline'
-              : 'file-tray-outline'
-          }
-          size={scale(20)}
-          color="#6366F1"
-        />
-        <TouchableOpacity onPress={onRemove} disabled={disabled} style={styles.fileCardRemove}>
-          <Ionicons name="close" size={scale(16)} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.fileCardName} numberOfLines={2}>
-        {file.name}
-      </Text>
-      <Text style={styles.fileCardSize}>{formatFileSize(file.size)}</Text>
-      {progress !== undefined && progress < 100 && progress > 0 && (
-        <View style={styles.fileCardProgress}>
-          <View style={[styles.fileCardProgressFill, { width: `${progress}%` }]} />
-        </View>
-      )}
-      {progress === 100 && (
-        <View style={styles.fileCardSuccess}>
-          <Ionicons name="checkmark" size={scale(12)} color="#10B981" />
-          <Text style={styles.fileCardSuccessText}>Uploaded</Text>
-        </View>
-      )}
-      {progress === -1 && (
-        <View style={styles.fileCardError}>
-          <Ionicons name="close" size={scale(12)} color="#EF4444" />
-          <Text style={styles.fileCardErrorText}>Failed</Text>
-        </View>
-      )}
-    </View>
-  ));
+  const handleClose = () => {
+    if (!isLoading) onClose();
+  };
 
   return (
-    <Modal
-      visible={isVisible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={handleClose}
-      statusBarTranslucent={true}
-    >
+    <Modal visible={isVisible} animationType="fade" transparent onRequestClose={handleClose} statusBarTranslucent>
       <StatusBar backgroundColor="rgba(0,0,0,0.5)" />
-      <SafeAreaView style={styles.container}>
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => {
-            if (!keyboardVisible) {
-              handleClose();
-            }
-          }}
-        />
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.select({
-            ios: 0,
-            android: StatusBar.currentHeight ? StatusBar.currentHeight + scale(20) : scale(20),
-          })}
-        >
-          <View style={styles.modalContent}>
+      <View style={styles.container}>
+        <Animated.View style={[styles.backdrop, { opacity: backdropAnim }]}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={handleClose} />
+        </Animated.View>
+
+        <Animated.View style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={styles.handle} />
+
             <View style={styles.header}>
-              <View style={styles.headerContent}>
-                <Ionicons name="flag" size={scale(24)} color="#EF4444" />
-                <Text style={styles.headerTitle}>Report Issue</Text>
+              <View style={styles.headerRow}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name="flag-outline" size={20} color={C.red} />
+                </View>
+                <Text style={styles.title}>Report Issue</Text>
               </View>
-              <TouchableOpacity
-                onPress={handleClose}
-                disabled={isLoading}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={scale(24)} color="#FFFFFF" />
+              <TouchableOpacity onPress={handleClose} style={styles.closeBtn} disabled={isLoading}>
+                <Ionicons name="close" size={22} color={C.textSecondary} />
               </TouchableOpacity>
             </View>
-            {formData.tasktitle && (
+
+            {taskTitle ? (
               <Text style={styles.taskInfo}>
-                Reporting issue with: <Text style={styles.taskTitle}>{formData.tasktitle}</Text>
+                Reporting: <Text style={{ fontWeight: '700', color: C.textPrimary }}>{taskTitle}</Text>
               </Text>
+            ) : null}
+          </KeyboardAvoidingView>
+
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.label}>Reason <Text style={{ color: C.red }}>*</Text></Text>
+            <TextInput
+              style={[styles.input, errors.reason && styles.inputError]}
+              placeholder="Enter reason for reporting..."
+              placeholderTextColor={C.textMuted}
+              value={formData.reason}
+              onChangeText={(text) => handleChange('reason', text)}
+              editable={!isLoading}
+              maxLength={100}
+            />
+            {errors.reason && <Text style={styles.errorText}>{errors.reason}</Text>}
+
+            <Text style={styles.label}>Details <Text style={{ color: C.red }}>*</Text></Text>
+            <TextInput
+              style={[styles.input, styles.textArea, errors.details && styles.inputError]}
+              placeholder="Describe the issue in detail..."
+              placeholderTextColor={C.textMuted}
+              value={formData.details}
+              onChangeText={(text) => handleChange('details', text)}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              editable={!isLoading}
+              maxLength={1000}
+            />
+            <Text style={styles.charCount}>{formData.details.length}/1000</Text>
+            {errors.details && <Text style={styles.errorText}>{errors.details}</Text>}
+
+            <Text style={styles.label}>Supporting Evidence (optional)</Text>
+            {!formData.evidence ? (
+              <TouchableOpacity style={styles.uploadBox} onPress={pickDocument} disabled={isLoading}>
+                <Ionicons name="cloud-upload-outline" size={24} color={C.primary} />
+                <Text style={styles.uploadText}>Add File</Text>
+                <Text style={styles.uploadSub}>Max 5MB • JPG, PNG, PDF</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.fileCard}>
+                <Ionicons name="document-outline" size={20} color={C.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fileName} numberOfLines={1}>{formData.evidence.name}</Text>
+                  <Text style={styles.fileSize}>{formatFileSize(formData.evidence.size)}</Text>
+                </View>
+                <TouchableOpacity onPress={removeDocument} disabled={isLoading}>
+                  <Ionicons name="close-circle" size={20} color={C.red} />
+                </TouchableOpacity>
+              </View>
             )}
-            <ScrollView
-              style={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="always"
-              contentContainerStyle={{
-                ...styles.scrollContentContainer,
-                paddingBottom: keyboardVisible ? scale(120) : scale(30),
-              }}
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={isLoading}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitBtn, isLoading && { opacity: 0.6 }]}
+              onPress={handleSubmit}
+              disabled={isLoading}
             >
-              {/* Reason Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  Reason <Text style={styles.required}>*</Text>
-                </Text>
-                <Text style={styles.sectionSubtitle}>
-                  Provide a brief reason for reporting
-                </Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    ref={reasonInputRef}
-                    style={[styles.textInput, errors.reason && styles.inputError]}
-                    placeholder="Enter reason for reporting..."
-                    placeholderTextColor="#9CA3AF"
-                    value={formData.reason}
-                    onChangeText={(text) => handleChange('reason', text)}
-                    editable={!isLoading}
-                    returnKeyType="next"
-                    maxLength={100}
-                    allowFontScaling={true}
-                  />
-                  {errors.reason && <Text style={styles.errorText}>{errors.reason}</Text>}
-                </View>
-              </View>
-
-              {/* Details Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>
-                  Details <Text style={styles.required}>*</Text>
-                </Text>
-                <Text style={styles.sectionSubtitle}>
-                  Provide a detailed explanation of the issue
-                </Text>
-                <View style={styles.inputContainer}>
-                  <TextInput
-                    style={[styles.textArea, errors.details && styles.inputError]}
-                    placeholder="Describe the issue in detail..."
-                    placeholderTextColor="#9CA3AF"
-                    value={formData.details}
-                    onChangeText={(text) => handleChange('details', text)}
-                    multiline={true}
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                    editable={!isLoading}
-                    maxLength={1000}
-                    returnKeyType="default"
-                    blurOnSubmit={false}
-                    allowFontScaling={true}
-                  />
-                  <View style={styles.charCounter}>
-                    {errors.details ? (
-                      <Text style={styles.errorText}>{errors.details}</Text>
-                    ) : (
-                      <Text style={styles.hintText}>Minimum 10 characters</Text>
-                    )}
-                    <Text style={styles.charCount}>{formData.details.length}/1000</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Evidence Section */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Supporting Evidence (Optional)</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Upload a file to support your report
-                </Text>
-                {!formData.evidence ? (
-                  <TouchableOpacity
-                    style={[styles.uploadCard, isLoading && styles.uploadCardDisabled]}
-                    onPress={pickDocument}
-                    disabled={isLoading}
-                  >
-                    <Ionicons name="cloud-upload" size={scale(32)} color="#6366F1" />
-                    <Text style={styles.uploadCardTitle}>Add File</Text>
-                    <Text style={styles.uploadCardSubtitle}>
-                      Max {formatFileSize(5 * 1024 * 1024)} • JPG, PNG, PDF, DOC
-                    </Text>
-                    {errors.evidence && (
-                      <Text style={styles.errorText}>{errors.evidence}</Text>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.fileGrid}>
-                    <FileCard
-                      file={formData.evidence}
-                      index={0}
-                      progress={uploadProgress[0]}
-                      onRemove={removeDocument}
-                      disabled={isLoading}
-                    />
-                  </View>
-                )}
-              </View>
-
-              {/* Error Messages */}
-              {errors.evidence && (
-                <View style={styles.errorContainer}>
-                  <View style={styles.errorHeader}>
-                    <Ionicons name="warning" size={scale(20)} color="#EF4444" />
-                    <Text style={styles.errorTitle}>File Error</Text>
-                  </View>
-                  <Text style={styles.errorItem}>{errors.evidence}</Text>
-                </View>
+              {isLoading ? (
+                <ActivityIndicator size="small" color={C.white} />
+              ) : (
+                <Text style={styles.submitText}>Submit Report</Text>
               )}
-            </ScrollView>
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton, isLoading && styles.buttonDisabled]}
-                onPress={handleClose}
-                disabled={isLoading}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.submitButton,
-                  (isLoading || !formData.reason.trim() || !formData.details.trim() || formData.reason.trim().length < 5 || formData.details.trim().length < 10) && styles.buttonDisabled,
-                ]}
-                onPress={handleSubmit}
-                disabled={isLoading || !formData.reason.trim() || !formData.details.trim() || formData.reason.trim().length < 5 || formData.details.trim().length < 10}
-              >
-                {isLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                    <Text style={styles.submitButtonText}>
-                      {uploadProgress[0] > 0 ? 'Uploading...' : 'Submitting...'}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <Ionicons name="flag" size={scale(16)} color="#FFFFFF" />
-                    <Text style={styles.submitButtonText}>Submit Report</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scale(16),
-    width: '100%',
+  sheet: {
+    backgroundColor: C.bg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: height * 0.9,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: scale(16),
-    width: Math.min(width * 0.9, scale(500)),
-    maxHeight: height * 0.95,
-    minHeight: scale(550),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.border,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   header: {
-    backgroundColor: '#EF4444',
-    borderTopLeftRadius: scale(16),
-    borderTopRightRadius: scale(16),
-    padding: scale(20),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  headerContent: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scale(8),
+    gap: 10,
   },
-  headerTitle: {
-    fontSize: scale(20),
-    fontWeight: '700',
-    color: '#FFFFFF',
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: C.redLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  closeButton: {
-    padding: scale(4),
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: C.textPrimary,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   taskInfo: {
-    fontSize: scale(14),
-    color: '#6B7280',
-    paddingHorizontal: scale(20),
-    paddingVertical: scale(12),
+    fontSize: 14,
+    color: C.textSecondary,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
-  taskTitle: {
-    fontWeight: '600',
-    color: '#111827',
+  scrollView: {
+    maxHeight: height * 0.6,
   },
   scrollContent: {
-    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  scrollContentContainer: {
-    padding: isTablet ? scale(30) : scale(20),
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.textSecondary,
+    letterSpacing: 0.3,
+    marginTop: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
   },
-  section: {
-    marginBottom: scale(24),
-  },
-  sectionTitle: {
-    fontSize: scale(18),
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: scale(8),
-  },
-  sectionSubtitle: {
-    fontSize: scale(14),
-    color: '#6B7280',
-    marginBottom: scale(16),
-  },
-  inputContainer: {
-    marginBottom: scale(16),
-  },
-  textInput: {
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: scale(12),
-    padding: scale(16),
-    fontSize: scale(16),
-    backgroundColor: '#FFFFFF',
-    color: '#111827',
+  input: {
+    backgroundColor: C.surface,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 15,
+    color: C.textPrimary,
   },
   textArea: {
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: scale(12),
-    padding: scale(16),
-    fontSize: scale(16),
-    backgroundColor: '#FFFFFF',
-    minHeight: scale(140),
+    minHeight: 120,
     textAlignVertical: 'top',
-    color: '#111827',
+    paddingTop: 13,
   },
   inputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
-  },
-  charCounter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: scale(8),
+    borderColor: C.red,
+    backgroundColor: C.redLight,
   },
   errorText: {
-    color: '#EF4444',
-    fontSize: scale(14),
-  },
-  hintText: {
-    color: '#6B7280',
-    fontSize: scale(14),
+    fontSize: 12,
+    color: C.red,
+    marginTop: 4,
+    fontWeight: '500',
   },
   charCount: {
-    color: '#6B7280',
-    fontSize: scale(14),
+    fontSize: 11,
+    color: C.textMuted,
+    textAlign: 'right',
+    marginTop: 4,
   },
-  uploadCard: {
-    backgroundColor: '#F8FAFC',
+  uploadBox: {
+    backgroundColor: C.surface,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: C.border,
     borderStyle: 'dashed',
-    borderRadius: scale(16),
-    padding: scale(24),
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
-    marginBottom: scale(16),
+    gap: 6,
   },
-  uploadCardDisabled: {
-    opacity: 0.5,
+  uploadText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.primary,
   },
-  uploadCardTitle: {
-    fontSize: scale(18),
-    fontWeight: '600',
-    color: '#6366F1',
-    marginVertical: scale(8),
-  },
-  uploadCardSubtitle: {
-    fontSize: scale(14),
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  fileGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(12),
+  uploadSub: {
+    fontSize: 12,
+    color: C.textMuted,
   },
   fileCard: {
-    width: isTablet ? scale(200) : (width - scale(72)) / 2,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 12,
+    gap: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: scale(12),
-    padding: scale(16),
-    marginBottom: scale(12),
+    borderColor: C.border,
   },
-  fileCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: scale(8),
-  },
-  fileCardRemove: {
-    padding: scale(2),
-  },
-  fileCardName: {
-    fontSize: scale(14),
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: scale(4),
-    lineHeight: scale(18),
-  },
-  fileCardSize: {
-    fontSize: scale(12),
-    color: '#6B7280',
-  },
-  fileCardProgress: {
-    height: scale(4),
-    backgroundColor: '#E5E7EB',
-    borderRadius: scale(2),
-    marginTop: scale(8),
-    overflow: 'hidden',
-  },
-  fileCardProgressFill: {
-    height: '100%',
-    backgroundColor: '#6366F1',
-    borderRadius: scale(2),
-  },
-  fileCardSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: scale(8),
-    gap: scale(4),
-  },
-  fileCardSuccessText: {
-    fontSize: scale(12),
-    color: '#10B981',
-    fontWeight: '500',
-  },
-  fileCardError: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: scale(8),
-    gap: scale(4),
-  },
-  fileCardErrorText: {
-    fontSize: scale(12),
-    color: '#EF4444',
-    fontWeight: '500',
-  },
-  errorContainer: {
-    backgroundColor: '#FEF2F2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
-    borderRadius: scale(8),
-    padding: scale(16),
-    marginBottom: scale(20),
-  },
-  errorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-    marginBottom: scale(8),
-  },
-  errorTitle: {
-    fontSize: scale(14),
+  fileName: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#991B1B',
+    color: C.textPrimary,
   },
-  errorItem: {
-    fontSize: scale(12),
-    color: '#991B1B',
-    lineHeight: scale(16),
+  fileSize: {
+    fontSize: 12,
+    color: C.textMuted,
+    marginTop: 2,
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: scale(20),
+    bottom:25,
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: C.border,
+    backgroundColor: C.surface,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  button: {
+  cancelBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale(14),
-    paddingHorizontal: scale(20),
-    borderRadius: scale(12),
-    gap: scale(8),
-    minHeight: scale(42),
+    paddingVertical: 15,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    backgroundColor: C.surface,
   },
-  cancelButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    marginRight: scale(8),
-  },
-  cancelButtonText: {
-    color: '#374151',
-    fontSize: scale(16),
+  cancelText: {
+    fontSize: 15,
     fontWeight: '600',
+    color: C.textSecondary,
   },
-  submitButton: {
-    backgroundColor: '#EF4444',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale(16),
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flexDirection: 'row',
+  submitBtn: {
+    flex: 2,
     alignItems: 'center',
-    gap: scale(8),
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: C.red,
+    shadowColor: C.red,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.white,
   },
 });
 

@@ -228,7 +228,7 @@ export const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    marginBottom:28,
+    marginBottom:38,
   },
   attachButton: {
     width: 44,

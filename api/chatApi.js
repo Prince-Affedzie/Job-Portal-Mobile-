@@ -14,3 +14,5 @@ export const handleChatFiles = (data) =>
   API.post("/api/handle/chat_files", data);
 
 export const fetchRoomInfo = (roomId) => API.get(`/api/get_room_info/${roomId}`);
+export const blockUserChat = (userId)=>API.post(`/api/block/user_chat/${userId}`)
+export const reportMessage = (messageId,data)=>API.post(`/api/chat/report/${messageId}`,data)

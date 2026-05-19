@@ -563,7 +563,7 @@ const handleSuburbChange = useCallback((text) => {
           </View>
         </FormSection>
 
-        {/* Media Upload */}
+        {/* Media Upload 
         <FormSection title="Photos & Videos" icon="images-outline" description="Add visual references (optional, max 3 files)" collapsible={true}>
           <View style={styles.mediaLimit}>
             <Text style={styles.mediaLimitText}>
@@ -611,7 +611,7 @@ const handleSuburbChange = useCallback((text) => {
               Clear photos/videos help taskers understand your requirements better
             </Text>
           </View>
-        </FormSection>
+        </FormSection>*/}
 
         {/* Skills & Requirements */}
         <FormSection title="Requirements & Skills" icon="checkmark-done-outline" description="Specify what skills and deliverables are needed" collapsible={true}>

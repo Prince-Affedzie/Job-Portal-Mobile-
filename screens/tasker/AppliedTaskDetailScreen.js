@@ -781,7 +781,9 @@ const formatFullAddress = (address) => {
       <ReportForm
         isVisible={showReportModal}
         onClose={() => setShowReportModal(false)}
-        task={task}
+        reportedUserId={task.employer?._id}
+        taskId={task._id}
+        taskTitle={task.title?.substring(0, 40)}
         onReportSubmitted={handleReportSubmitted}
       />
       
@@ -1490,7 +1492,7 @@ const styles = StyleSheet.create({
   // Bottom Action Bar
   bottomActionBar: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 12,
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',

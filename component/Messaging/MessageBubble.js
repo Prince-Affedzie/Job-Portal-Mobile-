@@ -1,3 +1,4 @@
+// component/Messaging/MessageBubble.js
 import React, { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import {
   View,
@@ -16,9 +17,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode } from 'expo-av';
 import { styles } from '../../styles/message/ChatWindowScreen.styles';
-import AudioPlayer from './AudioPlayer'; // Import the AudioPlayer component
+import AudioPlayer from './AudioPlayer';
 
-// Image Modal Component
+// ─── Image Modal Component ────────────────────────────────────────────────────
 const ImageModal = ({ visible, imageUri, fileName, onClose }) => {
   return (
     <Modal
@@ -58,7 +59,7 @@ const ImageModal = ({ visible, imageUri, fileName, onClose }) => {
   );
 };
 
-// Video Player Modal Component
+// ─── Video Player Modal Component ──────────────────────────────────────────────
 const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
   const videoRef = useRef(null);
   const [status, setStatus] = useState({});
@@ -92,7 +93,7 @@ const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
   );
 };
 
-// Video Thumbnail Component
+// ─── Video Thumbnail Component ─────────────────────────────────────────────────
 const VideoThumbnail = ({ videoUri, fileName, onPress }) => {
   const videoRef = useRef(null);
 
@@ -118,7 +119,7 @@ const VideoThumbnail = ({ videoUri, fileName, onPress }) => {
   );
 };
 
-// Document File Component
+// ─── Document File Component ───────────────────────────────────────────────────
 const DocumentFile = ({ fileUrl, fileName, fileType, onPress, isMyMessage }) => {
   const getFileIcon = () => {
     const ext = fileName.toLowerCase().split('.').pop();
@@ -190,6 +191,7 @@ const DocumentFile = ({ fileUrl, fileName, fileType, onPress, isMyMessage }) => 
   );
 };
 
+// ─── Main MessageBubble Component ──────────────────────────────────────────────
 export const MessageBubble = ({ 
   message, 
   isMyMessage, 
@@ -198,6 +200,7 @@ export const MessageBubble = ({
   messageRef, 
   isLastInGroup,
   onDelete,
+  onReport,          // ← NEW: report callback from parent
   socket 
 }) => {
   const [bubbleAnim] = useState(new Animated.Value(0));
@@ -250,17 +253,34 @@ export const MessageBubble = ({
     if (message.deleted) return;
 
     if (Platform.OS === 'ios') {
+      const options = [
+        'Cancel',
+        'Reply',
+        ...(isMyMessage ? ['Delete'] : []),
+        ...(!isMyMessage ? ['Report'] : []),
+      ];
+      const cancelButtonIndex = 0;
+      const destructiveButtonIndex = isMyMessage ? 2 : undefined;
+
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Cancel', 'Reply', ...(isMyMessage ? ['Delete'] : [])],
-          cancelButtonIndex: 0,
-          destructiveButtonIndex: isMyMessage ? 2 : undefined,
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex,
         },
         (buttonIndex) => {
           if (buttonIndex === 1) {
+            // Reply
             onReply(message);
           } else if (buttonIndex === 2 && isMyMessage) {
+            // Delete (only for own messages)
             handleDelete();
+          } else if (!isMyMessage && buttonIndex === (isMyMessage ? -1 : 2)) {
+            // Report (index 2 when Delete is not present)
+            onReport?.(message);
+          } else if (!isMyMessage && buttonIndex === 3) {
+            // Report (index 3 when Delete IS present)
+            onReport?.(message);
           }
         }
       );
@@ -529,6 +549,7 @@ export const MessageBubble = ({
               <Ionicons name="return-up-back" size={20} color="#6366F1" />
               <Text style={styles.actionText}>Reply</Text>
             </TouchableOpacity>
+
             {isMyMessage && (
               <TouchableOpacity 
                 style={[styles.actionButton, styles.deleteAction]}
@@ -538,6 +559,21 @@ export const MessageBubble = ({
                 <Text style={[styles.actionText, styles.deleteActionText]}>Delete</Text>
               </TouchableOpacity>
             )}
+
+            {/* ── Report button (only for other people's messages) ── */}
+            {!isMyMessage && (
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => {
+                  onReport?.(message);
+                  setShowActions(false);
+                }}
+              >
+                <Ionicons name="flag-outline" size={20} color="#7C3AED" />
+                <Text style={styles.actionText}>Report</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => setShowActions(false)}

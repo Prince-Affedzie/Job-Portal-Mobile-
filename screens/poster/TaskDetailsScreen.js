@@ -491,7 +491,9 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
       <ReportForm
         isVisible={showReport}
         onClose={()=>setShowReport(false)}
-        task={task}
+        reportedUserId={task.assignedTo._id}
+        taskId={task._id}
+        taskTitle={task.title.substring(0, 40)}
         onReportSubmitted={()=>Alert.alert('Submitted','Your report has been submitted.')}
       />
 
