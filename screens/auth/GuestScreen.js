@@ -1,17 +1,9 @@
 // screens/GuestScreen.js
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Dimensions,
-  StatusBar,
-  TextInput,
-  Animated,
+  View, Text, StyleSheet, SafeAreaView, ScrollView,
+  TouchableOpacity, ActivityIndicator, Dimensions,
+  StatusBar, Animated, RefreshControl, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,1052 +12,594 @@ import { getPublicTasks } from '../../api/miniTaskApi';
 
 const { width } = Dimensions.get('window');
 
-// ─── Theme (Pacific Indigo & Warm Gold) ──────────────────────────────────────
+// ─── Palette — "Pacific Indigo & Warm Gold" ───────────────────────────────────
 const C = {
-  bg:            '#F8FAFF',
+  bg:            '#F5F7FF',
   surface:       '#FFFFFF',
   border:        '#E4E8EE',
-  primary:       '#1E3A6E',
-  primaryMid:    '#1A56DB',
-  primaryDark:   '#152C4F',
-  primaryGlow:   '#EBF5FF',
+  navy:          '#0E1D3B',
+  navyMid:       '#1A2E5C',
+  navyLight:     '#243458',
+  blue:          '#1A56DB',
+  blueSoft:      '#EBF2FF',
+  blueBorder:    '#C4D7FF',
   gold:          '#D49B3F',
   goldLight:     '#FCF3E1',
-  textPrimary:   '#0F172A',
-  textSecondary: '#475569',
-  textMuted:     '#94A3B8',
-  white:         '#FFFFFF',
+  goldBorder:    '#E8C97A',
   green:         '#0E9F6E',
   greenLight:    '#E3FCEC',
+  textPri:       '#0E1D3B',
+  textSec:       '#475569',
+  textMut:       '#94A3B8',
+  white:         '#FFFFFF',
+  // card accent colours — cycling palette
+  accents: ['#1A56DB', '#D49B3F', '#0E9F6E', '#7C3AED', '#DB1A6A', '#1A7AD4'],
 };
 
-// ─── Comprehensive Services ───────────────────────────────────────────────────
-const SERVICES = [
-  { icon: 'hammer-outline',       label: 'Carpentry'     },
-  { icon: 'water-outline',        label: 'Plumbing'      },
-  { icon: 'flash-outline',        label: 'Electrical'    },
-  { icon: 'brush-outline',        label: 'Painting'      },
-  { icon: 'leaf-outline',         label: 'Gardening'     },
-  { icon: 'sparkles-outline',     label: 'Cleaning'      },
-  { icon: 'construct-outline',    label: 'Repairs'       },
-  { icon: 'desktop-outline',      label: 'Tech Help'     },
-  { icon: 'calendar-outline',     label: 'Event Planning' },
-  { icon: 'color-palette-outline',label: 'Graphic Design' },
-  { icon: 'megaphone-outline',    label: 'Digital Marketing' },
-  { icon: 'camera-outline',       label: 'Photography'   },
-  { icon: 'restaurant-outline',   label: 'Catering'      },
-  { icon: 'shirt-outline',        label: 'Fashion Design' },
-  { icon: 'school-outline',       label: 'Tutoring'      },
-  { icon: 'cut-outline',          label: 'Makeup'        },
-];
-
-// ─── How It Works ─────────────────────────────────────────────────────────────
-const STEPS = [
-  {
-    num: '01',
-    title: 'Search',
-    desc: 'Describe what you need and drop your location.',
-    icon: 'search-outline',
-    color: C.primaryMid,
-    bg: C.primaryGlow,
-  },
-  {
-    num: '02',
-    title: 'Choose',
-    desc: 'Browse vetted taskers, compare ratings & rates.',
-    icon: 'people-outline',
-    color: C.green,
-    bg: C.greenLight,
-  },
-  {
-    num: '03',
-    title: 'Book',
-    desc: 'Confirm your booking with secure payment.',
-    icon: 'calendar-outline',
-    color: C.gold,
-    bg: C.goldLight,
-  },
-];
-
-// ─── Stats Highlight ──────────────────────────────────────────────────────────
-const TRUST_STATS = [
-  { value: '2,400+', label: 'Verified Taskers' },
-  { value: '98%',    label: 'Satisfaction Rate' },
-  { value: '12K+',   label: 'Jobs Completed'    },
-];
-
-// ─── Testimonials ─────────────────────────────────────────────────────────────
-const TESTIMONIALS = [
-  {
-    name: 'Abena K.',
-    role: 'Homeowner, Accra',
-    text: 'Found a reliable plumber within 20 minutes. The booking process was seamless!',
-    rating: 5,
-    initials: 'AK',
-    color: '#1A56DB',
-  },
-  {
-    name: 'Kofi M.',
-    role: 'Tasker, Kumasi',
-    text: "I've tripled my monthly income since joining Workaflow. The platform just works.",
-    rating: 5,
-    initials: 'KM',
-    color: '#0E9F6E',
-  },
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 const formatAddress = (address) => {
   if (!address) return 'Remote';
-  return [address.suburb, address.city, address.region]
-    .filter(Boolean)
-    .join(', ') || 'Remote';
+  return [address.suburb, address.city, address.region].filter(Boolean).join(', ') || 'Remote';
 };
 
-const Stars = ({ count = 5 }) => (
-  <View style={{ flexDirection: 'row', gap: 2 }}>
-    {Array.from({ length: count }).map((_, i) => (
-      <Ionicons key={i} name="star" size={12} color="#F59E0B" />
-    ))}
-  </View>
-);
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'Recently';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 3600000);
+  if (diff < 1)  return 'Just now';
+  if (diff < 24) return `${diff}h ago`;
+  if (diff < 48) return 'Yesterday';
+  return d.toLocaleDateString('en-GH', { month: 'short', day: 'numeric' });
+};
 
-// ─── Fade‑in animation wrapper ────────────────────────────────────────────────
-const FadeInView = ({ children, delay = 0, style }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(20)).current;
-
+// ─── Animated entrance ────────────────────────────────────────────────────────
+function FadeSlide({ children, delay = 0, style }) {
+  const op = useRef(new Animated.Value(0)).current;
+  const ty = useRef(new Animated.Value(22)).current;
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1, duration: 500, delay, useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0, duration: 500, delay, useNativeDriver: true,
-      }),
+      Animated.timing(op, { toValue: 1, duration: 520, delay, useNativeDriver: true }),
+      Animated.spring(ty, { toValue: 0, tension: 50, friction: 12, delay, useNativeDriver: true }),
     ]).start();
   }, []);
+  return <Animated.View style={[style, { opacity: op, transform: [{ translateY: ty }] }]}>{children}</Animated.View>;
+}
+
+// ─── Stat pill ────────────────────────────────────────────────────────────────
+function StatPill({ icon, label, value, accent }) {
+  return (
+    <View style={[s.statPill, { borderColor: accent + '30', backgroundColor: accent + '10' }]}>
+      <View style={[s.statPillIcon, { backgroundColor: accent + '18' }]}>
+        <Ionicons name={icon} size={14} color={accent} />
+      </View>
+      <View>
+        <Text style={[s.statPillVal, { color: accent }]}>{value}</Text>
+        <Text style={s.statPillLabel}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Gig Card ─────────────────────────────────────────────────────────────────
+function GigCard({ task, index }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pIn  = () => Animated.spring(scaleAnim, { toValue: 0.975, useNativeDriver: true }).start();
+  const pOut = () => Animated.spring(scaleAnim, { toValue: 1,     useNativeDriver: true }).start();
+
+  const accent   = C.accents[index % C.accents.length];
+  const initials = task.employer?.name?.charAt(0)?.toUpperCase() || 'C';
 
   return (
-    <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>
-      {children}
-    </Animated.View>
+    <FadeSlide delay={80 + index * 60}>
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPressIn={pIn}
+          onPressOut={pOut}
+          onPress={() => navigate('GuestTaskDetail', { taskId: task._id })}
+          style={s.gigCard}
+        >
+          {/* coloured top border accent */}
+          <View style={[s.gigTopAccent, { backgroundColor: accent }]} />
+
+          <View style={s.gigInner}>
+            {/* ── Row 1: avatar + name + date + budget ── */}
+            <View style={s.gigRow1}>
+              <View style={[s.gigAvatar, { backgroundColor: accent }]}>
+                <Text style={s.gigAvatarText}>{initials}</Text>
+              </View>
+              <View style={s.gigMeta}>
+                <Text style={s.gigClientName} numberOfLines={1}>
+                  {task.employer?.name || 'Client'}
+                </Text>
+                <Text style={s.gigTime}>{formatDate(task.createdAt)}</Text>
+              </View>
+              <View style={[s.budgetBadge, { backgroundColor: C.greenLight, borderColor: C.green + '30' }]}>
+                <Ionicons name="cash-outline" size={11} color={C.green} />
+                <Text style={s.budgetText}>₵{task.budget}</Text>
+              </View>
+            </View>
+
+            {/* ── Title ── */}
+            <Text style={s.gigTitle} numberOfLines={2}>{task.title}</Text>
+
+            {/* ── Description ── */}
+            {task.description
+              ? <Text style={s.gigDesc} numberOfLines={2}>{task.description}</Text>
+              : null}
+
+            {/* ── Footer ── */}
+            <View style={s.gigFooter}>
+              <View style={s.gigLocationRow}>
+                <Ionicons name="location-outline" size={12} color={C.textMut} />
+                <Text style={s.gigLocationText} numberOfLines={1}>{formatAddress(task.address)}</Text>
+              </View>
+              <View style={s.gigRight}>
+                {task.category && (
+                  <View style={[s.categoryPill, { backgroundColor: accent + '12', borderColor: accent + '28' }]}>
+                    <Text style={[s.categoryText, { color: accent }]}>{task.category}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* ── CTA strip ── */}
+            <View style={[s.gigCta, { backgroundColor: accent + '08', borderColor: accent + '20' }]}>
+              <Text style={[s.gigCtaText, { color: accent }]}>View Details</Text>
+              <Ionicons name="arrow-forward" size={14} color={accent} />
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </FadeSlide>
   );
-};
+}
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function GuestScreen() {
   const [publicTasks, setPublicTasks] = useState([]);
-  const [loadingGigs, setLoadingGigs] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchInputRef = useRef(null);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [error,       setError]       = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await getPublicTasks();
-        if (res.status === 200) setPublicTasks(res.data.slice(0, 5));
-      } catch {
-        // silently fail
-      } finally {
-        setLoadingGigs(false);
-      }
-    })();
+  const loadTasks = useCallback(async (isRefresh = false) => {
+    try {
+      isRefresh ? setRefreshing(true) : setLoading(true);
+      setError(false);
+      const res = await getPublicTasks();
+      if (res.status === 200) setPublicTasks(res.data.slice(0, 12));
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const handleSearchSubmit = () => {
-    if (searchQuery.trim()) {
-      // For guest, navigate to register with a hint
-      navigate('Register');
-    }
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery('');
-    searchInputRef.current?.focus();
-  };
+  useEffect(() => { loadTasks(); }, [loadTasks]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={s.scroll}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadTasks(true)}
+            tintColor={C.blue}
+            colors={[C.blue]}
+            progressBackgroundColor={C.surface}
+          />
+        }
       >
-        {/* ── HERO (Matches the provided HeroSection style) ── */}
-        <View style={styles.heroWrapper}>
-          <LinearGradient
-            colors={['#1A1F3B', '#1A2744', '#243458']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
-          >
-            {/* Decorative blobs */}
-            <View style={styles.decorationOrb1} />
-            <View style={styles.decorationOrb2} />
 
-            <FadeInView delay={0} style={styles.heroContent}>
-              {/* Headline */}
-              <Text style={styles.heroHeadline}>
-                Get Any Task{'\n'}
-                <Text style={styles.heroHeadlineAccent}>Done Today.</Text>
-              </Text>
+        {/* ══════════════════════════════════════════════════════════════
+            HERO SECTION
+        ═══════════════════════════════════════════════════════════════ */}
+        <FadeSlide delay={0}>
+          <View style={s.heroWrap}>
+            <LinearGradient
+              colors={[C.navy, C.navyMid, C.navyLight]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={s.heroCard}
+            >
+              {/* decorative rings */}
+              <View style={s.ring1} />
+              <View style={s.ring2} />
+              <View style={s.ring3} />
 
-              <Text style={styles.heroSub}>
-                Book skilled professionals for any job — from plumbing to painting.
-                Trusted by thousands across Ghana.
-              </Text>
-
-              {/* Trust pill 
-              <View style={styles.trustPill}>
-                <View style={styles.trustAvatarStack}>
-                  {['#1E3A6E', '#D49B3F', '#0E9F6E'].map((bg, i) => (
-                    <View
-                      key={i}
-                      style={[styles.trustAvatar, { backgroundColor: bg, marginLeft: i > 0 ? -10 : 0 }]}
-                    >
-                      <Ionicons name="person" size={10} color="#fff" />
-                    </View>
-                  ))}
+              {/* top bar: guest badge + sign in */}
+              <View style={s.heroTopBar}>
+                <View style={s.guestChip}>
+                  <Ionicons name="eye-outline" size={11} color={C.gold} />
+                  <Text style={s.guestChipText}>Browsing as Guest</Text>
                 </View>
-                <Text style={styles.trustPillText}>
-                  <Text style={{ fontWeight: '700', color: C.primary }}>2,400+</Text>
-                  {' '}vetted taskers ready
+                <TouchableOpacity onPress={() => navigate('Login')} style={s.signInLink} activeOpacity={0.8}>
+                  <Text style={s.signInLinkText}>Sign In</Text>
+                  <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
+                </TouchableOpacity>
+              </View>
+
+              {/* headline */}
+              <View style={s.heroHeadWrap}>
+                <Text style={s.heroEyebrow}>Ghana's Gig Marketplace</Text>
+                <Text style={s.heroTitle}>Find Your{'\n'}<Text style={s.heroTitleAccent}>Next Gig.</Text></Text>
+                <Text style={s.heroSub}>
+                  Browse live tasks from clients near you.{'\n'}No account required.
                 </Text>
               </View>
-              */}
 
-              {/* Search bar (like the original HeroSection)
-              <View style={styles.searchContainer}>
-                <View style={[
-                  styles.searchCard,
-                  isSearchFocused && styles.searchCardFocused
-                ]}>
-                  <Ionicons name="search" size={18} color={isSearchFocused ? C.primaryMid : '#8B9CB1'} style={styles.searchIcon} />
-                  <TextInput
-                    ref={searchInputRef}
-                    style={styles.searchInput}
-                    placeholder="Search for a service..."
-                    placeholderTextColor="#64748B"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    onSubmitEditing={handleSearchSubmit}
-                    returnKeyType="search"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setIsSearchFocused(false)}
-                  />
-                  <View style={styles.searchActions}>
-                    {searchQuery && (
-                      <>
-                        <TouchableOpacity onPress={handleClearSearch} style={styles.searchActionButton}>
-                          <Ionicons name="close-circle" size={20} color="#8B9CB1" />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleSearchSubmit} style={styles.searchSubmitButton}>
-                          <LinearGradient colors={[C.primaryMid, C.primary]} style={styles.searchSubmitGradient}>
-                            <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </View> */}
+             
 
-              {/* CTA buttons */}
-              <View style={styles.heroCtas}>
-                <TouchableOpacity
-                  style={styles.heroCtaPrimary}
-                  onPress={() => navigate('Register')}
-                  activeOpacity={0.88}
-                >
-                 
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.heroCtaSecondary}
-                  onPress={() => navigate('Login')}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.heroCtaSecondaryText}>Sign In</Text>
-                </TouchableOpacity>
-              </View>
-            </FadeInView>
-          </LinearGradient>
-        </View>
-
-        {/* ── STATS STRIP ──────────────────────────────────────────────── */}
-        <FadeInView delay={100}>
-          <View style={styles.statsStrip}>
-            {TRUST_STATS.map((s, i) => (
-              <React.Fragment key={s.label}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{s.value}</Text>
-                  <Text style={styles.statLabel}>{s.label}</Text>
-                </View>
-                {i < TRUST_STATS.length - 1 && (
-                  <View style={styles.statDivider} />
-                )}
-              </React.Fragment>
-            ))}
-          </View>
-        </FadeInView>
-
-        {/* ── SERVICES GRID (now includes professional services) ──────── */}
-        <FadeInView delay={150} style={styles.section}>
-          <Text style={styles.sectionLabel}>WHAT WE OFFER</Text>
-          <Text style={styles.sectionHeading}>Any Service,{'\n'}One Platform</Text>
-          <View style={styles.servicesGrid}>
-            {SERVICES.map((svc) => (
+              {/* CTA button */}
               <TouchableOpacity
-                key={svc.label}
-                style={styles.serviceChip}
-                onPress={() => navigate('Register')}
-                activeOpacity={0.75}
+                style={s.heroCta}
+                onPress={() => navigate('GuestBrowseTaskers')}
+                activeOpacity={0.88}
               >
-                <View style={styles.serviceChipIcon}>
-                  <Ionicons name={svc.icon} size={20} color={C.primaryMid} />
-                </View>
-                <Text style={styles.serviceChipLabel}>{svc.label}</Text>
+                <LinearGradient
+                  colors={[C.blue, '#1040B8']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={s.heroCtaGrad}
+                >
+                  <Ionicons name="people-outline" size={18} color={C.white} />
+                  <Text style={s.heroCtaText}>Browse Taskers</Text>
+                  <Ionicons name="arrow-forward" size={16} color={C.white} />
+                </LinearGradient>
               </TouchableOpacity>
-            ))}
+
+              {/* register link */}
+              <View style={s.heroFooterRow}>
+                <Text style={s.heroFooterText}>New here?</Text>
+                <TouchableOpacity onPress={() => navigate('Register')} activeOpacity={0.8}>
+                  <Text style={s.heroFooterLink}>Create a free account →</Text>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
           </View>
-          <TouchableOpacity
-            style={styles.moreServices}
-            onPress={() => navigate('Register')}
-          >
-            <Text style={styles.moreServicesText}>+ Many more services</Text>
-            <Ionicons name="chevron-forward" size={14} color={C.primaryMid} />
-          </TouchableOpacity>
-        </FadeInView>
+        </FadeSlide>
 
-        {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
-        <FadeInView delay={200} style={styles.section}>
-          <Text style={styles.sectionLabel}>HOW IT WORKS</Text>
-          <Text style={styles.sectionHeading}>Book in Under{'\n'}3 Minutes</Text>
-          {STEPS.map((step, i) => (
-            <View key={step.num} style={styles.stepRow}>
-              <View style={styles.stepLeft}>
-                <View style={[styles.stepIconWrap, { backgroundColor: step.bg }]}>
-                  <Ionicons name={step.icon} size={22} color={step.color} />
-                </View>
-                {i < STEPS.length - 1 && <View style={styles.stepConnector} />}
+        {/* ══════════════════════════════════════════════════════════════
+            GIGS SECTION
+        ═══════════════════════════════════════════════════════════════ */}
+        <View style={s.gigsSection}>
+
+          {/* Section header */}
+          <FadeSlide delay={120}>
+            <View style={s.sectionHead}>
+              <View>
+                <Text style={s.sectionEyebrow}>LIVE OPPORTUNITIES</Text>
+                <Text style={s.sectionTitle}>Recent Gigs</Text>
               </View>
-              <View style={styles.stepContent}>
-                <View style={styles.stepNumRow}>
-                  <Text style={[styles.stepNum, { color: step.color }]}>{step.num}</Text>
-                  <Text style={styles.stepTitle}>{step.title}</Text>
-                </View>
-                <Text style={styles.stepDesc}>{step.desc}</Text>
-              </View>
+              
             </View>
-          ))}
-        </FadeInView>
+          </FadeSlide>
 
-        {/* ── LIVE GIGS ────────────────────────────────────────────────── */}
-        <FadeInView delay={250} style={styles.section}>
-          <Text style={styles.sectionLabel}>LIVE OPPORTUNITIES</Text>
-          <Text style={styles.sectionHeading}>Gigs Posted{'\n'}Right Now</Text>
+          {/* Refresh hint */}
+          <FadeSlide delay={160}>
+            <View style={s.refreshHint}>
+              <Ionicons name="refresh-outline" size={13} color={C.textMut} />
+              <Text style={s.refreshHintText}>Pull down to refresh</Text>
+            </View>
+          </FadeSlide>
 
-          {loadingGigs ? (
-            <View style={styles.gigsLoading}>
-              <ActivityIndicator size="small" color={C.primaryMid} />
-              <Text style={styles.gigsLoadingText}>Fetching live gigs…</Text>
+          {/* ── States ── */}
+          {loading ? (
+            <View style={s.loadingWrap}>
+              <ActivityIndicator size="large" color={C.blue} />
+              <Text style={s.loadingText}>Fetching latest gigs…</Text>
+            </View>
+          ) : error ? (
+            <View style={s.errorWrap}>
+              <View style={s.errorIconWrap}>
+                <Ionicons name="cloud-offline-outline" size={38} color={C.textMut} />
+              </View>
+              <Text style={s.errorTitle}>Couldn't load gigs</Text>
+              <Text style={s.errorSub}>Pull down to retry</Text>
+              <TouchableOpacity style={s.retryBtn} onPress={() => loadTasks()} activeOpacity={0.85}>
+                <Text style={s.retryBtnText}>Try Again</Text>
+              </TouchableOpacity>
             </View>
           ) : publicTasks.length > 0 ? (
-            <>
+            <View style={s.cardsWrap}>
               {publicTasks.map((task, idx) => (
-                <View key={task._id} style={styles.gigCard}>
-                  <View style={[styles.gigAccent, { backgroundColor: idx % 2 === 0 ? C.primaryMid : C.gold }]} />
-                  <View style={styles.gigCardInner}>
-                    <View style={styles.gigCardTop}>
-                      <View style={styles.gigClientRow}>
-                        <View style={[styles.gigAvatar, { backgroundColor: idx % 2 === 0 ? C.primary : C.gold }]}>
-                          <Text style={styles.gigAvatarText}>
-                            {task.employer?.name?.charAt(0)?.toUpperCase() || 'C'}
-                          </Text>
-                        </View>
-                        <View>
-                          <Text style={styles.gigClientName}>{"Anonymous user"}</Text>
-                          <Text style={styles.gigPostedTime}>
-                            {task.deadline
-                              ? new Date(task.deadline).toLocaleDateString('en-GH', { month: 'short', day: 'numeric' })
-                              : 'Flexible'}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={[styles.gigBudget, { backgroundColor: C.greenLight }]}>
-                        <Text style={[styles.gigBudgetText, { color: C.green }]}>₵{task.budget}</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.gigTitle} numberOfLines={2}>{task.title}</Text>
-                    <Text style={styles.gigDesc} numberOfLines={2}>{task.description}</Text>
-                    <View style={styles.gigFooter}>
-                      <View style={styles.gigLocationRow}>
-                        <Ionicons name="location-outline" size={12} color={C.textSecondary} />
-                        <Text style={styles.gigLocation} numberOfLines={1}>{formatAddress(task.address)}</Text>
-                      </View>
-                      {task.category && (
-                        <View style={styles.gigCategoryPill}>
-                          <Text style={styles.gigCategoryText}>{task.category}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
+                <GigCard key={task._id} task={task} index={idx} />
               ))}
-              <TouchableOpacity style={styles.viewAllGigs} onPress={() => navigate('Register')} activeOpacity={0.8}>
-                <Text style={styles.viewAllGigsText}>Sign Up to See All Gigs</Text>
-                <Ionicons name="arrow-forward" size={15} color={C.primaryMid} />
-              </TouchableOpacity>
-            </>
+            </View>
           ) : (
-            <View style={styles.noGigs}>
-              <Ionicons name="briefcase-outline" size={36} color={C.textMuted} />
-              <Text style={styles.noGigsText}>No public gigs right now.{'\n'}Check back soon!</Text>
+            <View style={s.emptyWrap}>
+              <View style={s.emptyIconWrap}>
+                <Ionicons name="briefcase-outline" size={36} color={C.textMut} />
+              </View>
+              <Text style={s.emptyTitle}>No gigs posted yet</Text>
+              <Text style={s.emptySub}>Pull down to refresh or browse taskers directly.</Text>
             </View>
           )}
-        </FadeInView>
+        </View>
 
-        {/* ── TESTIMONIALS ─────────────────────────────────────────────── */}
-        <FadeInView delay={300} style={styles.section}>
-          <Text style={styles.sectionLabel}>WHAT PEOPLE SAY</Text>
-          <Text style={styles.sectionHeading}>Loved by Clients{'\n'}& Taskers Alike</Text>
-          {TESTIMONIALS.map((t) => (
-            <View key={t.name} style={styles.testimonialCard}>
-              <Stars count={t.rating} />
-              <Text style={styles.testimonialText}>"{t.text}"</Text>
-              <View style={styles.testimonialAuthor}>
-                <View style={[styles.testimonialAvatar, { backgroundColor: t.color }]}>
-                  <Text style={styles.testimonialInitials}>{t.initials}</Text>
+        {/* ══════════════════════════════════════════════════════════════
+            FEATURE STRIP
+        ═══════════════════════════════════════════════════════════════ */}
+        <FadeSlide delay={200}>
+          <View style={s.featureStrip}>
+            {[
+              { icon: 'shield-checkmark-outline', label: 'Verified Taskers', color: C.green   },
+              { icon: 'flash-outline',            label: 'Fast Matching',    color: C.blue    },
+              { icon: 'wallet-outline',           label: 'Secure Payments',  color: C.gold    },
+            ].map((f, i) => (
+              <View key={i} style={s.featureItem}>
+                <View style={[s.featureIcon, { backgroundColor: f.color + '14' }]}>
+                  <Ionicons name={f.icon} size={20} color={f.color} />
                 </View>
-                <View>
-                  <Text style={styles.testimonialName}>{t.name}</Text>
-                  <Text style={styles.testimonialRole}>{t.role}</Text>
-                </View>
+                <Text style={s.featureLabel}>{f.label}</Text>
               </View>
-            </View>
-          ))}
-        </FadeInView>
+            ))}
+          </View>
+        </FadeSlide>
 
-        {/* ── FOR TASKERS ──────────────────────────────────────────────── */}
-        <FadeInView delay={350} style={styles.section}>
-          <View style={styles.taskerBanner}>
+        {/* ══════════════════════════════════════════════════════════════
+            SIGN UP BANNER
+        ═══════════════════════════════════════════════════════════════ */}
+        <FadeSlide delay={260}>
+          <View style={s.signUpBanner}>
             <LinearGradient
-              colors={[C.primary, '#1A3A7A']}
+              colors={[C.navy, C.navyLight]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.taskerBannerGradient}
+              style={s.signUpGrad}
             >
-              <View style={styles.bannerCircle} />
-              <View style={styles.taskerBannerContent}>
-                <View style={styles.taskerBannerBadge}>
-                  <Text style={styles.taskerBannerBadgeText}>FOR PROFESSIONALS</Text>
-                </View>
-                <Text style={styles.taskerBannerHeading}>
-                  Turn Your Skills{'\n'}Into Income
-                </Text>
-                <Text style={styles.taskerBannerSub}>
-                  Join 2,400+ taskers earning on their own schedule.
-                  Set your rates, choose your clients.
-                </Text>
-                <View style={styles.taskerPerks}>
-                  {['Set your own rates', 'Get paid securely', 'Build your reputation'].map((perk) => (
-                    <View key={perk} style={styles.taskerPerkRow}>
-                      <View style={styles.taskerPerkCheck}>
-                        <Ionicons name="checkmark" size={12} color={C.primary} />
-                      </View>
-                      <Text style={styles.taskerPerkText}>{perk}</Text>
-                    </View>
-                  ))}
-                </View>
+              {/* ring decoration */}
+              <View style={s.bannerRing} />
+
+              <View style={s.bannerIconWrap}>
+                <Ionicons name="rocket-outline" size={26} color={C.gold} />
+              </View>
+              <Text style={s.bannerTitle}>Ready to start earning?</Text>
+              <Text style={s.bannerSub}>
+                Join thousands of taskers across Ghana. Apply for gigs, chat with clients, and get paid — all in one place.
+              </Text>
+
+              <View style={s.bannerBtns}>
                 <TouchableOpacity
-                  style={styles.taskerBannerBtn}
+                  style={s.bannerPrimaryBtn}
                   onPress={() => navigate('Register')}
                   activeOpacity={0.88}
                 >
-                  <Text style={styles.taskerBannerBtnText}>Join as a Tasker</Text>
-                  <Ionicons name="arrow-forward" size={15} color={C.primary} />
+                  <Text style={s.bannerPrimaryText}>Create Free Account</Text>
+                  <Ionicons name="arrow-forward" size={16} color={C.navy} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={s.bannerSecBtn}
+                  onPress={() => navigate('Login')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.bannerSecText}>I already have an account</Text>
                 </TouchableOpacity>
               </View>
             </LinearGradient>
           </View>
-        </FadeInView>
+        </FadeSlide>
 
-        {/* ── FINAL CTA ─────────────────────────────────────────────────── */}
-        <FadeInView delay={400} style={styles.finalCta}>
-          <Text style={styles.finalCtaHeading}>Ready to get started?</Text>
-          <Text style={styles.finalCtaSub}>
-            Join thousands of Ghanaians who get things done with Workaflow.
-          </Text>
-          <TouchableOpacity
-            style={styles.finalCtaBtn}
-            onPress={() => navigate('Register')}
-            activeOpacity={0.88}
-          >
-            <LinearGradient
-              colors={[C.primary, C.primaryMid]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.finalCtaGradient}
-            >
-              <Text style={styles.finalCtaBtnText}>Create Free Account</Text>
-              <Ionicons name="arrow-forward" size={17} color="#FFFFFF" />
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.signInLink}
-            onPress={() => navigate('Login')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.signInLinkText}>Already have an account? </Text>
-            <Text style={[styles.signInLinkText, { color: C.primaryMid, fontWeight: '700' }]}>Sign In</Text>
-          </TouchableOpacity>
-          
-        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  scroll:    { paddingBottom: 48 },
+const s = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: C.bg },
+  scroll: { paddingBottom: 48 },
 
-  // Hero wrapper and card (matching HeroSection look)
-  heroWrapper: {
-    marginHorizontal: 5,
-    marginTop: 12,
-    borderTopLeftRadius:12,
-    borderTopRightRadius:12,
+  // ── Hero ─────────────────────────────────────────────────────────────────
+  heroWrap: {
+    marginHorizontal: 8, marginTop: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowColor: C.navy,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3, shadowRadius: 24, elevation: 14,
+    borderTopLeftRadius:26,
+     borderTopRighttRadius:26,
   },
-  heroCard: {
-    position: 'relative',
-    overflow: 'hidden',
+  heroCard: { position: 'relative', overflow: 'hidden', padding: 22 },
+
+  // decorative rings
+  ring1: {
+    position: 'absolute', top: -50, right: -50,
+    width: 180, height: 180, borderRadius: 90,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  decorationOrb1: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(99, 102, 241, 0.08)',
-    zIndex: 1,
+  ring2: {
+    position: 'absolute', top: 60, right: -30,
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: 'rgba(26,86,219,0.12)',
   },
-  decorationOrb2: {
-    position: 'absolute',
-    bottom: -60,
-    left: -60,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(139, 92, 246, 0.06)',
-    zIndex: 1,
+  ring3: {
+    position: 'absolute', bottom: -70, left: -50,
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
-  heroContent: {
-    padding: 22,
-    position: 'relative',
-    zIndex: 2,
+
+  heroTopBar: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 22,
   },
-  heroHeadline: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -1,
-    lineHeight: 40,
-    marginBottom: 8,
+  guestChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(212,155,63,0.18)',
+    borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(212,155,63,0.3)',
   },
-  heroHeadlineAccent: {
-    color: C.primaryMid,
+  guestChipText: { fontSize: 11, fontWeight: '700', color: C.gold, letterSpacing: 0.3 },
+  signInLink:    { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  signInLinkText:{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
+
+  heroHeadWrap:  { marginBottom: 20 },
+  heroEyebrow: {
+    fontSize: 10, fontWeight: '700', color: C.gold,
+    letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8,
   },
+  heroTitle: {
+    fontSize: 34, fontWeight: '800', color: C.white,
+    letterSpacing: -1, lineHeight: 42, marginBottom: 12,
+  },
+  heroTitleAccent: { color: '#60CAFF' },
   heroSub: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14, color: 'rgba(255,255,255,0.68)',
     lineHeight: 22,
-    marginBottom: 18,
   },
-  trustPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surface,
-    borderRadius: 30,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    gap: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  trustAvatarStack: { flexDirection: 'row', alignItems: 'center' },
-  trustAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trustPillText: { fontSize: 13, color: C.textSecondary },
 
-  // Search bar inside hero
-  searchContainer: {
+  statRow:    { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
+  statPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 14,
+    paddingHorizontal: 11, paddingVertical: 8,
+  },
+  statPillIcon: { width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  statPillVal:  { fontSize: 13, fontWeight: '800' },
+  statPillLabel:{ fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
+
+  heroCta:     { borderRadius: 14, overflow: 'hidden', marginBottom: 14 },
+  heroCtaGrad: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 16, gap: 10,
+  },
+  heroCtaText: { color: C.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+
+  heroFooterRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  heroFooterText:{ fontSize: 13, color: 'rgba(255,255,255,0.45)' },
+  heroFooterLink:{ fontSize: 13, color: 'rgba(255,255,255,0.78)', fontWeight: '700' },
+
+  // ── Gigs section ─────────────────────────────────────────────────────────
+  gigsSection:  { paddingHorizontal: 14, marginTop: 28 },
+  sectionHead: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-end', marginBottom: 6,
+  },
+  sectionEyebrow: {
+    fontSize: 10, fontWeight: '700', color: C.blue,
+    letterSpacing: 1.8, textTransform: 'uppercase', marginBottom: 4,
+  },
+  sectionTitle: { fontSize: 22, fontWeight: '800', color: C.textPri, letterSpacing: -0.5 },
+  seeAllBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  seeAllText:   { fontSize: 13, fontWeight: '700', color: C.blue },
+
+  refreshHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     marginBottom: 16,
   },
-  searchCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    padding: 12,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  searchCardFocused: {
-    borderColor: C.primaryMid,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1E293B',
-    fontWeight: '500',
-    padding: 0,
-  },
-  searchActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  searchActionButton: {
-    padding: 4,
-  },
-  searchSubmitButton: {
-    padding: 2,
-  },
-  searchSubmitGradient: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  refreshHintText: { fontSize: 12, color: C.textMut },
 
-  heroCtas: { gap: 10 },
-  heroCtaPrimary: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  heroCtaGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  heroCtaPrimaryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.1,
-  },
-  heroCtaSecondary: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-  },
-  heroCtaSecondaryText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: C.primary,
-  },
+  // ── Loading / error / empty ───────────────────────────────────────────────
+  loadingWrap: { alignItems: 'center', paddingVertical: 52, gap: 12 },
+  loadingText: { fontSize: 14, color: C.textMut },
 
-  // Stats strip
-  statsStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.primary,
-    marginHorizontal: 22,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    marginTop: 24,
-    marginBottom: 36,
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 7,
-  },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
-  statLabel: { fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: '500', marginTop: 2 },
-  statDivider: { width: 1, height: 32, backgroundColor: 'rgba(255,255,255,0.2)' },
+  errorWrap:    { alignItems: 'center', paddingVertical: 52, gap: 10 },
+  errorIconWrap:{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border, marginBottom: 4 },
+  errorTitle:   { fontSize: 17, fontWeight: '700', color: C.textPri },
+  errorSub:     { fontSize: 13, color: C.textMut },
+  retryBtn:     { marginTop: 8, backgroundColor: C.blue, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 11 },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: C.white },
 
-  // Generic section
-  section: { paddingHorizontal: 22, marginBottom: 40 },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.primaryMid,
-    letterSpacing: 1.2,
-    marginBottom: 6,
-  },
-  sectionHeading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: C.textPrimary,
-    letterSpacing: -0.6,
-    lineHeight: 34,
-    marginBottom: 20,
-  },
+  emptyWrap:    { alignItems: 'center', paddingVertical: 52, gap: 8 },
+  emptyIconWrap:{ width: 72, height: 72, borderRadius: 36, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border, marginBottom: 4 },
+  emptyTitle:   { fontSize: 17, fontWeight: '700', color: C.textPri },
+  emptySub:     { fontSize: 13, color: C.textMut, textAlign: 'center', paddingHorizontal: 24 },
 
-  // Services grid (now accommodates more items)
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  serviceChip: {
-    width: (width - 44 - 30) / 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderWidth: 1,
-    borderColor: C.border,
-    gap: 7,
-  },
-  serviceChipIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: C.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  serviceChipLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: C.textSecondary,
-    textAlign: 'center',
-  },
-  moreServices: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingTop: 14,
-  },
-  moreServicesText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.primaryMid,
-  },
-
-  // Steps
-  stepRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 4,
-  },
-  stepLeft: { alignItems: 'center', width: 48 },
-  stepIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepConnector: {
-    width: 2,
-    flex: 1,
-    minHeight: 20,
-    backgroundColor: C.border,
-    marginVertical: 4,
-  },
-  stepContent: { flex: 1, paddingBottom: 20, paddingTop: 4 },
-  stepNumRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  stepNum: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  stepTitle: { fontSize: 17, fontWeight: '700', color: C.textPrimary },
-  stepDesc: { fontSize: 14, color: C.textSecondary, lineHeight: 20 },
-
-  // Gig cards
-  gigsLoading: { alignItems: 'center', paddingVertical: 30, gap: 10 },
-  gigsLoadingText: { fontSize: 14, color: C.textMuted },
+  // ── Gig card ─────────────────────────────────────────────────────────────
+  cardsWrap: { gap: 14 },
   gigCard: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
+    backgroundColor: C.surface, borderRadius: 18,
+    overflow: 'hidden', borderWidth: 1, borderColor: C.border,
+    shadowColor: '#1E3A6E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07, shadowRadius: 12, elevation: 4,
+  },
+  gigTopAccent: { height: 3, width: '100%' },
+  gigInner: { padding: 16 },
+
+  gigRow1: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  gigAvatar: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  gigAvatarText: { color: C.white, fontWeight: '800', fontSize: 16 },
+  gigMeta:   { flex: 1 },
+  gigClientName: { fontSize: 14, fontWeight: '700', color: C.textPri },
+  gigTime:       { fontSize: 11, color: C.textMut, marginTop: 1 },
+  budgetBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5,
     borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    flexDirection: 'row',
   },
-  gigAccent: { width: 4, borderRadius: 2 },
-  gigCardInner: { flex: 1, padding: 14 },
-  gigCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  gigClientRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  gigAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gigAvatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  gigClientName: { fontSize: 13, fontWeight: '600', color: C.textPrimary },
-  gigPostedTime: { fontSize: 11, color: C.textMuted },
-  gigBudget: {
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  gigBudgetText: { fontSize: 13, fontWeight: '700' },
-  gigTitle: { fontSize: 16, fontWeight: '700', color: C.textPrimary, marginBottom: 5, lineHeight: 22 },
-  gigDesc: { fontSize: 13, color: C.textSecondary, lineHeight: 19, marginBottom: 10 },
+  budgetText: { fontSize: 13, fontWeight: '800', color: C.green },
+
+  gigTitle: { fontSize: 17, fontWeight: '800', color: C.textPri, letterSpacing: -0.3, lineHeight: 23, marginBottom: 6 },
+  gigDesc:  { fontSize: 13, color: C.textSec, lineHeight: 19, marginBottom: 12 },
+
   gigFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingTop: 10,
+    borderTopWidth: 1, borderTopColor: C.border,
+    paddingTop: 10, marginBottom: 12,
   },
   gigLocationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 },
-  gigLocation: { fontSize: 12, color: C.textSecondary, fontWeight: '500', flex: 1 },
-  gigCategoryPill: {
-    backgroundColor: C.primaryGlow,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  gigCategoryText: { fontSize: 11, fontWeight: '600', color: C.primaryMid },
-  noGigs: { alignItems: 'center', paddingVertical: 30, gap: 10 },
-  noGigsText: { fontSize: 14, color: C.textMuted, textAlign: 'center', lineHeight: 21 },
-  viewAllGigs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 14,
-    marginTop: 4,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: C.primaryGlow,
-    backgroundColor: C.primaryGlow,
-  },
-  viewAllGigsText: { fontSize: 14, fontWeight: '700', color: C.primaryMid },
+  gigLocationText:{ fontSize: 12, color: C.textMut, flex: 1 },
+  gigRight:       { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  categoryPill:   { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1 },
+  categoryText:   { fontSize: 11, fontWeight: '700' },
 
-  // Testimonials
-  testimonialCard: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
+  gigCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 10, paddingVertical: 11, gap: 6,
     borderWidth: 1,
-    borderColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-    gap: 10,
   },
-  testimonialText: {
-    fontSize: 15,
-    color: C.textPrimary,
-    lineHeight: 23,
-    fontStyle: 'italic',
-    fontWeight: '500',
-  },
-  testimonialAuthor: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  testimonialAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  testimonialInitials: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  testimonialName: { fontSize: 14, fontWeight: '700', color: C.textPrimary },
-  testimonialRole: { fontSize: 12, color: C.textMuted },
+  gigCtaText: { fontSize: 13, fontWeight: '700' },
 
-  // Tasker banner
-  taskerBanner: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+  // ── Feature strip ─────────────────────────────────────────────────────────
+  featureStrip: {
+    flexDirection: 'row', justifyContent: 'space-around',
+    marginHorizontal: 14, marginTop: 28,
+    backgroundColor: C.surface, borderRadius: 18,
+    paddingVertical: 20, paddingHorizontal: 10,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: '#1E3A6E', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05, shadowRadius: 10, elevation: 3,
   },
-  taskerBannerGradient: { padding: 24, overflow: 'hidden', position: 'relative' },
-  bannerCircle: {
-    position: 'absolute',
-    top: -40,
-    right: -40,
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  taskerBannerContent: { position: 'relative', zIndex: 1 },
-  taskerBannerBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignSelf: 'flex-start',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    marginBottom: 14,
-  },
-  taskerBannerBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.85)',
-    letterSpacing: 1.2,
-  },
-  taskerBannerHeading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    lineHeight: 34,
-    marginBottom: 10,
-  },
-  taskerBannerSub: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.75)',
-    lineHeight: 21,
-    marginBottom: 18,
-  },
-  taskerPerks: { gap: 8, marginBottom: 22 },
-  taskerPerkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  taskerPerkCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  taskerPerkText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  taskerBannerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 15,
-    gap: 8,
-  },
-  taskerBannerBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: C.primary,
-  },
+  featureItem:  { alignItems: 'center', gap: 8, flex: 1 },
+  featureIcon:  { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  featureLabel: { fontSize: 12, fontWeight: '700', color: C.textSec, textAlign: 'center' },
 
-  // Final CTA
-  finalCta: {
-    paddingHorizontal: 22,
-    marginBottom: 8,
+  // ── Sign up banner ────────────────────────────────────────────────────────
+  signUpBanner: {
+    marginHorizontal: 14, marginTop: 24,
+    borderRadius: 24, overflow: 'hidden',
+    shadowColor: C.navy, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22, shadowRadius: 18, elevation: 10,
   },
-  finalCtaHeading: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: C.textPrimary,
-    letterSpacing: -0.5,
-    textAlign: 'center',
-    marginBottom: 8,
+  signUpGrad: { padding: 24, position: 'relative', overflow: 'hidden', alignItems: 'center' },
+  bannerRing: {
+    position: 'absolute', top: -60, right: -60,
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  finalCtaSub: {
-    fontSize: 14,
-    color: C.textSecondary,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginBottom: 24,
+  bannerIconWrap: {
+    width: 56, height: 56, borderRadius: 18,
+    backgroundColor: 'rgba(212,155,63,0.18)',
+    borderWidth: 1, borderColor: 'rgba(212,155,63,0.3)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
   },
-  finalCtaBtn: {
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 12,
-    shadowColor: C.primary,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 7,
+  bannerTitle: { fontSize: 22, fontWeight: '800', color: C.white, letterSpacing: -0.4, textAlign: 'center', marginBottom: 10 },
+  bannerSub:   { fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 21, textAlign: 'center', marginBottom: 22 },
+  bannerBtns:  { width: '100%', gap: 10 },
+  bannerPrimaryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.white, borderRadius: 14,
+    paddingVertical: 15, gap: 8,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 8, elevation: 5,
   },
-  finalCtaGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 17,
-    gap: 8,
-  },
-  finalCtaBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  signInLink: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  signInLinkText: { fontSize: 14, color: C.textSecondary, fontWeight: '500' },
-  footerNote: {
-    textAlign: 'center',
-    fontSize: 12,
-    color: C.textMuted,
-    marginTop: 20,
-  },
+  bannerPrimaryText: { fontSize: 15, fontWeight: '800', color: C.navy },
+  bannerSecBtn:  { alignItems: 'center', paddingVertical: 10 },
+  bannerSecText: { fontSize: 14, color: 'rgba(255,255,255,0.55)', fontWeight: '600' },
 });

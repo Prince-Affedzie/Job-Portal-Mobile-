@@ -12,6 +12,9 @@ import TaskerOnboardingScreen from '../screens/auth/TaskerOnboarding'
 import  GuestScreen from '../screens/auth/GuestScreen'
 import PrivacyPolicyScreen from '../screens/auth/PrivacyPolicyScreen'
 import TermsOfServiceScreen from '../screens/auth/ServiceTermsScreen'
+import GuestBrowseTaskersScreen from '../screens/auth/GuestBrowseTaskers'
+import GuestTaskDetailScreen from '../screens/auth/GuestTaskDetailScreen'
+import GuestTaskerProfileScreen from '../screens/auth/GuestTaskerProfileScreen'
 
 
 const Stack = createNativeStackNavigator();
@@ -20,6 +23,9 @@ export default function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Guest" component={GuestScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GuestBrowseTaskers" component={GuestBrowseTaskersScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GuestTaskDetail" component={GuestTaskDetailScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GuestTaskerProfile" component={GuestTaskerProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />

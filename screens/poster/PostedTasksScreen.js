@@ -290,7 +290,7 @@ export default function AllTasksScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 100 },
+  scrollContent: { paddingBottom: 100, marginHorizontal: 8,},
 
   // Hero with rounded top corners, flat bottom
   heroSection: {
