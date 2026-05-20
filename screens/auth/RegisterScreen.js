@@ -288,15 +288,8 @@ export default function RegisterScreen({ navigation }) {
     });
   }, []);
 
-  // ── role guard — both social buttons require a role first ──────────────
-  const guardRole = () => {
-    if (!role) {
-      setErrors(e => ({ ...e, role: 'Please select a role before continuing' }));
-      return false;
-    }
-    setErrors(e => ({ ...e, role: undefined }));
-    return true;
-  };
+  // ── role + EULA guard (both are required) ─────────────────────────────
+  const canUseSocial = role !== '' && eulaAccepted;
 
   // ── redirect after success ──────────────────────────────────────────────
   const redirectAfterSignUp = (userRole) => {
@@ -309,7 +302,11 @@ export default function RegisterScreen({ navigation }) {
 
   // ── Google ──────────────────────────────────────────────────────────────
   const handleGoogle = async () => {
-    if (!guardRole()) return;
+    if (!canUseSocial) {
+      if (!role) setErrors(e => ({ ...e, role: 'Please select a role' }));
+      if (!eulaAccepted) setErrors(e => ({ ...e, eula: 'You must accept the Terms of Service' }));
+      return;
+    }
     setLoadingGoogle(true);
     try {
       if (Platform.OS === 'android') {
@@ -342,7 +339,11 @@ export default function RegisterScreen({ navigation }) {
 
   // ── Apple ───────────────────────────────────────────────────────────────
   const handleApple = async () => {
-    if (!guardRole()) return;
+    if (!canUseSocial) {
+      if (!role) setErrors(e => ({ ...e, role: 'Please select a role' }));
+      if (!eulaAccepted) setErrors(e => ({ ...e, eula: 'You must accept the Terms of Service' }));
+      return;
+    }
     setLoadingApple(true);
     try {
       const available = await AppleAuthentication.isAvailableAsync();
@@ -404,7 +405,9 @@ export default function RegisterScreen({ navigation }) {
     else if (password !== confirmPassword)  e.confirmPassword = 'Passwords do not match';
     
     // ── EULA check ────────────────────────────────────────────────────────
-    if (!eulaAccepted)                      e.eula = 'You must accept the Terms of Service and Privacy Policy';
+    if (!eulaAccepted) {
+      e.eula = 'You must accept the Terms of Service and Privacy Policy to continue.';
+    }
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -473,6 +476,41 @@ export default function RegisterScreen({ navigation }) {
             <RoleSelector selected={role} onChange={r => { setRole(r); setErrors(e => ({ ...e, role: undefined })); }} error={errors.role} />
           </Animated.View>
 
+          {/* ── EULA Consent Checkbox (moved above social to block them) ── */}
+          <Animated.View style={[{ marginHorizontal: 20, marginBottom: 12 }, socialAnim]}>
+            <View style={s.eulaContainer}>
+              <TouchableOpacity
+                style={[s.eulaCheckbox, eulaAccepted && s.eulaCheckboxActive]}
+                onPress={() => {
+                  setEulaAccepted(v => !v);
+                  setErrors(e => ({ ...e, eula: undefined }));
+                }}
+                activeOpacity={0.8}
+                disabled={busy}
+              >
+                {eulaAccepted && (
+                  <Ionicons name="checkmark" size={14} color={C.white} />
+                )}
+              </TouchableOpacity>
+              <View style={s.eulaTextContainer}>
+                <Text style={s.eulaText}>
+                  I agree to the{' '}
+                  <Text style={s.eulaLink} onPress={() => navigation.navigate('TermsOfService')}>
+                    Terms of Service
+                  </Text>{' '}
+                  and acknowledge that objectionable content and abusive behaviour are{' '}
+                  <Text style={{ fontWeight: '700', color: C.coral }}>not tolerated</Text>.
+                </Text>
+              </View>
+            </View>
+            {errors.eula && (
+              <View style={s.errRow}>
+                <Ionicons name="alert-circle-outline" size={12} color={C.coral} />
+                <Text style={s.errText}>{errors.eula}</Text>
+              </View>
+            )}
+          </Animated.View>
+
           {/* ── Social auth ─────────────────────────────────────────── */}
           <Animated.View style={[s.socialSection, socialAnim]}>
             <SocialBtn
@@ -480,7 +518,7 @@ export default function RegisterScreen({ navigation }) {
               label="Continue with Google"
               onPress={handleGoogle}
               loading={loadingGoogle}
-              disabled={busy}
+              disabled={!canUseSocial || busy}
             />
             {Platform.OS === 'ios' && (
               <SocialBtn
@@ -488,14 +526,16 @@ export default function RegisterScreen({ navigation }) {
                 label="Continue with Apple"
                 onPress={handleApple}
                 loading={loadingApple}
-                disabled={busy}
+                disabled={!canUseSocial || busy}
                 dark
               />
             )}
-            {!role && (
+            {(!role || !eulaAccepted) && (
               <View style={s.socialBlockedNote}>
                 <Ionicons name="information-circle-outline" size={14} color={C.textMuted} />
-                <Text style={s.socialBlockedText}>Select a role above to enable social sign-up</Text>
+                <Text style={s.socialBlockedText}>
+                  {!role ? 'Select a role' : 'Accept the Terms of Service'} to enable social sign‑up
+                </Text>
               </View>
             )}
           </Animated.View>
@@ -565,47 +605,6 @@ export default function RegisterScreen({ navigation }) {
                 disabled={busy}
               />
 
-              {/* ── EULA Consent Checkbox ──────────────────────────────── */}
-              <View style={s.eulaContainer}>
-                <TouchableOpacity
-                  style={[s.eulaCheckbox, eulaAccepted && s.eulaCheckboxActive]}
-                  onPress={() => {
-                    setEulaAccepted(v => !v);
-                    setErrors(e => ({ ...e, eula: undefined }));
-                  }}
-                  activeOpacity={0.8}
-                  disabled={busy}
-                >
-                  {eulaAccepted && (
-                    <Ionicons name="checkmark" size={14} color={C.white} />
-                  )}
-                </TouchableOpacity>
-                <View style={s.eulaTextContainer}>
-                  <Text style={s.eulaText}>
-                    I agree to the{' '}
-                    <Text
-                      style={s.eulaLink}
-                      onPress={() => navigation.navigate('TermsOfService')}
-                    >
-                      Terms of Service
-                    </Text>
-                    {' '}and{' '}
-                    <Text
-                      style={s.eulaLink}
-                      onPress={() => navigation.navigate('PrivacyPolicy')}
-                    >
-                      Privacy Policy
-                    </Text>
-                  </Text>
-                </View>
-              </View>
-              {errors.eula && (
-                <View style={s.errRow}>
-                  <Ionicons name="alert-circle-outline" size={12} color={C.coral} />
-                  <Text style={s.errText}>{errors.eula}</Text>
-                </View>
-              )}
-
               {/* ── Submit Button (disabled until EULA accepted) ──────── */}
               <TouchableOpacity
                 style={[
@@ -655,7 +654,7 @@ export default function RegisterScreen({ navigation }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles (same as before, no changes needed) ──────────────────────────────
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 50 },
@@ -756,10 +755,8 @@ const s = StyleSheet.create({
   eulaContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 12,
-    marginTop: 4,
-    paddingVertical: 4,
+    gap: 10,
+    marginVertical: 4,
   },
   eulaCheckbox: {
     width: 24,

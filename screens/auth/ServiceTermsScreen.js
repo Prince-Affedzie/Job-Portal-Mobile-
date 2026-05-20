@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: W } = Dimensions.get('window');
 
-// ─── Design tokens (same as Privacy Policy) ──────────────────────────────────
+// ─── Design tokens ──────────────────────────────────────────────────────────
 const C = {
   bg:           '#F4F6FB',
   surface:      '#FFFFFF',
@@ -23,6 +23,8 @@ const C = {
   goldMid:      '#E8A730',
   teal:         '#0F766E',
   tealLight:    '#E0F5F2',
+  red:          '#DC2626',
+  redLight:     '#FEE2E2',
   textPrimary:  '#0D1B35',
   textSecondary:'#4A5B7A',
   textMuted:    '#8FA0BE',
@@ -62,6 +64,40 @@ const SECTIONS = [
       { heading: 'One Account Per Person', text: 'You may not create more than one account without our prior written permission. Duplicate accounts may be suspended or terminated.' },
     ],
   },
+  // ══════════════════════════════════════════════════════════════════════
+  // 🆕 NEW SECTION: User Content & Conduct — Apple Guideline 1.2 compliant
+  // ══════════════════════════════════════════════════════════════════════
+  {
+    id: 'user-content',
+    icon: 'shield-checkmark-outline',
+    color: C.red,
+    bg: C.redLight,
+    title: 'User Content & Conduct — Zero Tolerance Policy',
+    content: `Workaflow is committed to maintaining a safe, respectful, and trustworthy environment for all users. We have a zero‑tolerance policy for objectionable content and abusive behaviour.`,
+    bullets: [
+      {
+        heading: 'No Objectionable Content',
+        text: 'You may not create, upload, post, send, or share any content that is unlawful, defamatory, harassing, threatening, obscene, pornographic, hateful, racially or ethnically offensive, or otherwise objectionable. This includes text messages, images, videos, documents, profile information, and any other user‑generated content within the platform.',
+      },
+      {
+        heading: 'No Abusive Behaviour',
+        text: 'You may not engage in harassment, bullying, intimidation, stalking, or any form of abusive conduct toward other users. Abusive behaviour includes, but is not limited to, repeated unwanted contact, threats of violence, hate speech, and personal attacks. We take all reports of abuse seriously and will investigate promptly.',
+      },
+      {
+        heading: 'Content Moderation',
+        text: 'Workaflow actively monitors user‑generated content and provides mechanisms for users to flag and report objectionable material. Reported content is reviewed within 24 hours. Content found to violate these Terms will be removed immediately, and the offending user may have their account suspended or permanently terminated.',
+      },
+      {
+        heading: 'Blocking Abusive Users',
+        text: 'You may block any user who is behaving abusively or sending unwanted content. When you block a user, all messages between you and that user are permanently deleted from your view, and the blocked user can no longer contact you through the platform. We are notified of all blocks and will review the blocked user\'s activity for potential Terms violations.',
+      },
+      {
+        heading: 'Consequences of Violation',
+        text: 'Any user who violates this policy may face immediate consequences, including but not limited to: removal of the offending content, temporary suspension of account privileges, permanent account termination, and reporting to relevant law enforcement authorities where appropriate. Workaflow reserves the right to determine, in its sole discretion, what constitutes objectionable content or abusive behaviour.',
+      },
+    ],
+    footer: 'If you encounter objectionable content or abusive behaviour, please report it immediately using the in‑app reporting feature or contact us at safety@workaflow.app. We are committed to acting on all reports within 24 hours.',
+  },
   {
     id: 'services',
     icon: 'construct-outline',
@@ -72,8 +108,22 @@ const SECTIONS = [
       { heading: 'Service Listings', text: 'Taskers may post services they offer. All service descriptions, prices, and availability must be accurate and not misleading.' },
       { heading: 'Booking & Payment', text: 'When you book a service, you agree to pay the indicated price. Workaflow facilitates payments through third‑party processors and holds funds in escrow until the job is completed, unless otherwise agreed.' },
       { heading: 'Tasker–Client Relationship', text: 'Taskers are independent contractors, not employees of Workaflow. We are not responsible for the quality, safety, or legality of the services performed. Any disputes between users should be resolved between them, though we may assist.' },
-      { heading: 'Prohibited Conduct', text: 'You may not use the platform for any illegal, fraudulent, or harmful activity. Harassment, discrimination, and abuse are strictly forbidden and will result in immediate account termination.' },
+      { heading: 'Prohibited Conduct', text: 'You may not use the platform for any illegal, fraudulent, or harmful activity. Harassment, discrimination, abuse, and objectionable content of any kind are strictly forbidden and will result in immediate account termination, content removal, and potential reporting to authorities.' },
     ],
+  },
+  {
+    id: 'reporting',
+    icon: 'flag-outline',
+    color: C.red,
+    bg: C.redLight,
+    title: 'Reporting Objectionable Content & Abuse',
+    content: `Workaflow provides in‑app tools to report objectionable content and abusive users at any time.`,
+    bullets: [
+      { heading: 'Reporting a Message', text: 'In any chat conversation, long‑press on the offensive message and select "Report." Choose a reason for the report and submit. Our moderation team will review the content within 24 hours.' },
+      { heading: 'Blocking a User', text: 'You may block any user from the chat header menu. Blocking immediately removes all messages from both parties and prevents further contact. We are automatically notified and will review the blocked user\'s account for potential violations.' },
+      { heading: 'Our Commitment', text: 'We review all reports within 24 hours. Content that violates these Terms is removed immediately. Users who repeatedly or egregiously violate this policy will have their accounts permanently terminated.' },
+    ],
+    footer: 'To report urgent safety concerns, contact us directly at safety@workaflow.app.',
   },
   {
     id: 'payments',
@@ -133,7 +183,7 @@ const SECTIONS = [
     color: '#DC2626',
     bg: '#FEE2E2',
     title: 'Termination',
-    content: `We may suspend or terminate your account at any time, with or without notice, for any violation of these Terms or for any other reason at our sole discretion.\n\nUpon termination, your right to use the Services immediately ceases. You may delete your account at any time through the app settings.`,
+    content: `We may suspend or terminate your account at any time, with or without notice, for any violation of these Terms — including but not limited to posting objectionable content or engaging in abusive behaviour — or for any other reason at our sole discretion.\n\nUpon termination, your right to use the Services immediately ceases. You may delete your account at any time through the app settings.`,
   },
   {
     id: 'changes',
@@ -153,7 +203,7 @@ const SECTIONS = [
     contact: [
       { icon: 'mail-outline',     label: 'Email',   value: 'legal@workaflow.app'     },
       { icon: 'globe-outline',    label: 'Website', value: 'www.workaflow.app'        },
-      { icon: 'location-outline', label: 'Address', value: 'Accra, Ghana'            },
+      { icon: 'location-outline', label: 'Address', value: 'Accra, Ghana'             },
     ],
   },
 ];
@@ -357,7 +407,6 @@ export default function TermsOfServiceScreen({ navigation }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={s.hero}
           >
-            {/* Decorative rings */}
             <View style={s.heroRing1} />
             <View style={s.heroRing2} />
 
@@ -367,14 +416,14 @@ export default function TermsOfServiceScreen({ navigation }) {
                 start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                 style={s.heroIconCircle}
               >
-                <Ionicons name="document-text" size={32} color={C.white} />
+                <Ionicons name="shield-checkmark" size={32} color={C.white} />
               </LinearGradient>
             </View>
 
             <Text style={s.heroWordmark}>Workaflow</Text>
             <Text style={s.heroTitle}>Terms of Service</Text>
             <Text style={s.heroSub}>
-              Please read these terms carefully before using our platform.
+              Please read these terms carefully.{'\n'}We have zero tolerance for objectionable content and abusive behaviour.
             </Text>
 
             <View style={s.heroDates}>
@@ -398,10 +447,10 @@ export default function TermsOfServiceScreen({ navigation }) {
             contentContainerStyle={s.chipsRow}
           >
             {[
-              { icon: 'shield-checkmark-outline', label: 'Transparent Terms', color: C.teal,    bg: C.tealLight },
-              { icon: 'lock-closed-outline',       label: 'User Protection',  color: C.navyMid, bg: C.navyLight },
-              { icon: 'scale-outline',             label: 'Fair Disputes',    color: C.gold,    bg: C.goldLight },
-              { icon: 'refresh-outline',           label: 'Regular Updates',  color: '#7C3AED', bg: '#EDE9FE' },
+              { icon: 'shield-checkmark-outline', label: 'Zero Tolerance',    color: C.red,     bg: C.redLight  },
+              { icon: 'flag-outline',             label: 'Report & Block',    color: '#7C3AED', bg: '#EDE9FE'  },
+              { icon: 'time-outline',             label: '24hr Review',       color: C.teal,    bg: C.tealLight },
+              { icon: 'lock-closed-outline',      label: 'User Protection',   color: C.navyMid, bg: C.navyLight },
             ].map((chip, i) => (
               <View key={i} style={[s.chip, { backgroundColor: chip.bg }]}>
                 <Ionicons name={chip.icon} size={14} color={chip.color} />
@@ -430,12 +479,13 @@ export default function TermsOfServiceScreen({ navigation }) {
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={s.footer}
           >
-            <Ionicons name="document-text" size={28} color={C.gold} style={{ marginBottom: 10 }} />
+            <Ionicons name="shield-checkmark" size={28} color={C.gold} style={{ marginBottom: 10 }} />
             <Text style={s.footerBrand}>Workaflow</Text>
             <Text style={s.footerTagline}>Connecting people. Building trust.</Text>
             <View style={s.footerDivider} />
             <Text style={s.footerCopy}>
               © {new Date().getFullYear()} Workaflow. All rights reserved.{'\n'}
+              Zero tolerance for objectionable content and abusive users.{'\n'}
               These terms are effective as of {EFFECTIVE}.
             </Text>
           </LinearGradient>
@@ -476,7 +526,7 @@ export default function TermsOfServiceScreen({ navigation }) {
   );
 }
 
-// ─── Styles (identical to Privacy Policy) ────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: C.bg },
   scroll: { paddingBottom: 20 },
@@ -500,7 +550,8 @@ const s = StyleSheet.create({
 
   // Hero
   hero: {
-    margin: 16, borderTopRightRadius: 24,borderTopLeftRadius: 24, padding: 28, alignItems: 'center',
+    margin: 16, borderTopRightRadius: 24, borderTopLeftRadius: 24,
+    padding: 28, alignItems: 'center',
     overflow: 'hidden', position: 'relative',
   },
   heroRing1: {
@@ -517,7 +568,7 @@ const s = StyleSheet.create({
   heroIconCircle: { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   heroWordmark:   { fontSize: 13, fontWeight: '800', color: C.gold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 },
   heroTitle:      { fontSize: 28, fontWeight: '800', color: C.white, letterSpacing: -0.5, textAlign: 'center', marginBottom: 10 },
-  heroSub:        { fontSize: 13, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 20, marginBottom: 20, maxWidth: 260 },
+  heroSub:        { fontSize: 13, color: 'rgba(255,255,255,0.65)', textAlign: 'center', lineHeight: 20, marginBottom: 20, maxWidth: 280 },
   heroDates:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
   heroDateChip:   { flexDirection: 'row', alignItems: 'center', gap: 5 },
   heroDateTxt:    { fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
