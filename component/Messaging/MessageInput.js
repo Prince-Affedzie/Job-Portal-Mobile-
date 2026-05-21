@@ -46,7 +46,7 @@ export const MessageInput = ({
           <Ionicons name="attach" size={24} color={isUploading ? '#D1D5DB' : '#6366F1'} />
         </TouchableOpacity>
 
-        {/* Voice Button - FIXED */}
+        {/* Voice Button - FIXED 
         <TouchableOpacity
           style={[styles.voiceButton, isUploading && styles.voiceButtonDisabled]}
           onPress={() => setVoiceModal(true)} // ← This was the bug!
@@ -54,6 +54,7 @@ export const MessageInput = ({
         >
           <Ionicons name="mic" size={22} color={isUploading ? '#D1D5DB' : '#EF4444'} />
         </TouchableOpacity>
+        */}
 
         {/* Text Input */}
         <TextInput

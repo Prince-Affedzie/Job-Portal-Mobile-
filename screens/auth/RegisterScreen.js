@@ -377,9 +377,7 @@ export default function RegisterScreen({ navigation }) {
           Alert.alert('Welcome! 🎉', 'Your account has been created successfully.');
           redirectAfterSignUp(userRole);
         }, 100);
-      } else {
-        Alert.alert('Sign-Up Failed', response?.message || 'Please try again.');
-      }
+      } 
     } catch (err) {
       if (err.code === 'ERR_REQUEST_CANCELED') return;
       Alert.alert('Apple Error', err.message || 'Could not sign in with Apple.');
