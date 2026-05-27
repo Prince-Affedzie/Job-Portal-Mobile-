@@ -10,6 +10,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { taskerOnboarding, uploadProfileImage } from '../../api/authApi';
 import { sendFileToS3 } from '../../api/commonApi';
 import { AuthContext } from '../../context/AuthContext';
@@ -496,48 +497,8 @@ function ServiceModal({ visible, editingSvc, svcForm, setSvcForm, onClose, onSav
               onChangeText={t => setSvcForm(f => ({ ...f, description: t }))}
               placeholder="What does this service include?"
             />
- 
-            {/* Tags editor */}
-            <View style={{ height: 14 }} />
-            <Label text="Tags" />
-            <View style={s.tagsWrap}>
-              {svcForm.tags.map((tag, i) => (
-                <View key={i} style={s.tagChip}>
-                  <Text style={s.tagChipText}>{tag}</Text>
-                  <TouchableOpacity onPress={() => removeTag(tag)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                    <Ionicons name="close" size={12} color={C.accent} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-            <View style={s.tagInputRow}>
-              <TextInput
-                ref={tagInputRef}
-                style={s.tagInput}
-                placeholder="Add tag and press return…"
-                placeholderTextColor={C.textMuted}
-                returnKeyType="done"
-                onSubmitEditing={(e) => {
-                  addTag(e.nativeEvent.text);
-                  // clear the native input
-                  if (tagInputRef.current) tagInputRef.current.clear();
-                }}
-              />
-              <TouchableOpacity
-                style={s.tagAddBtn}
-                onPress={() => {
-                  if (tagInputRef.current) {
-                    // programmatic add isn't directly possible without controlled value;
-                    // the submit handler above handles the real work
-                    tagInputRef.current.focus();
-                  }
-                }}
-              >
-                <Ionicons name="add" size={16} color={C.white} />
-              </TouchableOpacity>
-            </View>
-            <Text style={s.hint}>Tags help clients find your service when searching</Text>
- 
+
+
             {/* Pricing model */}
             <View style={{ height: 14 }} />
             <Label text="Pricing Model" />
@@ -582,6 +543,49 @@ function ServiceModal({ visible, editingSvc, svcForm, setSvcForm, onClose, onSav
             )}
  
             <View style={{ height: 20 }} />
+ 
+            {/* Tags editor */}
+            <View style={{ height: 14 }} />
+            <Label text="Tags" />
+            <View style={s.tagsWrap}>
+              {svcForm.tags.map((tag, i) => (
+                <View key={i} style={s.tagChip}>
+                  <Text style={s.tagChipText}>{tag}</Text>
+                  <TouchableOpacity onPress={() => removeTag(tag)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <Ionicons name="close" size={12} color={C.accent} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <View style={s.tagInputRow}>
+              <TextInput
+                ref={tagInputRef}
+                style={s.tagInput}
+                placeholder="Add tag and press return…"
+                placeholderTextColor={C.textMuted}
+                returnKeyType="done"
+                onSubmitEditing={(e) => {
+                  addTag(e.nativeEvent.text);
+                  // clear the native input
+                  if (tagInputRef.current) tagInputRef.current.clear();
+                }}
+              />
+              <TouchableOpacity
+                style={s.tagAddBtn}
+                onPress={() => {
+                  if (tagInputRef.current) {
+                    // programmatic add isn't directly possible without controlled value;
+                    // the submit handler above handles the real work
+                    tagInputRef.current.focus();
+                  }
+                }}
+              >
+                <Ionicons name="add" size={16} color={C.white} />
+              </TouchableOpacity>
+            </View>
+            <Text style={s.hint}>Tags help clients find your service when searching</Text>
+ 
+            
           </ScrollView>
  
           {/* Footer */}
@@ -685,17 +689,35 @@ export default function TaskerOnboardingScreen({ navigation }) {
   };
 
   // ── Photo handlers ───────────────────────────────────────────────────────
-  const pickPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-    if (!result.canceled) setPhotoUri(result.assets[0].uri);
-  };
+ const pickPhoto = async () => {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false,  // disable native cropper
+    quality: 1,
+  });
+
+  if (!result.canceled) {
+    const asset = result.assets[0];
+
+    const size = Math.min(asset.width, asset.height);
+    const originX = (asset.width - size) / 2;
+    const originY = (asset.height - size) / 2;
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [
+        { crop: { originX, originY, width: size, height: size } },
+        { resize: { width: 400, height: 400 } },
+      ],
+      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    setPhotoUri(manipulated.uri);
+  }
+};
 
   const uploadPhoto = async (uri) => {
     setImgUploading(true);

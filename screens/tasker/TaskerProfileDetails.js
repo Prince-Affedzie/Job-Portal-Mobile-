@@ -8,6 +8,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   taskerProfileUpdate,
   taskerGetMyProfile,
@@ -386,19 +387,53 @@ export default function TaskerProfileDetailScreen({ navigation }) {
     setEditing(false);
   };
 
-  const pickBanner = async () => {
-    if (!editing) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo access to add a banner.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, aspect: [16, 5], quality: 0.87,
-    });
-    if (!result.canceled) {
-      setBrandBanner(result.assets[0].uri);
-      setBannerChanged(true);
+ const pickBanner = async () => {
+  if (!editing) return;
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo access to add a banner.'); return; }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false,  // disable native cropper
+    quality: 1,
+  });
+
+  if (!result.canceled) {
+    const asset = result.assets[0];
+
+    // Crop to centered 16:9 rectangle
+    const targetRatio = 16 / 9;
+    const assetRatio = asset.width / asset.height;
+
+    let cropWidth, cropHeight, originX, originY;
+
+    if (assetRatio > targetRatio) {
+      // Image is wider than 16:9 — constrain by height
+      cropHeight = asset.height;
+      cropWidth = cropHeight * targetRatio;
+      originX = (asset.width - cropWidth) / 2;
+      originY = 0;
+    } else {
+      // Image is taller than 16:9 — constrain by width
+      cropWidth = asset.width;
+      cropHeight = cropWidth / targetRatio;
+      originX = 0;
+      originY = (asset.height - cropHeight) / 2;
     }
-  };
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [
+        { crop: { originX, originY, width: cropWidth, height: cropHeight } },
+        { resize: { width: 1280, height: 720 } },
+      ],
+      { compress: 0.87, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    setBrandBanner(manipulated.uri);
+    setBannerChanged(true);
+  }
+};
 
   const uploadBanner = async (uri) => {
     setBannerUploading(true);

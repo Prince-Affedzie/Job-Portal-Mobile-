@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
@@ -164,22 +165,49 @@ export default function TaskerProfileScreen({ navigation }) {
 
   // ── Image Picker ─────────────────────────────────────────────────────────────
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow photo library access.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-    if (!result.canceled) {
-      setImgErr(false);
-      setProfileData(p => ({ ...p, profileImage: result.assets[0].uri }));
-    }
-  };
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission required', 'Please allow photo library access.');
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: false, // ← disable native cropper entirely
+    quality: 1,
+  });
+
+  if (!result.canceled) {
+    const asset = result.assets[0];
+
+    // Crop to a centered square, then resize and compress
+    const size = Math.min(asset.width, asset.height);
+    const originX = (asset.width - size) / 2;
+    const originY = (asset.height - size) / 2;
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [
+        {
+          crop: {
+            originX,
+            originY,
+            width: size,
+            height: size,
+          },
+        },
+        { resize: { width: 400, height: 400 } },
+      ],
+      {
+        compress: 0.85,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+
+    setImgErr(false);
+    setProfileData(p => ({ ...p, profileImage: manipulated.uri }));
+  }
+};
 
   const uploadImageToS3 = async (uri) => {
     setImageUploading(true);

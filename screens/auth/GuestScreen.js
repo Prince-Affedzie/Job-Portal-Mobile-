@@ -222,7 +222,7 @@ export default function GuestScreen() {
         </View>
         <TouchableOpacity onPress={() => navigate('Login')} style={s.signInLink} activeOpacity={0.8}>
           <Text style={s.signInLinkText}>Sign In</Text>
-          <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.6)" />
+          <Ionicons name="chevron-forward" size={15} color="rgba(255,255,255,0.6)" />
         </TouchableOpacity>
       </View>
 
@@ -435,7 +435,7 @@ const s = StyleSheet.create({
   },
   guestChipText: { fontSize: 11, fontWeight: '700', color: C.gold, letterSpacing: 0.3 },
   signInLink:    { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  signInLinkText:{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
+  signInLinkText:{ fontSize: 15, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
 
   heroHeadWrap:  { marginBottom: 20 },
   heroEyebrow: {

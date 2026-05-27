@@ -462,19 +462,6 @@ function ServiceModal({ visible, onClose, onSave, editing, saving }) {
               textAlignVertical="top"
             />
 
-            {/* Tags */}
-            <View style={mSt.labelRow}>
-              <Text style={mSt.label}>Service Tags</Text>
-              {form.tags.length > 0 && (
-                <View style={mSt.tagCountBadge}>
-                  <Text style={mSt.tagCountText}>{form.tags.length}</Text>
-                </View>
-              )}
-            </View>
-            <TagsEditor
-              tags={form.tags}
-              onChange={tags => setForm(f => ({ ...f, tags }))}
-            />
 
             {/* Pricing type */}
             <Text style={[mSt.label, { marginTop: 20 }]}>Pricing Type</Text>
@@ -506,6 +493,22 @@ function ServiceModal({ visible, onClose, onSave, editing, saving }) {
                 </View>
               </>
             )}
+
+            {/* Tags */}
+            <View style={mSt.labelRow}>
+              <Text style={mSt.label}>Service Tags</Text>
+              {form.tags.length > 0 && (
+                <View style={mSt.tagCountBadge}>
+                  <Text style={mSt.tagCountText}>{form.tags.length}</Text>
+                </View>
+              )}
+            </View>
+            <TagsEditor
+              tags={form.tags}
+              onChange={tags => setForm(f => ({ ...f, tags }))}
+            />
+
+            
 
             <View style={{ height: 16 }} />
           </ScrollView>
