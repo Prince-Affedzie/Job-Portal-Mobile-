@@ -586,10 +586,12 @@ const ClientTaskDetailScreen = ({ route, navigation }) => {
           </SectionCard>
         )}
 
-        <ClientRefundNoticeCard task={task} isTaskOwner={true}/>
+       
 
         <View style={{height:120}}/>
       </ScrollView>
+
+       <ClientRefundNoticeCard task={task} isTaskOwner={true}/>
 
       {/* ── Bottom action bar ──────────────────────────────────────────── */}
       {(canMessage || canMarkDone) && (
