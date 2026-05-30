@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 import { taskerOnboarding, uploadProfileImage } from '../../api/authApi';
 import { sendFileToS3 } from '../../api/commonApi';
 import { AuthContext } from '../../context/AuthContext';
@@ -690,32 +691,69 @@ export default function TaskerOnboardingScreen({ navigation }) {
 
   // ── Photo handlers ───────────────────────────────────────────────────────
  const pickPhoto = async () => {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow photo access.'); return; }
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'image/*',
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: false,  // disable native cropper
-    quality: 1,
-  });
+    if (result.canceled || !result.assets?.[0]) return;
 
-  if (!result.canceled) {
     const asset = result.assets[0];
 
-    const size = Math.min(asset.width, asset.height);
-    const originX = (asset.width - size) / 2;
-    const originY = (asset.height - size) / 2;
+    // Get image dimensions
+    const info = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [],
+      {
+        compress: 1,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
 
+    const width = info.width;
+    const height = info.height;
+
+    // Center square crop (same logic you had)
+    const size = Math.min(width, height);
+    const originX = (width - size) / 2;
+    const originY = (height - size) / 2;
+
+    // Crop + resize + compress
     const manipulated = await ImageManipulator.manipulateAsync(
       asset.uri,
       [
-        { crop: { originX, originY, width: size, height: size } },
-        { resize: { width: 400, height: 400 } },
+        {
+          crop: {
+            originX,
+            originY,
+            width: size,
+            height: size,
+          },
+        },
+        {
+          resize: {
+            width: 400,
+            height: 400,
+          },
+        },
       ],
-      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
+      {
+        compress: 0.85,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
     );
 
     setPhotoUri(manipulated.uri);
+
+  } catch (error) {
+    console.log(error);
+
+    Alert.alert(
+      'Error',
+      'Failed to pick photo.'
+    );
   }
 };
 

@@ -1,89 +1,92 @@
-import React, { useState, useContext, useRef,useCallback } from 'react';
+import React, { useState, useContext, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  Dimensions,
-  StatusBar,
-  Image,
-  Platform,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  TextInput, Alert, ActivityIndicator, Dimensions,
+  StatusBar, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import Header from "../../component/tasker/Header";
+import Header from '../../component/tasker/Header';
 import { PosterContext } from '../../context/PosterContext';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
-import { taskMediaUpload } from '../../api/miniTaskApi';
-import { sendFileToS3 } from '../../api/commonApi';
 
 const { width } = Dimensions.get('window');
-const guidelineBaseWidth = 375;
-const scale = (size) => (width / guidelineBaseWidth) * size;
+const scale = (size) => (width / 375) * size;
 
-const categories = [
-  "Home Services", "Delivery & Errands", "Digital Services",
-  "Writing & Assistance", "Learning & Tutoring", "Creative Tasks",
-  "Event Support", "Others"
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  'Home Services', 'Delivery & Errands', 'Digital Services',
+  'Writing & Assistance', 'Learning & Tutoring', 'Creative Tasks',
+  'Event Support', 'Others',
 ];
 
-const subcategories = {
-  "Home Services": ["Cleaning", "Repairs", "Assembly", "Gardening", "Other"],
-  "Delivery & Errands": ["Food Delivery", "Package Delivery", "Grocery Shopping", "Other"],
-  "Digital Services": ["Web Development", "Graphic Design", "Social Media", "Data Entry", "Other"],
-  "Writing & Assistance": ["Content Writing", "Translation", "Research", "Virtual Assistant", "Other"],
-  "Learning & Tutoring": ["Academic Tutoring", "Music Lessons", "Language Teaching", "Skill Training", "Other"],
-  "Creative Tasks": ["Photography", "Videography", "Art & Design", "Music Production", "Other"],
-  "Event Support": ["Event Planning", "Catering", "Decoration", "Coordination", "Other"],
-  "Others": ["General Tasks", "Miscellaneous"]
+const SUBCATEGORIES = {
+  'Home Services':       ['Cleaning', 'Repairs', 'Assembly', 'Gardening', 'Other'],
+  'Delivery & Errands':  ['Food Delivery', 'Package Delivery', 'Grocery Shopping', 'Other'],
+  'Digital Services':    ['Web Development', 'Graphic Design', 'Social Media', 'Data Entry', 'Other'],
+  'Writing & Assistance':['Content Writing', 'Translation', 'Research', 'Virtual Assistant', 'Other'],
+  'Learning & Tutoring': ['Academic Tutoring', 'Music Lessons', 'Language Teaching', 'Skill Training', 'Other'],
+  'Creative Tasks':      ['Photography', 'Videography', 'Art & Design', 'Music Production', 'Other'],
+  'Event Support':       ['Event Planning', 'Catering', 'Decoration', 'Coordination', 'Other'],
+  'Others':              ['General Tasks', 'Miscellaneous'],
 };
 
-// Enhanced InputField Component (unchanged)
-// Enhanced InputField Component - FIXED VERSION
-const InputField = React.memo(({ 
-  label, value, onChange, placeholder, error, multiline = false, 
-  numberOfLines = 1, required = false, icon = null, keyboardType = 'default', ...props 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const C = {
+  bg:            '#F8FAFF',
+  surface:       '#FFFFFF',
+  border:        '#E4E8EE',
+  borderLight:   '#EEF1F6',
+  primary:       '#1E3A6E',
+  primaryMid:    '#1A56DB',
+  primaryGlow:   '#EBF5FF',
+  gold:          '#D49B3F',
+  goldLight:     '#FCF3E1',
+  green:         '#0E9F6E',
+  greenLight:    '#E3FCEC',
+  red:           '#DC2626',
+  redLight:      '#FEF2F2',
+  textPrimary:   '#0F172A',
+  textSecondary: '#475569',
+  textMuted:     '#94A3B8',
+  white:         '#FFFFFF',
+};
+
+// ─── InputField ───────────────────────────────────────────────────────────────
+const InputField = React.memo(({
+  label, value, onChange, placeholder, error, multiline = false,
+  numberOfLines = 1, required = false, icon = null, keyboardType = 'default', ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
-   const inputRef = useRef(null);
-  
+  const inputRef = useRef(null);
+
   return (
-    <View style={styles.inputContainer}>
-      <View style={styles.labelContainer}>
-        <Text style={styles.inputLabel}>
-          {label} {required && <Text style={styles.required}>*</Text>}
-        </Text>
-      </View>
-      <TouchableOpacity 
-       activeOpacity={1}
-       onPress={() => inputRef.current?.focus()}
-      style={[
-        styles.inputWrapper,
-        isFocused && styles.inputFocused,
-        error && styles.inputError,
-        multiline && styles.textAreaWrapper
-      ]}>
-        {icon && <Ionicons name={icon} size={scale(20)} color="#6366F1" style={styles.inputIcon} />}
+    <View style={s.inputContainer}>
+      <Text style={s.inputLabel}>
+        {label}{required && <Text style={{ color: C.red }}> *</Text>}
+      </Text>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => inputRef.current?.focus()}
+        style={[
+          s.inputWrapper,
+          isFocused && s.inputFocused,
+          error && s.inputError,
+          multiline && s.textAreaWrapper,
+        ]}
+      >
+        {icon && <Ionicons name={icon} size={scale(18)} color={isFocused ? C.primaryMid : C.textMuted} style={s.inputIcon} />}
         <TextInput
-          style={[
-            styles.textInput,
-            multiline && styles.textArea,
-            icon && styles.textInputWithIcon
-          ]}
+          ref={inputRef}
+          style={[s.textInput, multiline && s.textArea, icon && s.textInputWithIcon]}
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={C.textMuted}
           multiline={multiline}
           numberOfLines={numberOfLines}
           keyboardType={keyboardType}
@@ -95,786 +98,573 @@ const InputField = React.memo(({
         />
       </TouchableOpacity>
       {error ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="warning" size={scale(14)} color="#EF4444" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={s.errorRow}>
+          <Ionicons name="alert-circle-outline" size={scale(13)} color={C.red} />
+          <Text style={s.errorText}>{error}</Text>
         </View>
-      ) : (
-        <Text style={styles.helperText}>
-          {multiline ? `Characters: ${value.length}/1000` : '\u00A0'}
-        </Text>
-      )}
+      ) : multiline ? (
+        <Text style={s.charCount}>{value.length}/1000</Text>
+      ) : null}
     </View>
   );
 });
-// Enhanced Chip Component (unchanged)
-const Chip = ({ text, onRemove, variant = 'skill' }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const shouldTruncate = text.length > 20; 
 
+// ─── Chip ─────────────────────────────────────────────────────────────────────
+const Chip = ({ text, onRemove, variant = 'skill' }) => (
+  <View style={[s.chip, variant === 'requirement' ? s.chipReq : s.chipSkill]}>
+    <Text style={s.chipText} numberOfLines={1}>{text}</Text>
+    <TouchableOpacity onPress={onRemove} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <Ionicons name="close-circle" size={scale(16)} color={variant === 'requirement' ? C.green : C.primaryMid} />
+    </TouchableOpacity>
+  </View>
+);
+
+// ─── Section card ─────────────────────────────────────────────────────────────
+const SectionCard = ({ title, description, icon, children, accent = C.primaryMid, collapsible = false }) => {
+  const [collapsed, setCollapsed] = useState(false);
   return (
-    <View style={[
-      styles.chip,
-      variant === 'requirement' ? styles.chipRequirement : styles.chipSkill,
-      { minWidth: scale(100), maxWidth: '100%' }
-    ]}>
+    <View style={s.section}>
       <TouchableOpacity
-        style={styles.chipContent}
-        onPress={shouldTruncate ? () => setIsExpanded(!isExpanded) : null}
-        activeOpacity={shouldTruncate ? 0.7 : 1}
+        style={s.sectionHeader}
+        onPress={() => collapsible && setCollapsed(!collapsed)}
+        activeOpacity={collapsible ? 0.75 : 1}
       >
-        <Text
-          style={styles.chipText}
-          numberOfLines={isExpanded ? undefined : 1}
-          ellipsizeMode="tail"
-        >
-          {text}
-        </Text>
-        {shouldTruncate && !isExpanded && (
-          <Text style={styles.chipMoreIndicator}>...</Text>
+        <View style={[s.sectionIconWrap, { backgroundColor: accent }]}>
+          <Ionicons name={icon} size={scale(18)} color={C.white} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.sectionTitle}>{title}</Text>
+          {description && !collapsed && (
+            <Text style={s.sectionDesc}>{description}</Text>
+          )}
+        </View>
+        {collapsible && (
+          <Ionicons
+            name={collapsed ? 'chevron-down' : 'chevron-up'}
+            size={scale(18)}
+            color={C.textMuted}
+          />
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={onRemove}
-        style={styles.chipRemove}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 20 }}
-      >
-        <Ionicons name="close-circle" size={scale(18)} color="#EF4444" />
-      </TouchableOpacity>
+      {!collapsed && <View style={s.sectionBody}>{children}</View>}
     </View>
   );
 };
 
-// FormSection & EnhancedPicker remain unchanged
-const FormSection = ({ title, description, icon, children, collapsible = false }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  
-  return (
-    <View style={styles.section}>
-      <TouchableOpacity 
-        style={styles.sectionHeader}
-        onPress={() => collapsible && setIsCollapsed(!isCollapsed)}
-        activeOpacity={collapsible ? 0.7 : 1}
-      >
-        <View style={styles.sectionTitleRow}>
-          <View style={styles.sectionIcon}>
-            <Ionicons name={icon} size={scale(22)} color="#FFFFFF" />
-          </View>
-          <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionTitle}>{title}</Text>
-            {description && !isCollapsed && (
-              <Text style={styles.sectionDescription}>{description}</Text>
-            )}
-          </View>
-          {collapsible && (
-            <Ionicons 
-              name={isCollapsed ? "chevron-down" : "chevron-up"} 
-              size={scale(20)} 
-              color="#6B7280" 
-            />
-          )}
-        </View>
-      </TouchableOpacity>
-      
-      {!isCollapsed && (
-        <View style={styles.sectionContent}>
-          {children}
-        </View>
-      )}
-    </View>
-  );
-};
-
-const EnhancedPicker = ({ label, selectedValue, onValueChange, items, enabled = true, required = false }) => (
-  <View style={styles.inputContainer}>
-    <Text style={styles.inputLabel}>
-      {label} {required && <Text style={styles.required}>*</Text>}
+// ─── Picker wrapper ───────────────────────────────────────────────────────────
+const PickerField = ({ label, selectedValue, onValueChange, items, enabled = true, required = false }) => (
+  <View style={s.inputContainer}>
+    <Text style={s.inputLabel}>
+      {label}{required && <Text style={{ color: C.red }}> *</Text>}
     </Text>
-    <View style={[
-      styles.pickerContainer,
-      !enabled && styles.pickerDisabled
-    ]}>
+    <View style={[s.pickerWrap, !enabled && { opacity: 0.5 }]}>
       <Picker
         selectedValue={selectedValue}
         onValueChange={onValueChange}
         enabled={enabled}
-        dropdownIconColor="#6366F1"
-        style={styles.picker}
+        dropdownIconColor={C.primaryMid}
+        style={s.picker}
       >
-        <Picker.Item label={`Select ${label.toLowerCase()}`} value="" color="#9CA3AF" />
-        {items.map((item, index) => (
-          <Picker.Item key={index} label={item} value={item} color="#1F2937" />
+        <Picker.Item label={`Select ${label.toLowerCase()}`} value="" color={C.textMuted} />
+        {items.map((item, i) => (
+          <Picker.Item key={i} label={item} value={item} color={C.textPrimary} />
         ))}
       </Picker>
     </View>
   </View>
 );
 
-const MediaPreview = ({ media, index, onRemove }) => (
-  <View style={styles.mediaPreview}>
-    {media.type === 'image' ? (
-      <Image source={{ uri: media.uri || media.url }} style={styles.mediaImage} />
-    ) : (
-      <View style={styles.videoPlaceholder}>
-        <Ionicons name="videocam" size={scale(24)} color="#6366F1" />
-        <Text style={styles.videoText}>Video</Text>
-      </View>
-    )}
-    <TouchableOpacity 
-      style={styles.removeMediaButton}
-      onPress={() => onRemove(index)}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Ionicons name="close-circle" size={scale(20)} color="#EF4444" />
-    </TouchableOpacity>
-  </View>
-);
-
-
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 const CreateTaskScreen = ({ navigation }) => {
-  const { addTask, loading } = useContext(PosterContext);
-  const { user } = useContext(AuthContext);
+  const { addTask } = useContext(PosterContext);
+  const { user }    = useContext(AuthContext);
 
   const [task, setTask] = useState({
-    title: '',
-    description: '',
-    category: '',
-    subcategory: '',
-    biddingType: 'open-bid',
-    budget: '',
-    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    locationType: 'remote',
+    title:          '',
+    description:    '',
+    category:       '',
+    subcategory:    '',
+    biddingType:    'open-bid',
+    budget:         '',
+    deadline:       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    locationType:   'remote',
     skillsRequired: [],
-    requirements: [],
-    address: { region: '', city: '', suburb: '' },
-    media: [] // Now stores local + uploaded media
+    requirements:   [],
+    address:        { region: '', city: '', suburb: '' },
   });
 
-  const [currentSkill, setCurrentSkill] = useState('');
-  const [currentRequirement, setCurrentRequirement] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [currentSkill, setCurrentSkill]       = useState('');
+  const [currentRequirement, setCurrentReq]   = useState('');
+  const [showDatePicker, setShowDatePicker]   = useState(false);
+  const [errors, setErrors]                   = useState({});
+  const [isSubmitting, setIsSubmitting]       = useState(false);
 
+  // ── Stable change handlers ─────────────────────────────────────────────────
+  const setField   = useCallback((key, val) => setTask(p => ({ ...p, [key]: val })), []);
+  const setAddress = useCallback((key, val) => setTask(p => ({ ...p, address: { ...p.address, [key]: val } })), []);
 
-  const handleTitleChange = useCallback((text) => {
-  setTask(prev => ({ ...prev, title: text }));
-}, []);
-
-const handleDescriptionChange = useCallback((text) => {
-  setTask(prev => ({ ...prev, description: text }));
-}, []);
-
-const handleBudgetChange = useCallback((text) => {
-  setTask(prev => ({ ...prev, budget: text.replace(/[^0-9.]/g, '') }));
-}, []);
-
-const handleRegionChange = useCallback((text) => {
-  setTask(prev => ({
-    ...prev,
-    address: { ...prev.address, region: text }
-  }));
-}, []);
-
-const handleCityChange = useCallback((text) => {
-  setTask(prev => ({
-    ...prev,
-    address: { ...prev.address, city: text }
-  }));
-}, []);
-
-const handleSuburbChange = useCallback((text) => {
-  setTask(prev => ({
-    ...prev,
-    address: { ...prev.address, suburb: text }
-  }));
-}, []);
-
-  // === MEDIA HANDLING: Local storage only ===
-  const pickImage = async () => {
-    if (task.media.length >= 3) {
-      Alert.alert('Limit Reached', 'Maximum 3 files allowed');
-      return;
-    }
-
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Sorry, we need camera roll permissions.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await handleMediaSelection(result.assets[0], 'image');
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const pickVideo = async () => {
-    if (task.media.length >= 3) {
-      Alert.alert('Limit Reached', 'Maximum 3 files allowed');
-      return;
-    }
-
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Sorry, we need camera roll permissions.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await handleMediaSelection(result.assets[0], 'video');
-      }
-    } catch (error) {
-      console.error('Error picking video:', error);
-      Alert.alert('Error', 'Failed to pick video');
-    }
-  };
-
-  const handleMediaSelection = async (asset, type) => {
-    try {
-      const fileInfo = await FileSystem.getInfoAsync(asset.uri);
-      const fileSizeMB = (fileInfo.size || asset.fileSize || 0) / (1024 * 1024);
-
-      if (fileSizeMB > 10) {
-        Alert.alert('File too large', 'Please select a file smaller than 10MB');
-        return;
-      }
-
-      const localMediaItem = {
-        uri: asset.uri,
-        type,
-        name: asset.fileName || `media_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`,
-        tempId: Date.now(), // for stable key in list
-      };
-
-      setTask(prev => ({
-        ...prev,
-        media: [...prev.media, localMediaItem]
-      }));
-
-      Alert.alert(
-        'Added!',
-        `${type === 'image' ? 'Photo' : 'Video'} added. It will be uploaded when you post the task.`
-      );
-    } catch (error) {
-      console.error('Error adding media:', error);
-      Alert.alert('Error', 'Failed to add media');
-    }
-  };
-
-  const removeMedia = (index) => {
-    setTask(prev => ({
-      ...prev,
-      media: prev.media.filter((_, i) => i !== index)
-    }));
-  };
-  // === FORM VALIDATION (unchanged) ===
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!task.title.trim()) newErrors.title = 'Title is required';
-    if (task.title.length < 5) newErrors.title = 'Title should be at least 5 characters';
-    
-    if (!task.description.trim()) newErrors.description = 'Description is required';
-    if (task.description.length < 20) newErrors.description = 'Description should be at least 20 characters';
-    
-    if (!task.category) newErrors.category = 'Category is required';
-    
-    if (task.budget && parseFloat(task.budget) < 20) {
-      newErrors.budget = 'Minimum budget is ₵20';
-    }
-    
-    if (task.deadline < new Date()) newErrors.deadline = 'Deadline must be in the future';
-    
-    if (task.locationType === 'on-site' && (!task.address.region || !task.address.city)) {
-      newErrors.address = 'Region and city are required for on-site tasks';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // === SUBMIT: Upload media first, then post task ===
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      Alert.alert('Error', 'Please fix the errors in the form');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setUploadingMedia(true);
-
-    try {
-      let finalMedia = [];
-
-      // Upload any local (not uploaded) media items
-      for (const item of task.media) {
-        if (item.uri) { // local file
-          const file = {
-            uri: item.uri,
-            name: item.name,
-            type: item.type === 'image' ? 'image/jpeg' : 'video/mp4',
-          };
-
-          const fileInfoPayload = {
-            filename: file.name,
-            contentType: file.type,
-          };
-
-          const uploadResponse = await taskMediaUpload(fileInfoPayload);
-          if (uploadResponse.status !== 200) {
-            throw new Error('Failed to prepare media upload');
-          }
-
-          const { publicUrl, fileUrl } = uploadResponse.data;
-          await sendFileToS3(fileUrl, file);
-
-          finalMedia.push({ url: publicUrl, type: item.type });
-        } else {
-          // Already uploaded (in case of future edits)
-          finalMedia.push({ url: item.url, type: item.type });
-        }
-      }
-
-      // Prepare final task data
-      const taskData = {
-        ...task,
-        media: finalMedia,
-        budget: task.budget ? parseFloat(task.budget) : null,
-        deadline: task.deadline.toISOString(),
-      };
-
-      if (task.locationType === 'remote') {
-        delete taskData.address;
-      }
-
-      const result = await addTask(taskData);
-      
-      if (result.status === 200) {
-        Alert.alert(
-          '🎉 Task Posted Successfully!',
-          'Your task is now under review and will be live shortly.',
-          [{ text: 'Got It', onPress: () => navigate('MainTabs', { screen: 'PostedTasks' }) }]
-        );
-      } else {
-        Alert.alert('Error', result.message || 'Failed to post task');
-      }
-    } catch (error) {
-      console.error('Error posting task:', error);
-      Alert.alert('Error', 'Failed to post task. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-      setUploadingMedia(false);
-    }
-  };
-
-  // === SKILLS & REQUIREMENTS (unchanged) ===
+  // ── Skills & requirements ──────────────────────────────────────────────────
   const addSkill = () => {
     if (currentSkill.trim() && !task.skillsRequired.includes(currentSkill.trim())) {
-      setTask(prev => ({
-        ...prev,
-        skillsRequired: [...prev.skillsRequired, currentSkill.trim()]
-      }));
+      setTask(p => ({ ...p, skillsRequired: [...p.skillsRequired, currentSkill.trim()] }));
       setCurrentSkill('');
     }
   };
 
-  const removeSkill = (skillToRemove) => {
-    setTask(prev => ({
-      ...prev,
-      skillsRequired: prev.skillsRequired.filter(skill => skill !== skillToRemove)
-    }));
-  };
-
   const addRequirement = () => {
     if (currentRequirement.trim() && !task.requirements.includes(currentRequirement.trim())) {
-      setTask(prev => ({
-        ...prev,
-        requirements: [...prev.requirements, currentRequirement.trim()]
-      }));
-      setCurrentRequirement('');
+      setTask(p => ({ ...p, requirements: [...p.requirements, currentRequirement.trim()] }));
+      setCurrentReq('');
     }
   };
 
-  const removeRequirement = (requirementToRemove) => {
-    setTask(prev => ({
-      ...prev,
-      requirements: prev.requirements.filter(req => req !== requirementToRemove)
-    }));
+  // ── Validation ─────────────────────────────────────────────────────────────
+  const validate = () => {
+    const e = {};
+    if (!task.title.trim() || task.title.length < 5)          e.title       = 'Title must be at least 5 characters';
+    if (!task.description.trim() || task.description.length < 20) e.description = 'Please describe your task in at least 20 characters';
+    if (!task.category)                                         e.category    = 'Please select a category';
+    if (task.budget && parseFloat(task.budget) < 20)           e.budget      = 'Minimum budget is ₵20';
+    if (task.deadline < new Date())                            e.deadline    = 'Deadline must be in the future';
+    if (task.locationType === 'on-site' && (!task.address.region || !task.address.city))
+      e.address = 'Region and city are required for on-site tasks';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setTask(prev => ({ ...prev, deadline: selectedDate }));
+  // ── Submit ─────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!validate()) { Alert.alert('Please fix the errors below'); return; }
+    setIsSubmitting(true);
+    try {
+      const taskData = {
+        ...task,
+        budget:   task.budget ? parseFloat(task.budget) : null,
+        deadline: task.deadline.toISOString(),
+        media:    [],
+      };
+      if (task.locationType === 'remote') delete taskData.address;
+
+      const result = await addTask(taskData);
+      if (result.status === 200) {
+        Alert.alert(
+          'Task Posted! 🎉',
+          'Taskers can now find and apply for your job.',
+          [{ text: 'View My Posts', onPress: () => navigate('MainTabs', { screen: 'PostedTasks' }) }]
+        );
+      } else {
+        Alert.alert('Error', result.message || 'Failed to post task. Please try again.');
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to post task. Please check your connection.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2D325D" />
-      <Header title="Create New Task" showBackButton={true} />
-      
-      <ScrollView 
-        style={styles.scrollView}
+    <SafeAreaView style={s.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <Header title="Post a Task" showBackButton />
+
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="always"
         removeClippedSubviews={false}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-         scrollEventThrottle={16}
       >
-        {/* Task Details */}
-        <FormSection title="Task Details" icon="document-text-outline" description="Tell us what you need help with">
-          <InputField label="Task Title" value={task.title} onChange={handleTitleChange}
-            placeholder="e.g., Website Design, Home Cleaning" error={errors.title} required  />
-          <InputField label="Description" value={task.description} onChange={handleDescriptionChange}
-            placeholder="Describe what needs to be done..." error={errors.description} multiline numberOfLines={4} required  />
-          <View style={styles.row}>
-            <View style={{ flex: 1, marginRight: scale(8) }}>
-              <EnhancedPicker label="Category" selectedValue={task.category} onValueChange={value => setTask(prev => ({ ...prev, category: value, subcategory: '' }))}
-                items={categories} required />
-            </View>
-            <View style={{ flex: 1, marginLeft: scale(8) }}>
-              <EnhancedPicker label="Subcategory" selectedValue={task.subcategory} onValueChange={value => setTask(prev => ({ ...prev, subcategory: value }))}
-                items={task.category ? subcategories[task.category] || [] : []} enabled={!!task.category} />
-            </View>
-          </View>
-        </FormSection>
-
-        {/* Media Upload 
-        <FormSection title="Photos & Videos" icon="images-outline" description="Add visual references (optional, max 3 files)" collapsible={true}>
-          <View style={styles.mediaLimit}>
-            <Text style={styles.mediaLimitText}>
-              <Ionicons name="information-circle" size={scale(14)} color="#6366F1" />
-              {' '}Files added: {task.media.length}/3 (uploaded on post)
-            </Text>
-          </View>
-          
-          <View style={styles.mediaButtons}>
-            <TouchableOpacity style={[styles.mediaButton, (task.media.length >= 3 || uploadingMedia) && styles.mediaButtonDisabled]}
-              onPress={pickImage} disabled={task.media.length >= 3 || uploadingMedia}>
-              <LinearGradient colors={['#6366F1', '#4F46E5']} style={styles.mediaButtonGradient}>
-                <Ionicons name="image-outline" size={scale(20)} color="#FFFFFF" />
-                <Text style={styles.mediaButtonText}>Add Photo</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.mediaButton, (task.media.length >= 3 || uploadingMedia) && styles.mediaButtonDisabled]}
-              onPress={pickVideo} disabled={task.media.length >= 3 || uploadingMedia}>
-              <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.mediaButtonGradient}>
-                <Ionicons name="videocam-outline" size={scale(20)} color="#FFFFFF" />
-                <Text style={styles.mediaButtonText}>Add Video</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          {uploadingMedia && (
-            <View style={styles.uploadingIndicator}>
-              <ActivityIndicator size="small" color="#6366F1" />
-              <Text style={styles.uploadingText}>Preparing media for upload...</Text>
-            </View>
-          )}
-
-          {task.media.length > 0 && (
-            <View style={styles.mediaPreviews}>
-              {task.media.map((media, index) => (
-                <MediaPreview key={media.tempId || index} media={media} index={index} onRemove={removeMedia} />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.mediaTip}>
-            <Ionicons name="bulb-outline" size={scale(16)} color="#F59E0B" />
-            <Text style={styles.mediaTipText}>
-              Clear photos/videos help taskers understand your requirements better
-            </Text>
-          </View>
-        </FormSection>*/}
-
-        {/* Skills & Requirements */}
-        <FormSection title="Requirements & Skills" icon="checkmark-done-outline" description="Specify what skills and deliverables are needed" collapsible={true}>
-          {/* Skills */}
-          <View style={styles.chipInputWrapper}>
-            <Text style={styles.chipSectionLabel}>Required Skills</Text>
-            <Text style={styles.chipSectionDescription}>Add skills that taskers need to have (e.g., Web Design, Photography)</Text>
-            
-            <View style={styles.chipInputStackedContainer}>
-              <TextInput style={styles.chipInputStacked} value={currentSkill} onChangeText={setCurrentSkill}
-                placeholder="Type a skill and press Add..." onSubmitEditing={addSkill} returnKeyType="done" blurOnSubmit={false} />
-              <TouchableOpacity style={[styles.addChipButtonStacked, !currentSkill.trim() && styles.addChipButtonDisabled]}
-                onPress={addSkill} disabled={!currentSkill.trim()}>
-                <Ionicons name="add-circle" size={scale(22)} color="#FFFFFF" />
-                <Text style={styles.addChipButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {task.skillsRequired.length > 0 && (
-              <View style={styles.chipsContainer}>
-                <Text style={styles.chipsLabel}>Skills Added ({task.skillsRequired.length}):</Text>
-                <View style={styles.chipsGrid}>
-                  {task.skillsRequired.map((skill, index) => (
-                    <Chip key={index} text={skill} onRemove={() => removeSkill(skill)} variant="skill" />
-                  ))}
-                </View>
-              </View>
-            )}
-            <View style={styles.sectionSeparator} />
-          </View>
-
-          {/* Requirements */}
-          <View style={styles.chipInputWrapper}>
-            <Text style={styles.chipSectionLabel}>Deliverables & Requirements</Text>
-            <Text style={styles.chipSectionDescription}>Specify what needs to be delivered (e.g., Source files, Documentation)</Text>
-            
-            <View style={styles.chipInputStackedContainer}>
-              <TextInput style={styles.chipInputStacked} value={currentRequirement} onChangeText={setCurrentRequirement}
-                placeholder="Type a requirement and press Add..." onSubmitEditing={addRequirement} returnKeyType="done" blurOnSubmit={false} />
-              <TouchableOpacity style={[styles.addChipButtonStacked, !currentRequirement.trim() && styles.addChipButtonDisabled]}
-                onPress={addRequirement} disabled={!currentRequirement.trim()}>
-                <Ionicons name="add-circle" size={scale(22)} color="#FFFFFF" />
-                <Text style={styles.addChipButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {task.requirements.length > 0 && (
-              <View style={styles.chipsContainer}>
-                <Text style={styles.chipsLabel}>Deliverables ({task.requirements.length}):</Text>
-                <View style={styles.chipsGrid}>
-                  {task.requirements.map((req, index) => (
-                    <Chip key={index} text={req} onRemove={() => removeRequirement(req)} variant="requirement" />
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-        </FormSection>
-
-        {/* Budget Section */}
-        <FormSection 
-          title="Budget" 
-          icon="cash-outline"
-          description="Set your budget for this task (optional)"
-          collapsible={true}
-        >
-          <View style={styles.budgetContainer}>
-            <InputField
-              label="Amount (GHS)"
-              value={task.budget}
-              onChange={handleBudgetChange}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              error={errors.budget}
-              icon="cash-outline"
-            />
-            
-            <View style={styles.budgetTip}>
-              <View style={styles.tipHeader}>
-                <Ionicons name="information-circle" size={scale(16)} color="#6366F1" />
-                <Text style={styles.tipTitle}>Budget Tips</Text>
-              </View>
-              <View style={styles.tipList}>
-                <View style={styles.tipItem}>
-                  <Ionicons name="checkmark" size={scale(14)} color="#10B981" />
-                  <Text style={styles.tipText}>Minimum: ₵20</Text>
-                </View>
-                <View style={styles.tipItem}>
-                  <Ionicons name="checkmark" size={scale(14)} color="#10B981" />
-                  <Text style={styles.tipText}>Higher budgets attract experienced taskers</Text>
-                </View>
-                <View style={styles.tipItem}>
-                  <Ionicons name="checkmark" size={scale(14)} color="#10B981" />
-                  <Text style={styles.tipText}>Consider task complexity when setting budget</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </FormSection>
-
-        {/* Timeline & Location */}
-        <FormSection 
-          title="When & Where" 
-          icon="location-outline"
-          description="Set deadline and location preferences"
-          collapsible={true}
-        >
-          <TouchableOpacity 
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
+        {/* ── Purpose banner ─────────────────────────────────────────── */}
+        <View style={s.purposeBanner}>
+          <LinearGradient
+            colors={[C.primary, '#1A3A7A']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={s.purposeBannerGrad}
           >
-            <LinearGradient
-              colors={['#6366F1', '#4F46E5']}
-              style={styles.dateButtonGradient}
-            >
-              <Ionicons name="calendar-outline" size={scale(20)} color="#FFFFFF" />
-              <Text style={styles.dateText}>
-                Deadline: {task.deadline.toLocaleDateString()}
+            <View style={s.purposeBannerCircle} />
+            <View style={s.purposeBannerContent}>
+              <View style={s.purposeBadge}>
+                <Text style={s.purposeBadgeText}>FOR CLIENTS</Text>
+              </View>
+              <Text style={s.purposeTitle}>Need a service?</Text>
+              <Text style={s.purposeSub}>
+                Describe the service you need below and skilled taskers in your area will apply. You review their profiles and choose the best fit.
               </Text>
-              <Ionicons name="chevron-down" size={scale(16)} color="#FFFFFF" />
-            </LinearGradient>
+              <View style={s.purposeSteps}>
+                {[
+                  { icon: 'create-outline',   text: 'Fill in your job details' },
+                  { icon: 'people-outline',   text: 'Taskers apply with offers'  },
+                  { icon: 'checkmark-circle-outline', text: 'You pick and book the best' },
+                ].map((step, i) => (
+                  <View key={i} style={s.purposeStep}>
+                    <View style={s.purposeStepNum}>
+                      <Text style={s.purposeStepNumText}>{i + 1}</Text>
+                    </View>
+                    <Ionicons name={step.icon} size={14} color="rgba(255,255,255,0.8)" />
+                    <Text style={s.purposeStepText}>{step.text}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+
+        {/* ── 1. Job Details ──────────────────────────────────────────── */}
+        <SectionCard
+          title="Job Details"
+          description="What do you need help with?"
+          icon="document-text-outline"
+          accent={C.primaryMid}
+        >
+          <InputField
+            label="Job Title"
+            value={task.title}
+            onChange={useCallback(t => setField('title', t), [])}
+            placeholder="e.g. Fix leaking bathroom pipe, Logo design for my business"
+            error={errors.title}
+            required
+          />
+          <InputField
+            label="Description"
+            value={task.description}
+            onChange={useCallback(t => setField('description', t), [])}
+            placeholder="Describe exactly what needs to be done. The more detail you provide, the better your applicants will be."
+            error={errors.description}
+            multiline
+            numberOfLines={5}
+            required
+          />
+
+          {/* Category row */}
+          <View style={s.row}>
+            <View style={{ flex: 1 }}>
+              <PickerField
+                label="Category"
+                selectedValue={task.category}
+                onValueChange={val => setTask(p => ({ ...p, category: val, subcategory: '' }))}
+                items={CATEGORIES}
+                required
+              />
+              {errors.category && (
+                <View style={s.errorRow}>
+                  <Ionicons name="alert-circle-outline" size={12} color={C.red} />
+                  <Text style={s.errorText}>{errors.category}</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <PickerField
+                label="Subcategory"
+                selectedValue={task.subcategory}
+                onValueChange={val => setField('subcategory', val)}
+                items={task.category ? (SUBCATEGORIES[task.category] || []) : []}
+                enabled={!!task.category}
+              />
+            </View>
+          </View>
+        </SectionCard>
+
+        {/* ── 2. Budget ──────────────────────────────────────────────── */}
+        <SectionCard
+          title="Budget"
+          description="How much are you willing to pay?"
+          icon="cash-outline"
+          accent={C.green}
+          collapsible
+        >
+          <InputField
+            label="Your Budget (GHS)"
+            value={task.budget}
+            onChange={useCallback(t => setField('budget', t.replace(/[^0-9.]/g, '')), [])}
+            placeholder="Enter amount (e.g. 150)"
+            keyboardType="decimal-pad"
+            error={errors.budget}
+            icon="cash-outline"
+          />
+
+          {/* Bidding type 
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldGroupLabel}>How should taskers respond?</Text>
+            <View style={s.biddingRow}>
+              {[
+                { value: 'open-bid',   label: 'Open Bidding',   desc: 'Taskers send their price',  icon: 'pricetags-outline' },
+                { value: 'fixed',      label: 'Fixed Budget',   desc: 'Pay your set amount',        icon: 'lock-closed-outline' },
+                { value: 'negotiation',label: 'Negotiable',     desc: 'Discuss price directly',    icon: 'chatbubbles-outline' },
+              ].map(opt => {
+                const active = task.biddingType === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[s.biddingCard, active && s.biddingCardActive]}
+                    onPress={() => setField('biddingType', opt.value)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={opt.icon} size={scale(20)} color={active ? C.primaryMid : C.textMuted} />
+                    <Text style={[s.biddingLabel, active && { color: C.primaryMid }]}>{opt.label}</Text>
+                    <Text style={s.biddingDesc}>{opt.desc}</Text>
+                    {active && <View style={s.biddingCheck}><Ionicons name="checkmark" size={10} color={C.white} /></View>}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>*/}
+
+          <View style={s.tipBox}>
+            <Ionicons name="bulb-outline" size={14} color={C.gold} />
+            <Text style={s.tipBoxText}>
+              A fair budget attracts more experienced taskers. Minimum is ₵20.
+            </Text>
+          </View>
+        </SectionCard>
+
+        {/* ── 3. Schedule & Location ─────────────────────────────────── */}
+        <SectionCard
+          title="When & Where"
+          description="Set your deadline and work location"
+          icon="location-outline"
+          accent={C.gold}
+          collapsible
+        >
+          {/* Deadline */}
+          <Text style={s.fieldLabel}>Deadline <Text style={{ color: C.red }}>*</Text></Text>
+          <TouchableOpacity style={s.dateBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.85}>
+            <View style={s.dateBtnInner}>
+              <View style={s.dateBtnIcon}>
+                <Ionicons name="calendar-outline" size={scale(18)} color={C.primaryMid} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.dateBtnLabel}>Task deadline</Text>
+                <Text style={s.dateBtnValue}>
+                  {task.deadline.toLocaleDateString('en-GH', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={scale(16)} color={C.textMuted} />
+            </View>
           </TouchableOpacity>
+          {errors.deadline && (
+            <View style={s.errorRow}>
+              <Ionicons name="alert-circle-outline" size={12} color={C.red} />
+              <Text style={s.errorText}>{errors.deadline}</Text>
+            </View>
+          )}
 
           {showDatePicker && (
             <DateTimePicker
               value={task.deadline}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onDateChange}
               minimumDate={new Date()}
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) setField('deadline', date);
+              }}
             />
           )}
 
-          <View style={styles.locationContainer}>
-            <Text style={styles.locationTitle}>Location Type</Text>
-            <View style={styles.locationOptions}>
+          {/* Location type */}
+          <View style={s.fieldGroup}>
+            <Text style={s.fieldGroupLabel}>Where will this job take place?</Text>
+            <View style={s.locationRow}>
               {[
-                { id: 'remote', label: 'Remote Work', icon: 'laptop-outline' },
-                { id: 'on-site', label: 'On-site Work', icon: 'location-outline' }
-              ].map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[
-                    styles.locationOption,
-                    task.locationType === option.id && styles.locationOptionActive
-                  ]}
-                  onPress={() => setTask(prev => ({ ...prev, locationType: option.id }))}
-                >
-                  <Ionicons 
-                    name={option.icon} 
-                    size={scale(24)} 
-                    color={task.locationType === option.id ? '#6366F1' : '#9CA3AF'} 
-                  />
-                  <Text style={[
-                    styles.locationLabel,
-                    task.locationType === option.id && styles.locationLabelActive
-                  ]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                { id: 'remote',  label: 'Remote',  sub: 'Done online / anywhere', icon: 'laptop-outline' },
+                { id: 'on-site', label: 'On-site', sub: 'At a specific location',  icon: 'location-outline' },
+              ].map(opt => {
+                const active = task.locationType === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[s.locationCard, active && s.locationCardActive]}
+                    onPress={() => setField('locationType', opt.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name={opt.icon} size={scale(22)} color={active ? C.primaryMid : C.textMuted} />
+                    <Text style={[s.locationCardLabel, active && { color: C.primaryMid }]}>{opt.label}</Text>
+                    <Text style={s.locationCardSub}>{opt.sub}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          </View>
 
-            {task.locationType === 'on-site' && (
-              <View style={styles.addressContainer}>
-                <Text style={styles.addressTitle}>Address Details</Text>
-                <View style={styles.row}>
-                  <View style={{ flex: 1, marginRight: scale(8) }}>
-                    <InputField
-                      label="Region"
-                      value={task.address.region}
-                      onChange={handleRegionChange }
-                      placeholder="Greater Accra"
-                      icon="navigate-outline"
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: scale(8) }}>
-                    <InputField
-                      label="City"
-                      value={task.address.city}
-                      onChange={handleCityChange}
-                      placeholder="Accra"
-                      icon="business-outline"
-                    />
-                  </View>
+          {/* Address fields (on-site only) */}
+          {task.locationType === 'on-site' && (
+            <View style={s.addressBlock}>
+              <View style={s.addressHint}>
+                <Ionicons name="information-circle-outline" size={14} color={C.primaryMid} />
+                <Text style={s.addressHintText}>
+                  Your exact address is only shared with the tasker you hire.
+                </Text>
+              </View>
+              {errors.address && (
+                <View style={[s.errorRow, { marginBottom: 8 }]}>
+                  <Ionicons name="alert-circle-outline" size={12} color={C.red} />
+                  <Text style={s.errorText}>{errors.address}</Text>
                 </View>
-                <InputField
-                  label="Suburb/Street"
-                  value={task.address.suburb}
-                  onChange={handleSuburbChange}
-                  placeholder="e.g., East Legon"
-                  icon="home-outline"
-                />
+              )}
+              <View style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <InputField label="Region" value={task.address.region}
+                    onChange={useCallback(t => setAddress('region', t), [])}
+                    placeholder="Greater Accra" icon="navigate-outline" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <InputField label="City" value={task.address.city}
+                    onChange={useCallback(t => setAddress('city', t), [])}
+                    placeholder="Accra" icon="business-outline" />
+                </View>
+              </View>
+              <InputField label="Suburb / Street" value={task.address.suburb}
+                onChange={useCallback(t => setAddress('suburb', t), [])}
+                placeholder="e.g. East Legon, Tema Community 5" icon="home-outline" />
+            </View>
+          )}
+        </SectionCard>
+
+        {/* ── 4. Skills & Requirements ───────────────────────────────── */}
+        <SectionCard
+          title="Skills & Deliverables"
+          description="What should applicants know or provide?"
+          icon="checkmark-done-outline"
+          accent="#7E3AF2"
+          collapsible
+        >
+          {/* Skills */}
+          <View style={s.chipSection}>
+            <Text style={s.chipSectionTitle}>Skills needed</Text>
+            <Text style={s.chipSectionSub}>
+              e.g. Plumbing, Graphic Design, Driving licence
+            </Text>
+            <View style={s.chipInputRow}>
+              <TextInput
+                style={s.chipInput}
+                value={currentSkill}
+                onChangeText={setCurrentSkill}
+                placeholder="Type a skill…"
+                placeholderTextColor={C.textMuted}
+                onSubmitEditing={addSkill}
+                returnKeyType="done"
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                style={[s.chipAddBtn, !currentSkill.trim() && s.chipAddBtnDisabled]}
+                onPress={addSkill}
+                disabled={!currentSkill.trim()}
+              >
+                <Ionicons name="add" size={scale(18)} color={C.white} />
+                <Text style={s.chipAddBtnText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+            {task.skillsRequired.length > 0 && (
+              <View style={s.chipsWrap}>
+                {task.skillsRequired.map((sk, i) => (
+                  <Chip key={i} text={sk} onRemove={() => setTask(p => ({ ...p, skillsRequired: p.skillsRequired.filter(x => x !== sk) }))} variant="skill" />
+                ))}
               </View>
             )}
           </View>
-        </FormSection>
 
-        {/* Summary Preview */}
-        <FormSection 
-          title="Summary" 
-          icon="eye-outline"
-          description="Preview your task before posting"
-          collapsible={true}
-        >
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Task Title:</Text>
-              <Text style={styles.summaryValue}>{task.title || 'Not set'}</Text>
+          <View style={s.sectionDivider} />
+
+          {/* Requirements / Deliverables */}
+          <View style={s.chipSection}>
+            <Text style={s.chipSectionTitle}>Deliverables</Text>
+            <Text style={s.chipSectionSub}>
+              What must the tasker provide? e.g. Source files, Written report, 5 photos
+            </Text>
+            <View style={s.chipInputRow}>
+              <TextInput
+                style={s.chipInput}
+                value={currentRequirement}
+                onChangeText={setCurrentReq}
+                placeholder="Type a deliverable…"
+                placeholderTextColor={C.textMuted}
+                onSubmitEditing={addRequirement}
+                returnKeyType="done"
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                style={[s.chipAddBtn, { backgroundColor: C.green }, !currentRequirement.trim() && s.chipAddBtnDisabled]}
+                onPress={addRequirement}
+                disabled={!currentRequirement.trim()}
+              >
+                <Ionicons name="add" size={scale(18)} color={C.white} />
+                <Text style={s.chipAddBtnText}>Add</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Category:</Text>
-              <Text style={styles.summaryValue}>
-                {task.category ? `${task.category}${task.subcategory ? ` › ${task.subcategory}` : ''}` : 'Not set'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Budget:</Text>
-              <Text style={styles.summaryValue}>
-                {task.budget ? `₵${parseFloat(task.budget).toFixed(2)}` : 'Not specified'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Deadline:</Text>
-              <Text style={styles.summaryValue}>
-                {task.deadline ? task.deadline.toLocaleDateString() : 'Not set'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Location:</Text>
-              <Text style={styles.summaryValue}>
-                {task.locationType === 'remote' ? 'Remote' : 
-                 task.address.city ? `${task.address.city}, ${task.address.region}` : 'Not specified'}
-              </Text>
-            </View>
+            {task.requirements.length > 0 && (
+              <View style={s.chipsWrap}>
+                {task.requirements.map((req, i) => (
+                  <Chip key={i} text={req} onRemove={() => setTask(p => ({ ...p, requirements: p.requirements.filter(x => x !== req) }))} variant="requirement" />
+                ))}
+              </View>
+            )}
           </View>
-        </FormSection>
+        </SectionCard>
 
-        {/* Submit Button */}
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isSubmitting}>
-          <LinearGradient colors={['#6366F1', '#4F46E5']} style={styles.submitGradient}>
+        {/* ── 5. Summary ──────────────────────────────────────────────── */}
+        <SectionCard
+          title="Review Before Posting"
+          description="Check your details one last time"
+          icon="eye-outline"
+          accent={C.textSecondary}
+          collapsible
+        >
+          <View style={s.summaryGrid}>
+            {[
+              { label: 'Job title',    value: task.title || '—',                              icon: 'document-text-outline' },
+              { label: 'Category',     value: task.category ? `${task.category}${task.subcategory ? ` › ${task.subcategory}` : ''}` : '—', icon: 'grid-outline' },
+              { label: 'Budget',       value: task.budget ? `₵${parseFloat(task.budget).toFixed(2)}` : 'Not specified', icon: 'cash-outline' },
+              { label: 'Deadline',     value: task.deadline.toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' }), icon: 'calendar-outline' },
+              { label: 'Location',     value: task.locationType === 'remote' ? 'Remote / Online' : task.address.city ? `${task.address.city}, ${task.address.region}` : 'On-site (address not set)', icon: 'location-outline' },
+              { label: 'Bidding',      value: task.biddingType === 'open-bid' ? 'Open Bidding' : task.biddingType === 'fixed' ? 'Fixed Budget' : 'Negotiable', icon: 'pricetags-outline' },
+              { label: 'Skills',       value: task.skillsRequired.length > 0 ? task.skillsRequired.join(', ') : 'None specified', icon: 'build-outline' },
+              { label: 'Deliverables', value: task.requirements.length > 0 ? `${task.requirements.length} item${task.requirements.length > 1 ? 's' : ''}` : 'None specified', icon: 'checkmark-done-outline' },
+            ].map((item, i) => (
+              <View key={i} style={[s.summaryRow, i < 7 && s.summaryRowBorder]}>
+                <View style={s.summaryIcon}>
+                  <Ionicons name={item.icon} size={14} color={C.primaryMid} />
+                </View>
+                <Text style={s.summaryLabel}>{item.label}</Text>
+                <Text style={s.summaryValue} numberOfLines={2}>{item.value}</Text>
+              </View>
+            ))}
+          </View>
+        </SectionCard>
+
+        {/* ── Submit ──────────────────────────────────────────────────── */}
+        <TouchableOpacity
+          style={[s.submitBtn, isSubmitting && { opacity: 0.75 }]}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={[C.primaryMid, C.primary]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={s.submitGrad}
+          >
             {isSubmitting ? (
               <>
-                <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={styles.submitButtonText}>Posting Task...</Text>
+                <ActivityIndicator size="small" color={C.white} />
+                <Text style={s.submitText}>Posting your task…</Text>
               </>
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={scale(22)} color="#FFFFFF" />
-                <Text style={styles.submitButtonText}>Post Task</Text>
+                <Ionicons name="send-outline" size={scale(20)} color={C.white} />
+                <Text style={s.submitText}>Post Task Publicly</Text>
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            By posting, you agree to our{' '}
-            <Text style={styles.footerLink}>Terms</Text> and{' '}
-            <Text style={styles.footerLink}>Privacy Policy</Text>
-          </Text>
-          <Text style={styles.footerNote}>
-            Your task will be reviewed before going live
+        <View style={s.footer}>
+          <Ionicons name="shield-checkmark-outline" size={14} color={C.textMuted} />
+          <Text style={s.footerText}>
+            Your task will be reviewed before going live.{' '}
+            <Text style={{ color: C.primaryMid }}>Terms</Text> &{' '}
+            <Text style={{ color: C.primaryMid }}>Privacy Policy</Text>
           </Text>
         </View>
       </ScrollView>
@@ -882,585 +672,218 @@ const handleSuburbChange = useCallback((text) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  container:     { flex: 1, backgroundColor: C.bg },
+  scroll:        { flex: 1, backgroundColor: C.bg },
+  scrollContent: { padding: scale(16), paddingBottom: scale(40) },
+
+  // Purpose banner
+  purposeBanner: {
+    borderRadius: 20, overflow: 'hidden', marginBottom: scale(20),
+    shadowColor: C.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22, shadowRadius: 14, elevation: 7,
   },
-  scrollView: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+  purposeBannerGrad: { padding: scale(22), overflow: 'hidden', position: 'relative' },
+  purposeBannerCircle: {
+    position: 'absolute', top: -40, right: -40,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  scrollContent: {
-    padding: scale(16),
-    paddingBottom: scale(32),
+  purposeBannerContent: { position: 'relative', zIndex: 1 },
+  purposeBadge: {
+    backgroundColor: 'rgba(255,255,255,0.18)', alignSelf: 'flex-start',
+    borderRadius: 20, paddingHorizontal: 11, paddingVertical: 4, marginBottom: 12,
   },
+  purposeBadgeText: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.9)', letterSpacing: 1.2 },
+  purposeTitle:    { fontSize: scale(22), fontWeight: '800', color: C.white, marginBottom: 6, letterSpacing: -0.4 },
+  purposeSub:      { fontSize: scale(13), color: 'rgba(255,255,255,0.78)', lineHeight: 20, marginBottom: 16 },
+  purposeSteps:    { gap: 8 },
+  purposeStep:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  purposeStepNum: {
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  purposeStepNumText: { fontSize: 11, fontWeight: '800', color: C.white },
+  purposeStepText:    { fontSize: scale(13), color: 'rgba(255,255,255,0.85)', fontWeight: '500', flex: 1 },
+
+  // Section card
   section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: scale(16),
-    marginBottom: scale(16),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: scale(8),
-    elevation: 2,
-    overflow: 'hidden',
+    backgroundColor: C.surface, borderRadius: 16, marginBottom: scale(14),
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, overflow: 'hidden',
   },
   sectionHeader: {
-    padding: scale(20),
+    flexDirection: 'row', alignItems: 'center',
+    padding: scale(16), gap: scale(12),
+    borderBottomWidth: 1, borderBottomColor: C.borderLight,
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionIcon: {
-    backgroundColor: '#6366F1',
-    width: scale(36),
-    height: scale(36),
-    borderRadius: scale(18),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: scale(12),
-  },
-  sectionTitleContainer: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: scale(18),
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: scale(4),
-  },
-  sectionDescription: {
-    fontSize: scale(14),
-    color: '#64748B',
-    lineHeight: scale(20),
-  },
-  sectionContent: {
-    paddingHorizontal: scale(20),
-    paddingBottom: scale(20),
-  },
-  // Input Styles
-  inputContainer: {
-    marginBottom: scale(20),
-  },
-  labelContainer: {
-    marginBottom: scale(8),
-  },
-  inputLabel: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: '#374151',
-  },
-  required: {
-    color: '#EF4444',
-  },
+  sectionIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { fontSize: scale(15), fontWeight: '700', color: C.textPrimary, marginBottom: 1 },
+  sectionDesc:  { fontSize: scale(12), color: C.textMuted, lineHeight: 17 },
+  sectionBody:  { padding: scale(16) },
+
+  // Inputs
+  inputContainer: { marginBottom: scale(14) },
+  inputLabel:     { fontSize: scale(13), fontWeight: '700', color: C.textSecondary, marginBottom: scale(7), letterSpacing: 0.1 },
   inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: scale(1.5),
-    borderColor: '#E2E8F0',
-    borderRadius: scale(12),
-    backgroundColor: '#FFFFFF',
-    minHeight: scale(52),
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.border,
+    borderRadius: 12, backgroundColor: C.surface,
+    minHeight: scale(50),
   },
-  inputFocused: {
-    borderColor: '#6366F1',
-    backgroundColor: '#F8FAFF',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: scale(6),
-    elevation: 3,
-  },
-  inputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
-  },
-  inputIcon: {
-    marginLeft: scale(16),
-  },
+  textAreaWrapper: { alignItems: 'flex-start' },
+  inputFocused: { borderColor: C.primaryMid, backgroundColor: '#F8FBFF' },
+  inputError:   { borderColor: C.red, backgroundColor: C.redLight },
+  inputIcon:    { marginLeft: scale(13) },
   textInput: {
-    flex: 1,
-    padding: scale(16),
-    fontSize: scale(16),
-    color: '#1F2937',
-    minHeight: scale(52),
+    flex: 1, paddingHorizontal: scale(13), paddingVertical: scale(13),
+    fontSize: scale(15), color: C.textPrimary,
   },
-  textInputWithIcon: {
-    marginLeft: scale(8),
+  textInputWithIcon: { paddingLeft: scale(8) },
+  textArea:     { minHeight: scale(110), textAlignVertical: 'top' },
+  errorRow:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
+  errorText:    { fontSize: scale(12), color: C.red, fontWeight: '500' },
+  charCount:    { fontSize: scale(11), color: C.textMuted, textAlign: 'right', marginTop: 4 },
+
+  // Picker
+  pickerWrap: {
+    borderWidth: 1.5, borderColor: C.border,
+    borderRadius: 12, backgroundColor: C.surface, overflow: 'hidden',
   },
-  textArea: {
-    minHeight: scale(120),
-    textAlignVertical: 'top',
-    paddingTop: scale(16),
+  picker: { height: scale(52) },
+
+  // Row
+  row: { flexDirection: 'row', gap: scale(10) },
+
+  // Field groups
+  fieldGroup:      { marginBottom: scale(16) },
+  fieldGroupLabel: { fontSize: scale(13), fontWeight: '700', color: C.textSecondary, marginBottom: scale(10), letterSpacing: 0.1 },
+  fieldLabel:      { fontSize: scale(13), fontWeight: '700', color: C.textSecondary, marginBottom: scale(7), letterSpacing: 0.1 },
+
+  // Bidding cards
+  biddingRow: { flexDirection: 'row', gap: 8 },
+  biddingCard: {
+    flex: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6,
+    borderRadius: 12, borderWidth: 1.5, borderColor: C.border,
+    backgroundColor: C.bg, gap: 4, position: 'relative',
   },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: scale(6),
-    gap: scale(6),
+  biddingCardActive: { borderColor: C.primaryMid, backgroundColor: C.primaryGlow },
+  biddingLabel:  { fontSize: scale(11), fontWeight: '700', color: C.textSecondary, textAlign: 'center' },
+  biddingDesc:   { fontSize: scale(10), color: C.textMuted, textAlign: 'center', lineHeight: 14 },
+  biddingCheck: {
+    position: 'absolute', top: 6, right: 6,
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: C.primaryMid, alignItems: 'center', justifyContent: 'center',
   },
-  errorText: {
-    color: '#EF4444',
-    fontSize: scale(13),
-    fontWeight: '500',
+
+  // Tip box
+  tipBox: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    backgroundColor: C.goldLight, borderRadius: 10, padding: 12,
+    borderWidth: 1, borderColor: '#F0D9A8',
   },
-  helperText: {
-    fontSize: scale(12),
-    color: '#9CA3AF',
-    marginTop: scale(6),
-    height: scale(20),
+  tipBoxText: { flex: 1, fontSize: scale(12), color: '#7C5C1A', lineHeight: 18, fontWeight: '500' },
+
+  // Date button
+  dateBtn: {
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 12,
+    backgroundColor: C.surface, marginBottom: scale(14), overflow: 'hidden',
   },
-  row: {
-    flexDirection: 'row',
-    gap: scale(12),
+  dateBtnInner: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: scale(13), paddingVertical: scale(12), gap: 12,
   },
-  // Picker Styles
-  pickerContainer: {
-    borderWidth: scale(1.5),
-    borderColor: '#E2E8F0',
-    borderRadius: scale(12),
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
+  dateBtnIcon: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: C.primaryGlow, alignItems: 'center', justifyContent: 'center',
   },
-  pickerDisabled: {
-    opacity: 0.6,
+  dateBtnLabel: { fontSize: scale(11), color: C.textMuted, fontWeight: '600', marginBottom: 1 },
+  dateBtnValue: { fontSize: scale(14), color: C.textPrimary, fontWeight: '700' },
+
+  // Location cards
+  locationRow: { flexDirection: 'row', gap: 10 },
+  locationCard: {
+    flex: 1, alignItems: 'center', paddingVertical: 16, paddingHorizontal: 8,
+    borderRadius: 12, borderWidth: 1.5, borderColor: C.border,
+    backgroundColor: C.bg, gap: 5,
   },
-  picker: {
-    height: scale(52),
+  locationCardActive: { borderColor: C.primaryMid, backgroundColor: C.primaryGlow },
+  locationCardLabel: { fontSize: scale(13), fontWeight: '700', color: C.textSecondary },
+  locationCardSub:   { fontSize: scale(11), color: C.textMuted, textAlign: 'center' },
+
+  // Address block
+  addressBlock: { marginTop: scale(14) },
+  addressHint: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 7,
+    backgroundColor: C.primaryGlow, borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: '#DBEAFE', marginBottom: 14,
   },
-  // Media Styles
-  mediaLimit: {
-    backgroundColor: '#F8FAFC',
-    padding: scale(12),
-    borderRadius: scale(8),
-    marginBottom: scale(20),
-    borderWidth: scale(1),
-    borderColor: '#E2E8F0',
-  },
-  mediaLimitText: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
-  },
-  mediaButtons: {
-    flexDirection: 'row',
-    gap: scale(12),
-    marginBottom: scale(20),
-  },
-  mediaButton: {
-    flex: 1,
-    borderRadius: scale(12),
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: scale(4),
-    elevation: 2,
-  },
-  mediaButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: scale(16),
-    gap: scale(8),
-  },
-  mediaButtonDisabled: {
-    opacity: 0.6,
-  },
-  mediaButtonText: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  uploadingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: scale(12),
-    gap: scale(8),
-    marginBottom: scale(20),
-    backgroundColor: '#F8FAFC',
-    borderRadius: scale(8),
-  },
-  uploadingText: {
-    fontSize: scale(14),
-    color: '#6366F1',
-    fontWeight: '500',
-  },
-  mediaPreviews: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(12),
-    marginBottom: scale(20),
-  },
-  mediaPreview: {
-    width: scale(80),
-    height: scale(80),
-    borderRadius: scale(12),
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-    position: 'relative',
-  },
-  mediaImage: {
-    width: '100%',
-    height: '100%',
-  },
-  videoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E5E7EB',
-  },
-  videoText: {
-    fontSize: scale(12),
-    color: '#6366F1',
-    fontWeight: '500',
-    marginTop: scale(4),
-  },
-  removeMediaButton: {
-    position: 'absolute',
-    top: scale(4),
-    right: scale(4),
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: scale(12),
-    padding: scale(4),
-  },
-  mediaTip: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFBEB',
-    padding: scale(12),
-    borderRadius: scale(8),
-    gap: scale(8),
-    alignItems: 'flex-start',
-  },
-  mediaTipText: {
-    fontSize: scale(13),
-    color: '#92400E',
-    flex: 1,
-    lineHeight: scale(18),
-  },
-  // Chip Styles
-  chipInputWrapper: {
-    marginBottom: scale(20),
-  },
-  chipInputContainer: {
-    flexDirection: 'row',
-    gap: scale(8),
-  },
+  addressHintText: { flex: 1, fontSize: scale(12), color: C.primary, fontWeight: '500', lineHeight: 17 },
+
+  // Skills / requirements
+  chipSection:      { marginBottom: scale(4) },
+  chipSectionTitle: { fontSize: scale(14), fontWeight: '700', color: C.textPrimary, marginBottom: 3 },
+  chipSectionSub:   { fontSize: scale(12), color: C.textMuted, marginBottom: 10, lineHeight: 17 },
+  chipInputRow:     { flexDirection: 'row', gap: 8, marginBottom: 10 },
   chipInput: {
-    flex: 1,
-    borderWidth: scale(1.5),
-    borderColor: '#E2E8F0',
-    borderRadius: scale(12),
-    paddingHorizontal: scale(16),
-    paddingVertical: scale(12),
-    fontSize: scale(16),
-    backgroundColor: '#FFFFFF',
-    color: '#1F2937',
-    minHeight: scale(48),
+    flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 11,
+    paddingHorizontal: 13, paddingVertical: 11,
+    fontSize: scale(14), backgroundColor: C.surface, color: C.textPrimary,
   },
-  addChipButton: {
-    backgroundColor: '#6366F1',
-    width: scale(48),
-    height: scale(48),
-    borderRadius: scale(12),
-    justifyContent: 'center',
-    alignItems: 'center',
+  chipAddBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: C.primaryMid, paddingHorizontal: 14, paddingVertical: 11,
+    borderRadius: 11,
   },
-  addChipButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  chipsContainer: {
-    marginTop: scale(12),
-  },
-  chipsLabel: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: scale(8),
-  },
-  chipsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scale(8),
-  },
+  chipAddBtnDisabled: { opacity: 0.45 },
+  chipAddBtnText:     { fontSize: scale(13), fontWeight: '700', color: C.white },
+  chipsWrap:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: scale(12),
-  paddingVertical: scale(10),
-  borderRadius: scale(24),
-  backgroundColor: '#EEF2FF', 
-  gap: scale(8),
-  alignSelf: 'flex-start',     
-  marginBottom: scale(8),      
-},
-  chipSkill: {
-    backgroundColor: '#EEF2FF',
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 11, paddingVertical: 7,
+    borderRadius: 20, gap: 6, marginBottom: 2,
   },
-  chipRequirement: {
-    backgroundColor: '#F0FDF4',
+  chipSkill:  { backgroundColor: C.primaryGlow, borderWidth: 1, borderColor: '#DBEAFE' },
+  chipReq:    { backgroundColor: C.greenLight,  borderWidth: 1, borderColor: '#BBF7D0' },
+  chipText:   { fontSize: scale(12), fontWeight: '600', color: C.textPrimary },
+  sectionDivider: { height: 1, backgroundColor: C.borderLight, marginVertical: scale(16) },
+
+  // Summary
+  summaryGrid: { gap: 0 },
+  summaryRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    paddingVertical: 10, gap: 10,
   },
-  chipLocation: {
-    backgroundColor: '#F0F9FF',
+  summaryRowBorder: { borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  summaryIcon: {
+    width: 26, height: 26, borderRadius: 8,
+    backgroundColor: C.primaryGlow, alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
-  chipText: {
-    fontSize: scale(13),
-    color: '#1E293B',
-    fontWeight: '500',
+  summaryLabel: { fontSize: scale(12), color: C.textMuted, fontWeight: '600', width: scale(80), paddingTop: 3 },
+  summaryValue: { flex: 1, fontSize: scale(13), color: C.textPrimary, fontWeight: '600', lineHeight: 19 },
+
+  // Submit
+  submitBtn: {
+    borderRadius: 16, overflow: 'hidden', marginBottom: scale(14),
+    shadowColor: C.primaryMid, shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28, shadowRadius: 10, elevation: 7,
   },
-  chipRemove: {
-    padding: scale(2),
+  submitGrad: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: scale(17), gap: scale(10),
   },
-  // Budget Styles
-  budgetContainer: {
-    marginTop: scale(8),
-  },
-  budgetTip: {
-    backgroundColor: '#F8FAFC',
-    padding: scale(16),
-    borderRadius: scale(12),
-    borderWidth: scale(1),
-    borderColor: '#E2E8F0',
-    marginTop: scale(8),
-  },
-  tipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: scale(12),
-    gap: scale(8),
-  },
-  tipTitle: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: '#374151',
-  },
-  tipList: {
-    gap: scale(8),
-  },
-  tipItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scale(8),
-  },
-  tipText: {
-    fontSize: scale(13),
-    color: '#6B7280',
-    flex: 1,
-  },
-  // Date Styles
-  dateButton: {
-    borderRadius: scale(12),
-    overflow: 'hidden',
-    marginBottom: scale(20),
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: scale(4),
-    elevation: 2,
-  },
-  dateButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: scale(16),
-    gap: scale(12),
-  },
-  dateText: {
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: '#FFFFFF',
-    flex: 1,
-  },
-  // Location Styles
-  locationContainer: {
-    marginTop: scale(8),
-  },
-  locationTitle: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: scale(12),
-  },
-  locationOptions: {
-    flexDirection: 'row',
-    gap: scale(12),
-    marginBottom: scale(20),
-  },
-  locationOption: {
-    flex: 1,
-    alignItems: 'center',
-    padding: scale(16),
-    borderRadius: scale(12),
-    borderWidth: scale(1.5),
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    gap: scale(8),
-  },
-  locationOptionActive: {
-    borderColor: '#6366F1',
-    backgroundColor: '#F8FAFF',
-  },
-  locationLabel: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  locationLabelActive: {
-    color: '#6366F1',
-  },
-  addressContainer: {
-    marginTop: scale(20),
-  },
-  addressTitle: {
-    fontSize: scale(15),
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: scale(16),
-  },
-  // Summary Styles
-  summaryContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: scale(12),
-    padding: scale(16),
-    borderWidth: scale(1),
-    borderColor: '#E2E8F0',
-  },
-  summaryItem: {
-    flexDirection: 'row',
-    marginBottom: scale(12),
-  },
-  summaryLabel: {
-    fontSize: scale(14),
-    fontWeight: '600',
-    color: '#6B7280',
-    width: scale(90),
-  },
-  summaryValue: {
-    fontSize: scale(14),
-    color: '#1F2937',
-    flex: 1,
-    fontWeight: '500',
-  },
-  // Submit Button
-  submitButton: {
-    borderRadius: scale(16),
-    overflow: 'hidden',
-    marginBottom: scale(16),
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: scale(8),
-    elevation: 6,
-  },
-  submitGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scale(18),
-    gap: scale(12),
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: scale(17),
-    fontWeight: '700',
-  },
+  submitText: { color: C.white, fontSize: scale(16), fontWeight: '700', letterSpacing: -0.2 },
+
   // Footer
   footer: {
-    alignItems: 'center',
-    paddingHorizontal: scale(20),
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6,
+    paddingHorizontal: scale(8), paddingBottom: scale(4),
   },
-  footerText: {
-    fontSize: scale(13),
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: scale(18),
-    marginBottom: scale(8),
-  },
-  footerLink: {
-    color: '#6366F1',
-    fontWeight: '600',
-  },
-  footerNote: {
-    fontSize: scale(12),
-    color: '#9CA3AF',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  chipInputWrapper: {
-  marginBottom: scale(24),
-},
-chipSectionLabel: {
-  fontSize: scale(15),
-  fontWeight: '700',
-  color: '#374151',
-  marginBottom: scale(4),
-},
-chipSectionDescription: {
-  fontSize: scale(13),
-  color: '#6B7280',
-  marginBottom: scale(12),
-  lineHeight: scale(18),
-},
-chipInputStackedContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: scale(12),
-  marginBottom: scale(12),
-},
-chipInputStacked: {
-  flex: 1,
-  borderWidth: scale(1.5),
-  borderColor: '#E2E8F0',
-  borderRadius: scale(12),
-  paddingHorizontal: scale(16),
-  paddingVertical: scale(12),
-  fontSize: scale(16),
-  backgroundColor: '#FFFFFF',
-  color: '#1F2937',
-  minHeight: scale(48),
-},
-addChipButtonStacked: {
-  backgroundColor: '#6366F1',
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: scale(16),
-  paddingVertical: scale(12),
-  borderRadius: scale(12),
-  gap: scale(6),
-  minHeight: scale(48),
-},
-addChipButtonDisabled: {
-  backgroundColor: '#9CA3AF',
-},
-addChipButtonText: {
-  fontSize: scale(14),
-  fontWeight: '600',
-  color: '#FFFFFF',
-},
-chipsContainer: {
-  marginTop: scale(8),
-},
-chipsLabel: {
-  fontSize: scale(14),
-  fontWeight: '600',
-  color: '#374151',
-  marginBottom: scale(8),
-},
-chipsGrid: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  gap: scale(8),
-},
-sectionSeparator: {
-  height: scale(1),
-  backgroundColor: '#F1F5F9',
-  marginVertical: scale(16),
-  marginHorizontal: scale(-16),
-},
+  footerText: { flex: 1, fontSize: scale(12), color: C.textMuted, lineHeight: 18, textAlign: 'center' },
 });
 
 export default CreateTaskScreen;

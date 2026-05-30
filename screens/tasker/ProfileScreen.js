@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-
+import * as DocumentPicker from 'expo-document-picker';
 import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import { sendFileToS3 } from '../../api/commonApi';
@@ -165,26 +165,33 @@ export default function TaskerProfileScreen({ navigation }) {
 
   // ── Image Picker ─────────────────────────────────────────────────────────────
   const pickImage = async () => {
-  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (status !== 'granted') {
-    Alert.alert('Permission required', 'Please allow photo library access.');
-    return;
-  }
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'image/*',
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    allowsEditing: false, // ← disable native cropper entirely
-    quality: 1,
-  });
+    if (result.canceled) return;
 
-  if (!result.canceled) {
     const asset = result.assets[0];
 
-    // Crop to a centered square, then resize and compress
-    const size = Math.min(asset.width, asset.height);
-    const originX = (asset.width - size) / 2;
-    const originY = (asset.height - size) / 2;
+    // Get image dimensions
+    const imageInfo = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [],
+      { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+    );
 
+    const width = imageInfo.width;
+    const height = imageInfo.height;
+
+    // Center crop square
+    const size = Math.min(width, height);
+    const originX = (width - size) / 2;
+    const originY = (height - size) / 2;
+
+    // Crop + resize + compress
     const manipulated = await ImageManipulator.manipulateAsync(
       asset.uri,
       [
@@ -196,7 +203,12 @@ export default function TaskerProfileScreen({ navigation }) {
             height: size,
           },
         },
-        { resize: { width: 400, height: 400 } },
+        {
+          resize: {
+            width: 400,
+            height: 400,
+          },
+        },
       ],
       {
         compress: 0.85,
@@ -205,7 +217,18 @@ export default function TaskerProfileScreen({ navigation }) {
     );
 
     setImgErr(false);
-    setProfileData(p => ({ ...p, profileImage: manipulated.uri }));
+
+    setProfileData(p => ({
+      ...p,
+      profileImage: manipulated.uri,
+    }));
+  } catch (error) {
+    console.log(error);
+
+    Alert.alert(
+      'Error',
+      'Failed to pick image.'
+    );
   }
 };
 

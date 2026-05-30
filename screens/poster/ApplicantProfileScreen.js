@@ -647,7 +647,20 @@ export default function ApplicantProfileScreen({ route, navigation }) {
         </FadeUp>
       ) : null}
 
-      {/* Stats strip */}
+     
+
+      {/* Services preview */}
+      {services.length > 0 && (
+        <FadeUp delay={170}>
+          <Section title="Services" dot={C.inkMid}
+            action={services.length>3 ? {label:`See all ${services.length}`, onPress:()=>setActiveTab('services')} : null}>
+            {services.slice(0,3).map((svc,i) => <ServiceCard key={i} svc={svc} index={i}/>)}
+          </Section>
+        </FadeUp>
+      )}
+
+
+       {/* Stats strip */}
       <FadeUp delay={130}>
         <View style={ss.statsStrip}>
           <View style={ss.statItem}>
@@ -673,16 +686,6 @@ export default function ApplicantProfileScreen({ route, navigation }) {
           </View>
         </View>
       </FadeUp>
-
-      {/* Services preview */}
-      {services.length > 0 && (
-        <FadeUp delay={170}>
-          <Section title="Services" dot={C.inkMid}
-            action={services.length>3 ? {label:`See all ${services.length}`, onPress:()=>setActiveTab('services')} : null}>
-            {services.slice(0,3).map((svc,i) => <ServiceCard key={i} svc={svc} index={i}/>)}
-          </Section>
-        </FadeUp>
-      )}
 
       {/* Details */}
       <FadeUp delay={220}>

@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 // ── API — adjust paths ─────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ export default function BookingScreen({ route,navigation  }) {
 
   // Identity
   const displayName  = taskerProfile.businessName || userDoc.name || 'Tasker';
-  const avatarUri    = userDoc.profileImage || DEFAULT_AVATAR;
+  const avatarUri    = userDoc.profileImage ||taskerProfile.userId?.profileImage|| taskerProfile.profileImage|| DEFAULT_AVATAR;
   const bannerUri    = taskerProfile.brandBanner || null;
   const rating       = taskerProfile.rating  || 0;
   const numRatings   = taskerProfile.numberOfRatings || 0;
@@ -352,30 +353,78 @@ export default function BookingScreen({ route,navigation  }) {
 
   // ── Media ─────────────────────────────────────────────────────────────────
   const pickMedia = async (type) => {
-    if (media.length >= 3) { Alert.alert('Limit Reached', 'Maximum 3 files allowed.'); return; }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Permission Required', 'Please allow photo access.'); return; }
+  try {
+    if (media.length >= 3) {
+      Alert.alert(
+        'Limit Reached',
+        'Maximum 3 files allowed.'
+      );
+      return;
+    }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
-      aspect: type === 'image' ? [4, 3] : [16, 9],
-      quality: 0.8,
-      ...(type === 'video' && { videoMaxDuration: 45 }),
+    const result = await DocumentPicker.getDocumentAsync({
+      type:
+        type === 'image'
+          ? 'image/*'
+          : 'video/*',
+
+      copyToCacheDirectory: true,
+      multiple: false,
     });
 
-    if (!result.canceled && result.assets?.[0]) {
-      const asset   = result.assets[0];
-      const info    = await FileSystem.getInfoAsync(asset.uri);
-      const sizeMB  = (info.size || asset.fileSize || 0) / (1024 * 1024);
-      if (sizeMB > 10) { Alert.alert('File Too Large', 'Please pick a file under 10 MB.'); return; }
-      setMedia(prev => [...prev, {
-        uri: asset.uri, type,
-        name: asset.fileName || `media_${Date.now()}.${type === 'image' ? 'jpg' : 'mp4'}`,
-        tempId: Date.now(),
-      }]);
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+
+    // File size validation
+    const info = await FileSystem.getInfoAsync(asset.uri);
+
+    const sizeMB =
+      (info.size || asset.size || 0) /
+      (1024 * 1024);
+
+    if (sizeMB > 10) {
+      Alert.alert(
+        'File Too Large',
+        'Please pick a file under 10 MB.'
+      );
+      return;
     }
-  };
+
+    // Optional video duration validation
+    // (DocumentPicker usually doesn't provide duration,
+    // so you'll need expo-video-thumbnails or expo-av
+    // if you want strict duration checks)
+
+    setMedia(prev => [
+      ...prev,
+      {
+        uri: asset.uri,
+        type,
+
+        name:
+          asset.name ||
+          `media_${Date.now()}.${
+            type === 'image'
+              ? 'jpg'
+              : 'mp4'
+          }`,
+
+        mimeType: asset.mimeType,
+
+        tempId: Date.now(),
+      },
+    ]);
+
+  } catch (error) {
+    console.log(error);
+
+    Alert.alert(
+      'Error',
+      'Failed to pick media.'
+    );
+  }
+};
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = () => {
@@ -674,7 +723,7 @@ export default function BookingScreen({ route,navigation  }) {
 
         {/* ═══════════════════════════════════════════════════════════════
             MEDIA
-        ════════════════════════════════════════════════════════════════ */}
+        ════════════════════════════════════════════════════════════════
         <Section title="Photos & Videos" icon="images-outline" accent={C.sage} delay={220}>
           <Text style={ss.mediaHint}>
             Optional — help the tasker understand the job scope ({media.length}/3 added)
@@ -715,13 +764,13 @@ export default function BookingScreen({ route,navigation  }) {
                   onRemove={() => setMedia(prev => prev.filter((_, idx) => idx !== i))}
                 />
               ))}
-              {/* ghost slots */}
+              
               {Array.from({ length: 3 - media.length }).map((_, i) => (
                 <View key={`ghost-${i}`} style={ss.mediaThumbGhost} />
               ))}
             </View>
           )}
-        </Section>
+        </Section>  */}
 
       </ScrollView>
 

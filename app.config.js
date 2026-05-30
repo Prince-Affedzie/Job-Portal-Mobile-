@@ -58,6 +58,11 @@ export default {
       foregroundImage: "./assets/workaflow_icon.png",
       backgroundColor: "#ffffff",
     },
+    blockedPermissions: [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
     package: "com.affedziep44.jobportalmobile",
     edgeToEdgeEnabled: true,
     googleServicesFile: "./google-services.json",

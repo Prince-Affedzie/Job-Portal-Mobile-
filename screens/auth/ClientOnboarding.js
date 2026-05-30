@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 import { navigate } from '../../services/navigationService';
@@ -175,65 +176,81 @@ const TaskPosterOnboarding = () => {
     }
   };
 
-  const handleImageUpload = async (useCamera = false) => {
-    try {
-      let result;
+ const handleImageUpload = async (useCamera = false) => {
+  try {
+    let result;
 
-      if (useCamera) {
-        const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!cameraPermission.granted) {
-          Alert.alert('Camera Access Required', 'Please allow camera access to take a photo.');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          allowsEditing: false,
-          aspect: [1, 1],
-          quality: 0.7,
-        });
-      } else {
-        const libraryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!libraryPermission.granted) {
-          Alert.alert('Photo Access Required', 'Please allow access to your photos.');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          aspect: [1, 1],
-          quality: 0.7,
-        });
+    if (useCamera) {
+      // Camera is still allowed (no media library permission needed)
+      const cameraPermission =
+        await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!cameraPermission.granted) {
+        Alert.alert(
+          'Camera Access Required',
+          'Please allow camera access to take a photo.'
+        );
+        return;
       }
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        
-        if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
-          setErrors(prev => ({ ...prev, profileImage: "Image too large (max 5MB)" }));
-          return;
-        }
+      result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.7,
+      });
 
-        const cropped = await autoCropToSquare(asset.uri);
-        if (cropped) {
-          setProfile(prev => ({
-            ...prev,
-            profileImage: {
-              uri: cropped.uri,
-              type: 'image/jpeg',
-              name: `profile-${Date.now()}.jpg`
-            },
-            profileImageUri: cropped.uri,
-          }));
-          
-          if (errors.profileImage) {
-            setErrors(prev => ({ ...prev, profileImage: null }));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      setErrors(prev => ({ ...prev, profileImage: "Failed to select image. Please try again." }));
+    } else {
+      // ✅ NO MEDIA PERMISSION ANYMORE
+      result = await DocumentPicker.getDocumentAsync({
+        type: 'image/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
     }
-  };
+
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+
+    // File size validation (5MB)
+    const sizeInMB =
+      (asset.size || asset.fileSize || 0) / (1024 * 1024);
+
+    if (sizeInMB > 5) {
+      setErrors(prev => ({
+        ...prev,
+        profileImage: "Image too large (max 5MB)"
+      }));
+      return;
+    }
+
+    // Keep your existing cropping logic
+    const cropped = await autoCropToSquare(asset.uri);
+
+    if (cropped) {
+      setProfile(prev => ({
+        ...prev,
+        profileImage: {
+          uri: cropped.uri,
+          type: 'image/jpeg',
+          name: `profile-${Date.now()}.jpg`,
+        },
+        profileImageUri: cropped.uri,
+      }));
+
+      if (errors.profileImage) {
+        setErrors(prev => ({ ...prev, profileImage: null }));
+      }
+    }
+
+  } catch (error) {
+    console.error('Error picking image:', error);
+
+    setErrors(prev => ({
+      ...prev,
+      profileImage: "Failed to select image. Please try again."
+    }));
+  }
+};
 
   const removeImage = () => {
     setProfile(prev => ({
