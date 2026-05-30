@@ -26,6 +26,8 @@ import Header from "../../component/tasker/Header";
 import moment from "moment";
 import LoadingIndicator from "../../component/common/LoadingIndicator";
 import VerificationTooltip from "../../component/common/VerificationToolTip";
+import ProfileCompletenessPopup from '../../component/tasker/ProfileCompletenessPopup'
+
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -375,6 +377,7 @@ const AvailableTasksScreen = () => {
         onFilterPress={handleFilterPress}
         showStats={false}
       />
+      <ProfileCompletenessPopup/>
       
       {renderTabs()}
       

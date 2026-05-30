@@ -23,6 +23,7 @@ import { AuthContext } from '../../context/AuthContext';
 import { navigate } from '../../services/navigationService';
 import { sendFileToS3 } from '../../api/commonApi';
 import { uploadProfileImage, switchAccount } from '../../api/authApi';
+import ProfileCompletenessPopup from '../../component/tasker/ProfileCompletenessPopup'
 import Header from '../../component/tasker/Header';
 
 const { width } = Dimensions.get('window');
@@ -326,6 +327,7 @@ export default function TaskerProfileScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={T.bg} />
       <Header title="My Account" showBack={false} />
+      <ProfileCompletenessPopup/>
 
       <ScrollView
         showsVerticalScrollIndicator={false}

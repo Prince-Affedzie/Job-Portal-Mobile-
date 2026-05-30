@@ -25,6 +25,7 @@ import TaskerBookingDetailScreen from '../screens/tasker/BookingDetailScreen'
 import PurchaseScreen from '../screens/tasker/CreditPurchaseScreen'
 import TaskerPortfolioScreen from '../screens/tasker/PortfolioScreens'
 import TaskerServicesScreen from '../screens/tasker/TaskerServicesScreen'
+
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -35,6 +36,7 @@ const Stack = createStackNavigator();
 function TaskerStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
+     
       {/* Tab Navigator as the main screen */}
       <Stack.Screen name="MainTabs" component={TaskerTabs} />
       
